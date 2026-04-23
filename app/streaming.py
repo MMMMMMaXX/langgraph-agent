@@ -1,12 +1,13 @@
 from collections.abc import Callable
 
+from app.runtime_context import get_stream_callback
 from app.state import AgentState
 
 
 def build_answer_streamer(
     state: AgentState, node_name: str
 ) -> tuple[Callable[[str], None] | None, dict[str, bool]]:
-    stream_callback = state.get("stream_callback")
+    stream_callback = get_stream_callback()
     request_id = state.get("request_id", "")
     session_id = state.get("session_id", "default")
     stream_state = {"used": False}

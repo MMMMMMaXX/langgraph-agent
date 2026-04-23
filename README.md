@@ -105,8 +105,8 @@ pip install -r requirements.txt
 ### 4.3 配置环境变量
 
 ```bash
-cp .env.example app/.env
-# 编辑 app/.env，至少填入一个 provider 的 API_KEY
+cp .env.example .env
+# 编辑 .env，至少填入一个 provider 的 API_KEY
 ```
 
 最常用的配置项：
@@ -142,6 +142,141 @@ python -m app.main
 
 在终端里 REPL，输入 `exit` 退出。状态会按会话维度保留在进程内。
 
+### 4.6 Docker Compose 本地启动
+
+```bash
+cp .env.example .env
+# 编辑 .env，至少填入 LLM / embedding 相关 API_KEY
+
+make docker-up
+```
+
+服务默认暴露在 `http://127.0.0.1:8000`：
+
+```bash
+make docker-health
+```
+
+`docker-compose.yml` 会把宿主机目录挂载进容器：
+
+| 宿主机路径 | 容器路径       | 用途                                                         |
+| ---------- | -------------- | ------------------------------------------------------------ |
+| `./data`   | `/app/data`    | Chroma、conversation history、LangGraph checkpoint 等持久化数据 |
+| `./outputs`| `/app/outputs` | eval 产物与本地调试输出                                      |
+
+停止并保留数据：
+
+```bash
+make docker-down
+```
+
+常用命令：
+
+| 命令                  | 作用                                         |
+| --------------------- | -------------------------------------------- |
+| `make docker-up`      | 构建镜像并启动服务                           |
+| `make docker-down`    | 停止容器，保留 `data/` 和 `outputs/`          |
+| `make docker-restart` | 重启服务，验证持久化恢复时很常用             |
+| `make docker-logs`    | 跟随查看容器日志                             |
+| `make docker-health`  | 检查 `/health`                               |
+| `make docker-smoke`   | 自动执行健康检查、请求、重启、总结恢复校验   |
+| `make eval-baseline`  | 对运行中的服务执行 baseline eval             |
+
+默认 `.env.example` 里 `LANGSMITH_TRACING=false`，避免 smoke/eval 测试请求污染 LangSmith 项目。需要观测 trace 时，再在 `.env` 里改成 `true`。
+
+如果想一条命令验证 checkpoint 跨容器重启是否生效：
+
+```bash
+make docker-smoke
+```
+
+它会使用同一个 `session_id` 请求一次，执行 `docker compose restart`，再问总结并检查答案是否包含上一轮问题。
+
+也可以手动验证：
+
+```bash
+curl -X POST http://127.0.0.1:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"session_id":"docker-cp-test","message":"WAI-ARIA技术是什么","debug":true}'
+
+docker compose restart
+
+curl -X POST http://127.0.0.1:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"session_id":"docker-cp-test","message":"总结所有问题","debug":true}'
+```
+
+### 4.7 Docker Compose 单机生产模式
+
+本地模式使用 `./data:/app/data` 这类目录挂载，方便直接查看文件；生产模式使用 Docker 命名 volume，避免把宿主机源码目录和运行数据绑得太死。
+
+```bash
+cp .env.example .env
+# 编辑 .env，填入真实 API Key，并确认 LANGSMITH_TRACING 是否需要开启
+
+make prod-up
+make prod-health
+```
+
+生产模式使用 [docker-compose.prod.yml](./docker-compose.prod.yml)：
+
+| Volume 名称          | 容器路径       | 用途                                                         |
+| -------------------- | -------------- | ------------------------------------------------------------ |
+| `langgraph_data`     | `/app/data`    | Chroma、conversation history、LangGraph checkpoint 等持久化数据 |
+| `langgraph_outputs`  | `/app/outputs` | eval 产物与运行输出                                          |
+
+常用生产命令：
+
+| 命令                | 作用                                  |
+| ------------------- | ------------------------------------- |
+| `make prod-up`      | 构建镜像并后台启动生产 compose         |
+| `make prod-down`    | 停止生产容器，保留命名 volume          |
+| `make prod-restart` | 重启生产容器                          |
+| `make prod-logs`    | 跟随查看生产容器日志                  |
+| `make prod-health`  | 检查 `/health`                        |
+| `make prod-smoke`   | 在生产 compose 上执行重启持久化 smoke |
+| `make prod-backup`  | 备份生产数据 volume 到 `backups/`      |
+| `make prod-restore` | 从备份恢复数据 volume，需显式确认      |
+
+生产模式可通过环境变量覆盖镜像名、容器名和端口：
+
+```bash
+LANGGRAPH_AGENT_IMAGE=langgraph-agent:v1 \
+LANGGRAPH_AGENT_CONTAINER=langgraph-agent \
+LANGGRAPH_AGENT_PORT=8000 \
+make prod-up
+```
+
+命名 volume 不会因为 `make prod-down` 被删除。如果确实要删除数据，需要显式执行 Docker volume 删除命令；这一步有破坏性，执行前请先备份。
+
+生产数据备份：
+
+```bash
+# 默认备份 langgraph_data，也就是 /app/data
+make prod-backup
+
+# 如果也想备份 outputs volume
+VOLUME_NAME=langgraph_outputs make prod-backup
+```
+
+备份文件会写到 `backups/`，文件名类似：
+
+```text
+backups/langgraph_data-20260423-120000.tar.gz
+```
+
+恢复会清空目标 volume 后再解压备份，必须显式确认：
+
+```bash
+make prod-down
+BACKUP_PATH=backups/langgraph_data-20260423-120000.tar.gz \
+CONFIRM_RESTORE=yes \
+make prod-restore
+make prod-up
+```
+
+恢复 `langgraph_outputs` 时同理传入 `VOLUME_NAME=langgraph_outputs`。恢复是破坏性操作，建议先对当前 volume 再做一次备份。
+
 ---
 
 ## 5. 评测与观测
@@ -171,7 +306,7 @@ EVAL_CASE_IDS=case_01,case_05 python scripts/eval_chat.py
 
 ### 5.2 LangSmith 追踪
 
-配置 `LANGSMITH_*` 后，每次调用会自动带上 request_id、session_id、route 等元数据，方便在 LangSmith 上按会话/路由聚合查看。
+将 `LANGSMITH_TRACING=true` 并配置 `LANGSMITH_API_KEY` 后，每次调用会自动带上 request_id、session_id、route 等元数据，方便在 LangSmith 上按会话/路由聚合查看。默认建议保持关闭，需要排查链路或观察模型调用时再开启。
 
 ### 5.3 本地日志
 

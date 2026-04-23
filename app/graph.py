@@ -1,6 +1,7 @@
 from collections.abc import Callable
 
 from langgraph.graph import StateGraph, START, END
+from app.checkpointing.factory import get_checkpointer
 from app.constants.routes import (
     NODE_MEMORY,
     NODE_MERGE,
@@ -18,6 +19,7 @@ from app.agents.chat_agent import chat_agent_node
 from app.agents.novel_script_agent import novel_script_agent_node
 from app.agents.merge import merge_node
 from app.nodes.memory import memory_node
+from app.runtime_context import get_stream_callback
 from app.utils.logger import log_node_timing, now_ms
 
 
@@ -51,7 +53,7 @@ def with_timing(
 ) -> Callable[[AgentState], AgentState]:
     def timed_node(state: AgentState) -> AgentState:
         started_at_ms = now_ms()
-        stream_callback = state.get("stream_callback")
+        stream_callback = get_stream_callback()
         if callable(stream_callback):
             stream_callback(
                 "node_started",
@@ -69,14 +71,13 @@ def with_timing(
             **result,
             "request_id": result.get("request_id", state.get("request_id", "")),
             "session_id": result.get("session_id", state.get("session_id", "default")),
-            "stream_callback": result.get("stream_callback", state.get("stream_callback")),
             "streamed_answer": result.get(
                 "streamed_answer", state.get("streamed_answer", False)
             ),
         }
         updated_result["node_timings"] = {name: round(duration_ms, 2)}
 
-        stream_callback = updated_result.get("stream_callback")
+        stream_callback = get_stream_callback()
         if callable(stream_callback):
             stream_callback(
                 "node_completed",
@@ -141,4 +142,4 @@ builder.add_edge(ROUTE_NOVEL_SCRIPT_AGENT, NODE_MERGE)
 builder.add_edge(NODE_MERGE, NODE_MEMORY)
 builder.add_edge(NODE_MEMORY, END)
 
-graph = builder.compile()
+graph = builder.compile(checkpointer=get_checkpointer())

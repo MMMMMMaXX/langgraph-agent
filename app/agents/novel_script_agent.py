@@ -18,6 +18,7 @@ from app.agents.novel_script.constants import (
     NOVEL_SCRIPT_SETUP_ITERATIONS,
     REVIEW_ENABLED_MAX_SOURCE_CHARS,
 )
+from app.runtime_context import get_stream_callback
 from app.state import AgentState
 from app.utils.logger import log_node, preview
 
@@ -116,7 +117,7 @@ def novel_script_agent_node(state: AgentState) -> AgentState:
         "request_id": state.get("request_id", ""),
         "session_id": state.get("session_id", "default"),
         "debug": state.get("debug", False),
-        "stream_callback": state.get("stream_callback"),
+        "stream_callback": get_stream_callback(),
         "streamed_answer": False,
         "source_text": source_text,
         "task_goal": "把小说片段改写成结构化剧本",

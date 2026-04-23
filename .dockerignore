@@ -1,0 +1,35 @@
+# Secrets / local environment
+.env
+.env.*
+!.env.example
+
+# Python caches
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local virtualenvs
+.venv/
+venv/
+env/
+
+# Git / editor / OS noise
+.git/
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Runtime data is mounted by docker-compose, not baked into the image.
+data/
+outputs/
+backups/
+logs/
+*.log
+
+# Build artifacts
+build/
+dist/

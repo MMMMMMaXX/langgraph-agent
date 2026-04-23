@@ -1,0 +1,31 @@
+services:
+  langgraph-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${LANGGRAPH_AGENT_IMAGE:-langgraph-agent:prod}
+    container_name: ${LANGGRAPH_AGENT_CONTAINER:-langgraph-agent-prod}
+    env_file:
+      - .env
+    ports:
+      - "${LANGGRAPH_AGENT_PORT:-8000}:8000"
+    volumes:
+      - langgraph_data:/app/data
+      - langgraph_outputs:/app/outputs
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).read()",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  langgraph_data:
+  langgraph_outputs:

@@ -29,6 +29,7 @@ from __future__ import annotations
 import threading
 from typing import Any
 
+from app.checkpointing.factory import clear_checkpoints
 from app.chat_service import create_initial_state
 from app.state import AgentState
 
@@ -53,11 +54,12 @@ def get_session_lock(session_id: str) -> threading.RLock:
 
 
 def clear_session_store() -> None:
-    """清空内存 session 状态，主要供 eval / 测试使用。"""
+    """清空内存 session 状态和 LangGraph checkpoint，主要供 eval / 测试使用。"""
 
     with session_store_guard:
         session_store.clear()
         session_locks.clear()
+    clear_checkpoints()
 
 
 def snapshot_session_state(session_id: str) -> AgentState:

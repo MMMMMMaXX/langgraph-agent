@@ -110,6 +110,18 @@ class ChunkingConfig:
     min_chunk_chars: int = 40
 
 
+@dataclass(frozen=True)
+class CheckpointConfig:
+    """LangGraph checkpoint 配置。
+
+    checkpoint 保存 graph state，用于 session 恢复；
+    conversation_history 保存业务流水，两者不要混用。
+    """
+
+    enabled: bool = True
+    path: str = "data/langgraph_checkpoints.sqlite3"
+
+
 def load_rag_config() -> RagConfig:
     # 配置优先从环境变量读取，方便做对照实验时不改代码。
     return RagConfig(
@@ -182,9 +194,20 @@ def load_chunking_config() -> ChunkingConfig:
     )
 
 
+def load_checkpoint_config() -> CheckpointConfig:
+    return CheckpointConfig(
+        enabled=get_env_bool("LANGGRAPH_CHECKPOINT_ENABLED", True),
+        path=get_env_str(
+            "LANGGRAPH_CHECKPOINT_SQLITE_PATH",
+            "data/langgraph_checkpoints.sqlite3",
+        ),
+    )
+
+
 # 先收敛最常调的实验参数，后续再逐步扩大配置覆盖面。
 RAG_CONFIG = load_rag_config()
 MEMORY_CONFIG = load_memory_config()
 CONVERSATION_HISTORY_CONFIG = load_conversation_history_config()
 VECTOR_STORE_CONFIG = load_vector_store_config()
 CHUNKING_CONFIG = load_chunking_config()
+CHECKPOINT_CONFIG = load_checkpoint_config()
