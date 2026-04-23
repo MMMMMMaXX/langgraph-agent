@@ -1,9 +1,0 @@
-id,status_code,category,expected_route,actual_route,doc_used,memory_used,request_ms,rag_ms,memory_ms,answer_len,quality,assertion,assertion_detail,answer,detail
-aria_definition,200,knowledge,rag_agent,rag_agent,True,False,4667.31,4231.75,419.21,100,good,pass,,"WAI-ARIA技术是一个为残疾人士提供无障碍访问动态、可交互Web内容的技术规范。  
-最关键的是，它通过aria-label等属性配合其他技术方式，让屏幕阅读器能准确识别网页中的内容、变化和状态。",
-virtual_list_definition,200,knowledge,rag_agent,rag_agent,True,False,3532.75,3355.20,174.27,82,good,pass,,"虚拟列表是一种只渲染可见区域内容的技术，通过不渲染或部分渲染非可见区域来提升渲染性能。  
-例如，在首次渲染时，如果屏幕只能显示10个列表项，就只加载这10条数据。",
-history_summary_after_two_turns,200,memory,chat_agent,chat_agent,-,True,8029.81,-,0.06,50,good,pass,,"刚刚的问题包括：
-1. 用户询问上海气候怎么样
-2. 用户询问北京气候怎么样
-3. 用户询问那上海呢",

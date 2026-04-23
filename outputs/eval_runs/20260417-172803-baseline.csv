@@ -1,2 +1,0 @@
-id,status_code,category,expected_route,actual_route,doc_used,memory_used,request_ms,rag_ms,memory_ms,answer_len,quality,assertion,assertion_detail,answer,detail
-novel_to_script_basic,500,creative_agent,novel_script_agent,-,-,-,730.44,-,-,0,poor,fail,"route mismatch: expected novel_script_agent, got -; missing expected text: ['角色', '场景', '赵百汇']",,agent execution failed
