@@ -1,0 +1,17 @@
+{
+  "profile": "concise",
+  "description": "偏短回答配置，减少生成长度，观察延迟与信息损失之间的平衡。",
+  "env": {
+    "DOC_SCORE_THRESHOLD": "0.45",
+    "DOC_SOFT_MATCH_THRESHOLD": "0.35",
+    "MAX_DOC_CONTEXT_CHARS": "240",
+    "MAX_DOC_CONTEXT_BLOCKS": "1",
+    "MAX_DOC_ANSWER_TOKENS": "120",
+    "MAX_MEMORY_ANSWER_TOKENS": "100"
+  },
+  "case_ids": "history_summary_after_two_turns",
+  "base_url": "http://127.0.0.1:8000",
+  "json_output": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260416-175610-concise.json",
+  "csv_output": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260416-175610-concise.csv",
+  "started_at": "2026-04-16T17:56:10"
+}

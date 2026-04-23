@@ -1,0 +1,13 @@
+id,status_code,category,expected_route,actual_route,doc_used,memory_used,request_ms,rag_ms,memory_ms,answer_len,quality,assertion,assertion_detail,answer,detail
+aria_definition,200,knowledge,rag_agent,rag_agent,-,-,4347.08,-,-,116,good,pass,,WAI-ARIA技术是一个为残疾人士等提供无障碍访问动态、可交互Web内容的技术规范。其全称是Web Accessibility Initiative - Accessible Rich Internet Applications。,
+virtual_list_definition,200,knowledge,rag_agent,rag_agent,-,-,4623.26,-,-,90,good,pass,,"虚拟列表是一种按需显示技术，只渲染可见区域的内容，对非可见区域不渲染或部分渲染，以提升渲染性能。  
+其核心是根据可见区域的高度和列表项高度，动态计算并仅加载当前可见的少量数据项。",
+beijing_climate,200,knowledge,rag_agent,rag_agent,-,-,4348.17,-,-,19,ok,pass,,北京气候四季分明，夏天很热，冬天很冷。,
+shanghai_followup_after_beijing,200,multi_turn,rag_agent,rag_agent,-,-,6230.02,-,-,17,ok,pass,,上海气候和北京类似，但更热更潮湿。,
+history_summary_after_two_turns,200,memory,chat_agent,chat_agent,-,-,11938.55,-,-,34,good,pass,,"刚刚的问题包括：
+1. 询问北京的气候情况
+2. 询问上海的气候情况",
+simple_math,200,tool,tool_agent,tool_agent,-,-,340.62,-,-,8,ok,pass,,计算结果是 3。,
+wai_aria_should_not_route_to_tool,200,routing,rag_agent,rag_agent,-,-,2978.93,-,-,44,good,pass,,WAI-ARIA 是一个为残疾人士等提供无障碍访问动态、可交互 Web 内容的技术规范。,
+unknown_concept_fallback,200,fallback,rag_agent,rag_agent,-,-,340.96,-,-,4,poor,pass,,资料不足,
+session_isolation_summary,200,session_isolation,chat_agent,chat_agent,-,-,1867.71,-,-,4,poor,pass,,资料不足,

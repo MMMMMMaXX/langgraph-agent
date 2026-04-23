@@ -1,0 +1,2 @@
+id,status_code,expected_route,actual_route,doc_used,memory_used,request_ms,rag_ms,memory_ms,answer_len,quality,answer,detail
+aria_definition,500,rag_agent,-,-,-,1349.71,-,-,0,poor,,agent execution failed

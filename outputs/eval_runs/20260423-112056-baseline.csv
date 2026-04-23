@@ -1,0 +1,7 @@
+id,status_code,category,expected_route,actual_route,doc_used,memory_used,request_ms,rag_ms,memory_ms,answer_len,quality,assertion,assertion_detail,answer,detail
+aria_definition,200,knowledge,rag_agent,rag_agent,True,False,3779.65,3721.38,7.83,66,good,pass,,WAI-ARIA是一项为残疾人士提供无障碍访问动态、可交互Web内容的技术规范。它可以让屏幕阅读器准确识别网页中的内容、变化和状态。,
+virtual_list_definition,200,knowledge,rag_agent,rag_agent,True,False,2630.74,2610.87,1.55,39,good,pass,,虚拟列表是一种只渲染可见区域内容的技术。它能显著提升大量数据渲染时的性能表现。,
+beijing_climate,200,knowledge,rag_agent,rag_agent,True,False,3207.52,2859.61,330.92,19,ok,pass,,北京气候四季分明，夏天很热，冬天很冷。,
+shanghai_followup_after_beijing,200,multi_turn,rag_agent,rag_agent,True,False,5818.11,1708.96,201.06,17,ok,pass,,上海气候与北京类似，但更热更潮湿。,
+wai_aria_should_not_route_to_tool,200,routing,rag_agent,rag_agent,True,False,3878.49,3657.26,215.33,108,good,pass,,WAI-ARIA 是一个为残疾人士提供无障碍访问动态、可交互 Web 内容的技术规范。它可以让屏幕阅读器准确识别网页中的内容、变化和状态。通过 aria-label、role、tabIndex 等方式构建无障碍模式。,
+unknown_concept_fallback,200,fallback,rag_agent,rag_agent,False,False,331.19,326.57,0.76,4,poor,pass,,资料不足,

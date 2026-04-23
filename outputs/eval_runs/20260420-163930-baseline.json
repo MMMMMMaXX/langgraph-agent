@@ -1,0 +1,285 @@
+[
+  {
+    "id": "novel_to_script_basic",
+    "category": "creative_agent",
+    "status_code": 200,
+    "expected_route": "novel_script_agent",
+    "actual_route": "novel_script_agent",
+    "doc_used": "-",
+    "memory_used": "-",
+    "request_ms": "69264.57",
+    "rag_ms": "-",
+    "memory_ms": "0.14",
+    "answer_len": 1586,
+    "quality": "good",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "creative script adaptation query",
+        "intent": "creative",
+        "routes": [
+          "novel_script_agent"
+        ]
+      },
+      "novel_script_agent": {
+        "source_text_preview": "第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。 【团队等级：1级，目前团队人数：1人；每天每人补助10元。】 赵百汇用手指敲了敲桌面，桌子上干瘪的布口袋就鼓了起来，里面多出了10斤大米。 “一天就10元钱，也只有买大米最划算了。” “2元一斤的大米，一天的补助只...",
+        "source_text_len": 804,
+        "chapter_count": 1,
+        "scene_count": 1,
+        "draft_count": 1,
+        "review_count": 0,
+        "iteration_count": 4,
+        "timing_breakdown_ms": {
+          "planner_context_build": 0.19,
+          "planner_llm_call": 29523.86,
+          "planner_parse": 0.05,
+          "planner": 29524.2,
+          "split_into_scenes": 0.09,
+          "extract_story_facts": 3619.59,
+          "write_script_scene": 36099.84,
+          "finalizer": 0.41
+        },
+        "iteration_timings": [
+          {
+            "iteration": 0,
+            "stage": "planner_context_build",
+            "duration_ms": 0.02,
+            "context_chars": 575,
+            "scene_count": 0,
+            "draft_count": 0,
+            "review_count": 0
+          },
+          {
+            "iteration": 0,
+            "stage": "planner_llm_call",
+            "duration_ms": 5608.28,
+            "context_chars": 575,
+            "answer_chars": 193
+          },
+          {
+            "iteration": 0,
+            "stage": "planner_parse",
+            "duration_ms": 0.01,
+            "selected_tool": "split_into_scenes"
+          },
+          {
+            "iteration": 1,
+            "stage": "planner",
+            "duration_ms": 5608.34,
+            "mode": "react_llm",
+            "selected_tool": "split_into_scenes",
+            "thought": "当前状态显示 scene_plan_count 为 0，即还没有将原文拆分成场景。根据规则3，如果 scene_plan 为空，优先 split_into_sc",
+            "context_chars": 575,
+            "planner_answer_chars": 193,
+            "error": ""
+          },
+          {
+            "iteration": 1,
+            "stage": "split_into_scenes",
+            "duration_ms": 0.09,
+            "selected_tool": "split_into_scenes",
+            "scene_count": 1,
+            "draft_count": 0,
+            "review_count": 0
+          },
+          {
+            "iteration": 1,
+            "stage": "planner_context_build",
+            "duration_ms": 0.03,
+            "context_chars": 453,
+            "scene_count": 1,
+            "draft_count": 0,
+            "review_count": 0
+          },
+          {
+            "iteration": 1,
+            "stage": "planner_llm_call",
+            "duration_ms": 5086.82,
+            "context_chars": 453,
+            "answer_chars": 239
+          },
+          {
+            "iteration": 1,
+            "stage": "planner_parse",
+            "duration_ms": 0.01,
+            "selected_tool": "extract_story_facts"
+          },
+          {
+            "iteration": 2,
+            "stage": "planner",
+            "duration_ms": 5086.88,
+            "mode": "react_llm",
+            "selected_tool": "extract_story_facts",
+            "thought": "当前状态显示 scene_plan_count 为 1，说明已经完成了场景拆分（split_into_scenes），但 story_facts 为空。根据规则",
+            "context_chars": 453,
+            "planner_answer_chars": 239,
+            "error": ""
+          },
+          {
+            "iteration": 2,
+            "stage": "extract_story_facts",
+            "duration_ms": 3619.59,
+            "selected_tool": "extract_story_facts",
+            "scene_count": 1,
+            "draft_count": 0,
+            "review_count": 0
+          },
+          {
+            "iteration": 2,
+            "stage": "planner_context_build",
+            "duration_ms": 0.03,
+            "context_chars": 498,
+            "scene_count": 1,
+            "draft_count": 0,
+            "review_count": 0
+          },
+          {
+            "iteration": 2,
+            "stage": "planner_llm_call",
+            "duration_ms": 11272.76,
+            "context_chars": 498,
+            "answer_chars": 557
+          },
+          {
+            "iteration": 2,
+            "stage": "planner_parse",
+            "duration_ms": 0.01,
+            "selected_tool": "write_script_scene"
+          },
+          {
+            "iteration": 3,
+            "stage": "planner",
+            "duration_ms": 11272.82,
+            "mode": "react_llm",
+            "selected_tool": "write_script_scene",
+            "thought": "当前状态显示：场景计划已拆分完成（scene_plan_count: 1），故事事实已提取（story_facts 非空），但尚未生成任何剧本场景（scene_",
+            "context_chars": 498,
+            "planner_answer_chars": 557,
+            "error": ""
+          },
+          {
+            "iteration": 3,
+            "stage": "write_script_scene",
+            "duration_ms": 36099.84,
+            "selected_tool": "write_script_scene",
+            "scene_count": 1,
+            "draft_count": 1,
+            "review_count": 0
+          },
+          {
+            "iteration": 3,
+            "stage": "planner_context_build",
+            "duration_ms": 0.11,
+            "context_chars": 616,
+            "scene_count": 1,
+            "draft_count": 1,
+            "review_count": 0
+          },
+          {
+            "iteration": 3,
+            "stage": "planner_llm_call",
+            "duration_ms": 7556.0,
+            "context_chars": 616,
+            "answer_chars": 331
+          },
+          {
+            "iteration": 3,
+            "stage": "planner_parse",
+            "duration_ms": 0.02,
+            "selected_tool": "finalize"
+          },
+          {
+            "iteration": 4,
+            "stage": "planner",
+            "duration_ms": 7556.16,
+            "mode": "react_llm",
+            "selected_tool": "finalize",
+            "thought": "当前状态显示：已完成场景拆分（scene_plan_count: 1），故事事实已提取（story_facts 非空），已生成一个场景草稿（scene_draf",
+            "context_chars": 616,
+            "planner_answer_chars": 331,
+            "error": ""
+          },
+          {
+            "iteration": 4,
+            "stage": "finalizer",
+            "duration_ms": 0.41,
+            "strategy": "deterministic_assembler",
+            "answer_chars": 1586
+          }
+        ],
+        "tool_history": [
+          {
+            "thought": "当前状态显示 scene_plan_count 为 0，即还没有将原文拆分成场景。根据规则3，如果 scene_plan 为空，优先 split_into_scenes。因此，第一步应该是将原文拆分成场景，以便后续进行剧本创作。",
+            "selected_tool": "split_into_scenes",
+            "tool_input": {
+              "text": "第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。\n【团队等级：1级，目前团队人数：1人；每天每人补助10元。】\n赵百汇用手指敲了敲桌面，桌子上干瘪的布口袋就鼓了起来，里面多出了10斤大米。\n“一天就10元钱，也只有买大米最划算了。”\n“2元一斤的大米，一天的补助只能买五斤。”\n希望三个丫头快点过考察期吧，到时候一天补助就是40元。\n“锦衣，锦衣。”\n“老爷，我进来了。”一个干干瘦瘦的丫头走了进来，身上粗布衣服破旧到处是补丁，不过洗得很干净。\n赵百汇拍了拍额头，“抱歉啊，是我的疏忽，这两天攒点钱，给你买一身衣服，这件衣服小了，不能再穿了。”\n赵锦衣赶紧摇头，“不用的老爷，这衣服我还能穿，等我回头改一改就行了，不用给我花钱。”\n来到客厅兼饭厅，11岁的锦绣和10岁的锦文正在往桌子上端饭，饭是13岁的锦衣做的。\n桌上放着四个碗，一个大碗里面的粥很稠，里面还有个鸡蛋，另外三个小碗里面的粥就很稀了，菜就一小碗咸菜。\n赵百汇无奈地说，“锦衣，我都说几次了，不要这样搞区别对待，我也不缺几碗粥的钱。”\n赵锦衣笑着说，“老爷，我们喝的粥已经很好了。”\n“算了，随你们吧。”\n吃完饭，赵百汇回屋把米袋子拿出来。\n“锦衣，这里面有十斤米，回头你拿去周老板的粮铺，然后再买点菜回来，其他的钱攒着。”\n“对了，现在攒了多少钱了？”\n“有三百四十六文。”\n赵百汇出门上了街，跨入牙人的门店，还没等他说话，留着两撇胡子的陈掌柜已经一脸猥琐笑容地迎了上来。\n“赵老爷，您可是来巧了！今天正好有好货色，绝对是您的心头好啊！”\n“带来给我看看吧。”赵百汇不想和这狗东西多说一句话。\n不多时，一个老年妇女带着一个看上去很小的丫头走了进来。\n赵百汇突然爆发出惊喜的笑容，正巧是锦衣的考核期过了，以后每天多10元补助。\n而陈掌柜却只以为是赵百汇看到小丫头开心了，露出更猥琐的笑容。",
+              "target_scene_count": 1
+            },
+            "tool_output_preview": "{'scenes': [{'scene_id': 'scene_1', 'summary': '第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。\\n【团队等级：1级，目前团队人数：1人；每天每人补助10', 'source_text': '第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。"
+          },
+          {
+            "thought": "当前状态显示 scene_plan_count 为 1，说明已经完成了场景拆分（split_into_scenes），但 story_facts 为空。根据规则4，如果 story_facts 为空，优先 extract_story_facts。我需要抽取角色、地点、冲突、目标等故事事实，为后续的剧本写作提供基础。",
+            "selected_tool": "extract_story_facts",
+            "tool_input": {
+              "text": "scene_1: 第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。\n【团队等级：1级，目前团队人数：1人；每天每人补助10"
+            },
+            "tool_output_preview": "{'characters': ['赵百汇'], 'locations': ['贵宝地'], 'conflicts': [], 'goals': ['卖大米', '租房子', '买三个豆芽菜一样的小丫头', '骗补助']}"
+          },
+          {
+            "thought": "当前状态显示：场景计划已拆分完成（scene_plan_count: 1），故事事实已提取（story_facts 非空），但尚未生成任何剧本场景（scene_draft_count: 0）。根据规则5，如果还有未生成的场景，应优先 write_script_scene。目标场景数量为1，且待重写场景列表为空，因此应开始为 scene_1 生成剧本。",
+            "selected_tool": "write_script_scene",
+            "tool_input": {
+              "scene_id": "scene_1",
+              "story_facts": {
+                "characters": [
+                  "赵百汇"
+                ],
+                "locations": [
+                  "贵宝地"
+                ],
+                "goals": [
+                  "卖大米",
+                  "租房子",
+                  "买三个豆芽菜一样的小丫头",
+                  "骗补助"
+                ],
+                "conflicts": []
+              },
+              "source_text": "第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。\n【团队等级：1级，目前团队人数：1人；每天每人补助10元。】\n赵百汇用手指敲了敲桌面，桌子上干瘪的布口袋就鼓了起来，里面多出了10斤大米。\n“一天就10元钱，也只有买大米最划算了。”\n“2元一斤的大米，一天的补助只能买五斤。”\n希望三个丫头快点过考察期吧，到时候一天补助就是40元。\n“锦衣，锦衣。”\n“老爷，我进来了。”一个干干瘦瘦的丫头走了进来，身上粗布衣服破旧到处是补丁，不过洗得很干净。\n赵百汇拍了拍额头，“抱歉啊，是我的疏忽，这两天攒点钱，给你买一身衣服，这件衣服小了，不能再穿了。”\n赵锦衣赶紧摇头，“不用的老爷，这衣服我还能穿，等我回头改一改就行了，不用给我花钱。”\n来到客厅兼饭厅，11岁的锦绣和10岁的锦文正在往桌子上端饭，饭是13岁的锦衣做的。\n桌上放着四个碗，一个大碗里面的粥很稠，里面还有个鸡蛋，另外三个小碗里面的粥就很稀了，菜就一小碗咸菜。\n赵百汇无奈地说，“锦衣，我都说几次了，不要这样搞区别对待，我也不缺几碗粥的钱。”\n赵锦衣笑着说，“老爷，我们喝的粥已经很好了。”\n“算了，随你们吧。”\n吃完饭，赵百汇回屋把米袋子拿出来。\n“锦衣，这里面有十斤米，回头你拿去周老板的粮铺，然后再买点菜回来，其他的钱攒着。”\n“对了，现在攒了多少钱了？”\n“有三百四十六文。”\n赵百汇出门上了街，跨入牙人的门店，还没等他说话，留着两撇胡子的陈掌柜已经一脸猥琐笑容地迎了上来。\n“赵老爷，您可是来巧了！今天正好有好货色，绝对是您的心头好啊！”\n“带来给我看看吧。”赵百汇不想和这狗东西多说一句话。\n不多时，一个老年妇女带着一个看上去很小的丫头走了进来。\n赵百汇突然爆发出惊喜的笑容，正巧是锦衣的考核期过了，以后每天多10元补助。\n而陈掌柜却只以为是赵百汇看到小丫头开心了，露出更猥琐的笑容。",
+              "summary": "第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。\n【团队等级：1级，目前团队人数：1人；每天每人补助10",
+              "script_style": "影视短剧",
+              "rewrite_reason": ""
+            },
+            "tool_output_preview": "{'scene_id': 'scene_1', 'script': '**场景ID：scene_1**\\n\\n**场景摘要：** 赵百汇初到贵宝地，卖米租房，购买三个瘦弱丫头以骗取系统补助。\\n\\n**地点：** 1. 赵百汇租住房内；2. 牙行门店\\n\\n**人物：**\\n- 赵百汇：男，青年，穿越者，试图利用系统规则。\\n- 赵锦衣：女，13岁，瘦弱，赵百汇买来的丫头，负责家务。\\n- 锦绣："
+          }
+        ],
+        "finalizer_strategy": "deterministic_assembler"
+      },
+      "merge": {
+        "agent_outputs": {
+          "novel_script_agent": "# 《第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。》\n\n## 改编标题\n第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。\n\n## 角色表\n- **赵百汇**\n- **赵锦衣**\n- **锦绣**\n- **锦文**\n- **陈掌柜**\n- **老年妇女**\n\n## 地点列表\n- **贵宝地**\n- **1. 赵百汇租住房内；2. 牙行门店**\n\n## 剧情段落列表\n- **剧情段落1**：第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。\n【团队等级：1级，目前团队人数：1人；每天每人补助10\n\n## 正文剧本\n### 剧情段落1\n\n**地点：** 1. 赵百汇租住房内；2. 牙行门店\n\n**人物：**\n- 赵百汇：男，青年，穿越者，试图利用系统规则。\n- 赵锦衣：女，13岁，瘦弱，赵百汇买来的丫头，负责家务。\n- 锦绣：女，11岁，瘦弱丫头。\n- 锦文：女，10岁，瘦弱丫头。\n- 陈掌柜：男，中年牙人，市侩猥琐。\n- 老年妇女：牙行仆妇。\n\n\n**【日，内，赵百汇租住房·卧室】**\n\n赵百汇独坐桌前。他伸出手指，敲了敲桌面。\n\n桌上一个干瘪的布口袋瞬间鼓胀起来。\n\n赵百汇（自语）：一天就10元补助……买大米最划算。2元一斤，一天才五斤。唉，希望那三个丫头快点过考察期吧，到时候一天就是40元。\n\n他朝门外喊。\n\n赵百汇：锦衣！锦衣！\n\n**【日，内，赵百汇租住房·客厅/饭厅】**\n\n门被推开。赵锦衣走进来。她十三岁，身材干瘦，身上的粗布衣服布满补丁，但浆洗得干净。衣服明显短小紧绷。\n\n赵锦衣：老爷，我进来了。\n\n赵百汇看着她不合身的衣服，拍了拍自己额头。\n\n赵百汇：抱歉，是我的疏忽。这两天攒点钱，给你买身新衣服。这件太小，不能穿了。\n\n赵锦衣连忙摆手。\n\n赵锦衣：不用的，老爷！这衣服我还能穿，回头改改就行，不用花钱。\n\n赵百汇无奈摇头，起身走向客厅。锦绣和锦文正将粥碗和一小碟咸菜端上桌。\n\n桌上四个碗：一个大碗粥很稠，里面卧着一个鸡蛋；另外三个小碗里的粥则清汤寡水。\n\n赵百汇（皱眉）：锦衣，我说几次了，不要搞区别对待。我不缺这几碗粥的钱。\n\n赵锦衣（笑着）：老爷，我们喝的粥已经很好了。\n\n赵百汇（叹气）：算了，随你们吧。\n\n**【日，内，赵百汇租住房·门口】**\n\n饭后。赵百汇从屋里拿出那个鼓胀的米袋，递给赵锦衣。\n\n赵百汇：这里面有十斤米。你拿去周老板粮铺卖了，再买点菜回来。剩下的钱攒着。\n\n赵锦衣：是，老爷。\n\n赵百汇：对了，现在攒了多少钱了？\n\n赵锦衣：有三百四十六文。\n\n赵百汇点点头，转身出门。\n\n**【日，内，牙行门店】**\n\n赵百汇跨进牙行。留着两撇胡子的陈掌柜立刻堆着猥琐的笑容迎上来。\n\n陈掌柜：哎哟！赵老爷！您可是来巧了！今天正好有好货色，绝对是您的心头好！\n\n赵百汇面无表情。\n\n赵百汇：带来看看。\n\n陈掌柜（对里间喊）：带出来！\n\n一个老年妇女领着一个面黄肌瘦、年纪很小的丫头走出来。\n\n**（系统提示音在赵百汇脑中响起）**\n\n赵百汇脸上突然爆发出难以抑制的惊喜笑容。（内心：锦衣的考核期过了！每天多10元补助！）\n\n陈掌柜见状，误会了这笑容的含义，脸上的猥琐笑容更盛。\n\n陈掌柜（压低声音）：赵老爷，怎么样？这雏儿……可还合心意？\n\n赵百汇收敛笑容，目光扫过那个怯生生的小丫头。\n\n赵百汇（对陈掌柜）：就她了。多少钱？\n\n**——场景结束——**\n\n## 改编说明\n1. 本次输出采用单剧情段落确定性组装，直接复用已生成场景草稿，避免 finalizer 再次整篇重写。\n2. 角色表、地点列表和剧情段落列表均基于已生成内容自动汇总并去重。"
+        },
+        "final_answer_preview": "# 《第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。》  ## 改编标题 第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。  ## 角色表 - **赵百汇** - **赵锦衣** - **锦绣** - **...",
+        "streamed_answer": false,
+        "error": ""
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": false,
+        "stored_to_vector": false,
+        "skipped_vector_store": true,
+        "stored_tags": [],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.02,
+          "vectorStore": 0.0,
+          "messagePrune": 0.0
+        },
+        "errors": []
+      }
+    },
+    "answer": "# 《第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。》\n\n## 改编标题\n第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。\n\n## 角色表\n- **赵百汇**\n- **赵锦衣**\n- **锦绣**\n- **锦文**\n- **陈掌柜**\n- **老年妇女**\n\n## 地点列表\n- **贵宝地**\n- **1. 赵百汇租住房内；2. 牙行门店**\n\n## 剧情段落列表\n- **剧情段落1**：第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。\n【团队等级：1级，目前团队人数：1人；每天每人补助10\n\n## 正文剧本\n### 剧情段落1\n\n**地点：** 1. 赵百汇租住房内；2. 牙行门店\n\n**人物：**\n- 赵百汇：男，青年，穿越者，试图利用系统规则。\n- 赵锦衣：女，13岁，瘦弱，赵百汇买来的丫头，负责家务。\n- 锦绣：女，11岁，瘦弱丫头。\n- 锦文：女，10岁，瘦弱丫头。\n- 陈掌柜：男，中年牙人，市侩猥琐。\n- 老年妇女：牙行仆妇。\n\n\n**【日，内，赵百汇租住房·卧室】**\n\n赵百汇独坐桌前。他伸出手指，敲了敲桌面。\n\n桌上一个干瘪的布口袋瞬间鼓胀起来。\n\n赵百汇（自语）：一天就10元补助……买大米最划算。2元一斤，一天才五斤。唉，希望那三个丫头快点过考察期吧，到时候一天就是40元。\n\n他朝门外喊。\n\n赵百汇：锦衣！锦衣！\n\n**【日，内，赵百汇租住房·客厅/饭厅】**\n\n门被推开。赵锦衣走进来。她十三岁，身材干瘦，身上的粗布衣服布满补丁，但浆洗得干净。衣服明显短小紧绷。\n\n赵锦衣：老爷，我进来了。\n\n赵百汇看着她不合身的衣服，拍了拍自己额头。\n\n赵百汇：抱歉，是我的疏忽。这两天攒点钱，给你买身新衣服。这件太小，不能穿了。\n\n赵锦衣连忙摆手。\n\n赵锦衣：不用的，老爷！这衣服我还能穿，回头改改就行，不用花钱。\n\n赵百汇无奈摇头，起身走向客厅。锦绣和锦文正将粥碗和一小碟咸菜端上桌。\n\n桌上四个碗：一个大碗粥很稠，里面卧着一个鸡蛋；另外三个小碗里的粥则清汤寡水。\n\n赵百汇（皱眉）：锦衣，我说几次了，不要搞区别对待。我不缺这几碗粥的钱。\n\n赵锦衣（笑着）：老爷，我们喝的粥已经很好了。\n\n赵百汇（叹气）：算了，随你们吧。\n\n**【日，内，赵百汇租住房·门口】**\n\n饭后。赵百汇从屋里拿出那个鼓胀的米袋，递给赵锦衣。\n\n赵百汇：这里面有十斤米。你拿去周老板粮铺卖了，再买点菜回来。剩下的钱攒着。\n\n赵锦衣：是，老爷。\n\n赵百汇：对了，现在攒了多少钱了？\n\n赵锦衣：有三百四十六文。\n\n赵百汇点点头，转身出门。\n\n**【日，内，牙行门店】**\n\n赵百汇跨进牙行。留着两撇胡子的陈掌柜立刻堆着猥琐的笑容迎上来。\n\n陈掌柜：哎哟！赵老爷！您可是来巧了！今天正好有好货色，绝对是您的心头好！\n\n赵百汇面无表情。\n\n赵百汇：带来看看。\n\n陈掌柜（对里间喊）：带出来！\n\n一个老年妇女领着一个面黄肌瘦、年纪很小的丫头走出来。\n\n**（系统提示音在赵百汇脑中响起）**\n\n赵百汇脸上突然爆发出难以抑制的惊喜笑容。（内心：锦衣的考核期过了！每天多10元补助！）\n\n陈掌柜见状，误会了这笑容的含义，脸上的猥琐笑容更盛。\n\n陈掌柜（压低声音）：赵老爷，怎么样？这雏儿……可还合心意？\n\n赵百汇收敛笑容，目光扫过那个怯生生的小丫头。\n\n赵百汇（对陈掌柜）：就她了。多少钱？\n\n**——场景结束——**\n\n## 改编说明\n1. 本次输出采用单剧情段落确定性组装，直接复用已生成场景草稿，避免 finalizer 再次整篇重写。\n2. 角色表、地点列表和剧情段落列表均基于已生成内容自动汇总并去重。",
+    "detail": ""
+  }
+]

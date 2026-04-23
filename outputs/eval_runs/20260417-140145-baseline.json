@@ -1,0 +1,838 @@
+[
+  {
+    "id": "aria_definition",
+    "category": "knowledge",
+    "status_code": 200,
+    "expected_route": "rag_agent",
+    "actual_route": "rag_agent",
+    "doc_used": "True",
+    "memory_used": "False",
+    "request_ms": "3052.94",
+    "rag_ms": "2885.87",
+    "memory_ms": "160.33",
+    "answer_len": 115,
+    "quality": "good",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "rule-based route",
+        "intent": "retrieval",
+        "routes": [
+          "rag_agent"
+        ]
+      },
+      "rag_agent": {
+        "rewritten_query": "WAI-ARIA技术是什么？",
+        "doc_used": true,
+        "memory_used": false,
+        "threshold": 0.5,
+        "doc_context_chars": 360,
+        "top_docs": [
+          {
+            "preview": "网络无障碍辅助功能（Accessibility，也被称为 a11y，因为以 A 开头，以 Y 结尾，中间一共 11 个字...",
+            "score": 0.4156
+          },
+          {
+            "preview": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 非可见区域中的数据不渲染或部分渲染的技术，从而达到极高的...",
+            "score": 0.2327
+          },
+          {
+            "preview": "上海气候和北京类似，但更热更潮湿。",
+            "score": 0.1816
+          },
+          {
+            "preview": "北京气候四季分明，夏天很热，冬天很冷。",
+            "score": 0.1658
+          }
+        ],
+        "filtered_docs": [
+          {
+            "preview": "网络无障碍辅助功能（Accessibility，也被称为 a11y，因为以 A 开头，以 Y 结尾，中间一共 11 个字...",
+            "score": 0.4156
+          }
+        ],
+        "pre_rerank_docs": [
+          {
+            "preview": "网络无障碍辅助功能（Accessibility，也被称为 a11y，因为以 A 开头，以 Y 结尾，中间一共 11 个字...",
+            "score": 0.4156
+          }
+        ],
+        "post_rerank_docs": [
+          {
+            "preview": "网络无障碍辅助功能（Accessibility，也被称为 a11y，因为以 A 开头，以 Y 结尾，中间一共 11 个字...",
+            "score": 0.4156
+          }
+        ],
+        "pre_rerank_memory": [],
+        "post_rerank_memory": [],
+        "sub_timings_ms": {
+          "rewrite": 0.0,
+          "docSearch": 398.81,
+          "docRerank": 0.0,
+          "memorySearch": 0.0,
+          "memoryRerank": 0.0,
+          "answerGeneration": 2486.82
+        }
+      },
+      "merge": {
+        "agent_outputs": {
+          "rag_agent": "WAI-ARIA技术是为残疾人士等提供无障碍访问动态、可交互Web内容的技术规范。它是Web Accessibility Initiative - Accessible Rich Internet Applications的简称。"
+        },
+        "final_answer_preview": "WAI-ARIA技术是为残疾人士等提供无障碍访问动态、可交互Web内容的技术规范。它是Web Accessibility Initiative - Accessible Rich Internet Applications的简称。"
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": false,
+        "stored_to_vector": true,
+        "stored_tags": [
+          "wai-aria"
+        ],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.0,
+          "vectorStore": 160.22,
+          "messagePrune": 0.0
+        }
+      }
+    },
+    "answer": "WAI-ARIA技术是为残疾人士等提供无障碍访问动态、可交互Web内容的技术规范。它是Web Accessibility Initiative - Accessible Rich Internet Applications的简称。",
+    "detail": ""
+  },
+  {
+    "id": "virtual_list_definition",
+    "category": "knowledge",
+    "status_code": 200,
+    "expected_route": "rag_agent",
+    "actual_route": "rag_agent",
+    "doc_used": "True",
+    "memory_used": "False",
+    "request_ms": "2965.07",
+    "rag_ms": "2616.54",
+    "memory_ms": "345.45",
+    "answer_len": 55,
+    "quality": "good",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "rule-based route",
+        "intent": "retrieval",
+        "routes": [
+          "rag_agent"
+        ]
+      },
+      "rag_agent": {
+        "rewritten_query": "虚拟列表是什么？",
+        "doc_used": true,
+        "memory_used": false,
+        "threshold": 0.5,
+        "doc_context_chars": 160,
+        "top_docs": [
+          {
+            "preview": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 非可见区域中的数据不渲染或部分渲染的技术，从而达到极高的...",
+            "score": 0.4111
+          },
+          {
+            "preview": "上海气候和北京类似，但更热更潮湿。",
+            "score": 0.2257
+          },
+          {
+            "preview": "网络无障碍辅助功能（Accessibility，也被称为 a11y，因为以 A 开头，以 Y 结尾，中间一共 11 个字...",
+            "score": 0.2065
+          },
+          {
+            "preview": "北京气候四季分明，夏天很热，冬天很冷。",
+            "score": 0.1913
+          }
+        ],
+        "filtered_docs": [
+          {
+            "preview": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 非可见区域中的数据不渲染或部分渲染的技术，从而达到极高的...",
+            "score": 0.4111
+          }
+        ],
+        "pre_rerank_docs": [
+          {
+            "preview": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 非可见区域中的数据不渲染或部分渲染的技术，从而达到极高的...",
+            "score": 0.4111
+          }
+        ],
+        "post_rerank_docs": [
+          {
+            "preview": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 非可见区域中的数据不渲染或部分渲染的技术，从而达到极高的...",
+            "score": 0.4111
+          }
+        ],
+        "pre_rerank_memory": [],
+        "post_rerank_memory": [],
+        "sub_timings_ms": {
+          "rewrite": 0.0,
+          "docSearch": 135.77,
+          "docRerank": 0.0,
+          "memorySearch": 0.0,
+          "memoryRerank": 0.0,
+          "answerGeneration": 2480.45
+        }
+      },
+      "merge": {
+        "agent_outputs": {
+          "rag_agent": "虚拟列表是一种只渲染可见区域内容的技术。  \n它通过计算屏幕显示范围，仅加载当前能看到的列表项来提升渲染性能。"
+        },
+        "final_answer_preview": "虚拟列表是一种只渲染可见区域内容的技术。   它通过计算屏幕显示范围，仅加载当前能看到的列表项来提升渲染性能。"
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": false,
+        "stored_to_vector": true,
+        "stored_tags": [
+          "virtual-list"
+        ],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.01,
+          "vectorStore": 345.35,
+          "messagePrune": 0.0
+        }
+      }
+    },
+    "answer": "虚拟列表是一种只渲染可见区域内容的技术。  \n它通过计算屏幕显示范围，仅加载当前能看到的列表项来提升渲染性能。",
+    "detail": ""
+  },
+  {
+    "id": "beijing_climate",
+    "category": "knowledge",
+    "status_code": 200,
+    "expected_route": "rag_agent",
+    "actual_route": "rag_agent",
+    "doc_used": "True",
+    "memory_used": "False",
+    "request_ms": "2934.44",
+    "rag_ms": "2723.29",
+    "memory_ms": "208.29",
+    "answer_len": 19,
+    "quality": "ok",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "rule-based route",
+        "intent": "retrieval",
+        "routes": [
+          "rag_agent"
+        ]
+      },
+      "rag_agent": {
+        "rewritten_query": "北京气候怎么样？",
+        "doc_used": true,
+        "memory_used": false,
+        "threshold": 0.5,
+        "doc_context_chars": 19,
+        "top_docs": [
+          {
+            "preview": "北京气候四季分明，夏天很热，冬天很冷。",
+            "score": 0.7647
+          },
+          {
+            "preview": "上海气候和北京类似，但更热更潮湿。",
+            "score": 0.7172
+          },
+          {
+            "preview": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 非可见区域中的数据不渲染或部分渲染的技术，从而达到极高的...",
+            "score": 0.1035
+          },
+          {
+            "preview": "网络无障碍辅助功能（Accessibility，也被称为 a11y，因为以 A 开头，以 Y 结尾，中间一共 11 个字...",
+            "score": 0.1013
+          }
+        ],
+        "filtered_docs": [
+          {
+            "preview": "北京气候四季分明，夏天很热，冬天很冷。",
+            "score": 0.7647
+          },
+          {
+            "preview": "上海气候和北京类似，但更热更潮湿。",
+            "score": 0.7172
+          }
+        ],
+        "pre_rerank_docs": [
+          {
+            "preview": "北京气候四季分明，夏天很热，冬天很冷。",
+            "score": 0.7647
+          },
+          {
+            "preview": "上海气候和北京类似，但更热更潮湿。",
+            "score": 0.7172
+          }
+        ],
+        "post_rerank_docs": [
+          {
+            "preview": "北京气候四季分明，夏天很热，冬天很冷。",
+            "score": 0.7647
+          }
+        ],
+        "pre_rerank_memory": [],
+        "post_rerank_memory": [],
+        "sub_timings_ms": {
+          "rewrite": 0.0,
+          "docSearch": 142.09,
+          "docRerank": 910.55,
+          "memorySearch": 0.0,
+          "memoryRerank": 0.0,
+          "answerGeneration": 1670.35
+        }
+      },
+      "merge": {
+        "agent_outputs": {
+          "rag_agent": "北京气候四季分明，夏天很热，冬天很冷。"
+        },
+        "final_answer_preview": "北京气候四季分明，夏天很热，冬天很冷。"
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": false,
+        "stored_to_vector": true,
+        "stored_tags": [
+          "climate",
+          "北京"
+        ],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.01,
+          "vectorStore": 208.19,
+          "messagePrune": 0.0
+        }
+      }
+    },
+    "answer": "北京气候四季分明，夏天很热，冬天很冷。",
+    "detail": ""
+  },
+  {
+    "id": "shanghai_followup_after_beijing",
+    "category": "multi_turn",
+    "status_code": 200,
+    "expected_route": "rag_agent",
+    "actual_route": "rag_agent",
+    "doc_used": "True",
+    "memory_used": "False",
+    "request_ms": "5279.19",
+    "rag_ms": "1733.83",
+    "memory_ms": "161.13",
+    "answer_len": 17,
+    "quality": "ok",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "rule-based route",
+        "intent": "retrieval",
+        "routes": [
+          "rag_agent"
+        ]
+      },
+      "rag_agent": {
+        "rewritten_query": "上海气候怎么样？",
+        "doc_used": true,
+        "memory_used": false,
+        "threshold": 0.5,
+        "doc_context_chars": 17,
+        "top_docs": [
+          {
+            "preview": "上海气候和北京类似，但更热更潮湿。",
+            "score": 0.7624
+          },
+          {
+            "preview": "北京气候四季分明，夏天很热，冬天很冷。",
+            "score": 0.3279
+          },
+          {
+            "preview": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 非可见区域中的数据不渲染或部分渲染的技术，从而达到极高的...",
+            "score": 0.1067
+          },
+          {
+            "preview": "网络无障碍辅助功能（Accessibility，也被称为 a11y，因为以 A 开头，以 Y 结尾，中间一共 11 个字...",
+            "score": 0.0997
+          }
+        ],
+        "filtered_docs": [
+          {
+            "preview": "上海气候和北京类似，但更热更潮湿。",
+            "score": 0.7624
+          }
+        ],
+        "pre_rerank_docs": [
+          {
+            "preview": "上海气候和北京类似，但更热更潮湿。",
+            "score": 0.7624
+          }
+        ],
+        "post_rerank_docs": [
+          {
+            "preview": "上海气候和北京类似，但更热更潮湿。",
+            "score": 0.7624
+          }
+        ],
+        "pre_rerank_memory": [],
+        "post_rerank_memory": [],
+        "sub_timings_ms": {
+          "rewrite": 0.0,
+          "docSearch": 110.31,
+          "docRerank": 0.0,
+          "memorySearch": 0.0,
+          "memoryRerank": 0.0,
+          "answerGeneration": 1623.28
+        }
+      },
+      "merge": {
+        "agent_outputs": {
+          "rag_agent": "上海气候与北京类似，但更热更潮湿。"
+        },
+        "final_answer_preview": "上海气候与北京类似，但更热更潮湿。"
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": false,
+        "stored_to_vector": true,
+        "stored_tags": [
+          "climate",
+          "上海"
+        ],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.01,
+          "vectorStore": 161.01,
+          "messagePrune": 0.0
+        }
+      }
+    },
+    "answer": "上海气候与北京类似，但更热更潮湿。",
+    "detail": ""
+  },
+  {
+    "id": "history_summary_after_two_turns",
+    "category": "memory",
+    "status_code": 200,
+    "expected_route": "chat_agent",
+    "actual_route": "chat_agent",
+    "doc_used": "-",
+    "memory_used": "True",
+    "request_ms": "5389.03",
+    "rag_ms": "-",
+    "memory_ms": "0.04",
+    "answer_len": 38,
+    "quality": "good",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "meta/history query",
+        "intent": "chat",
+        "routes": [
+          "chat_agent"
+        ]
+      },
+      "chat_agent": {
+        "task_type": "summary",
+        "used_memory": true,
+        "used_summary": false,
+        "pre_rerank_memory": [
+          {
+            "preview": "问题：那上海呢 重写问题：上海气候怎么样？ 回答：上海气候和北京类似，但更热更潮湿。 标签：climate,上海",
+            "score": 0.2243,
+            "timestamp": 1776405725.437475,
+            "source": "chat_round",
+            "tags": [
+              "climate",
+              "上海"
+            ]
+          },
+          {
+            "preview": "问题：北京气候怎么样 重写问题：北京气候怎么样？ 回答：北京气候四季分明，夏天很热，冬天很冷。 标签：climate,北...",
+            "score": 0.2236,
+            "timestamp": 1776405723.4663649,
+            "source": "chat_round",
+            "tags": [
+              "climate",
+              "北京"
+            ]
+          }
+        ],
+        "post_rerank_memory": [
+          {
+            "preview": "问题：那上海呢 重写问题：上海气候怎么样？ 回答：上海气候和北京类似，但更热更潮湿。 标签：climate,上海",
+            "score": 0.2243,
+            "timestamp": 1776405725.437475,
+            "source": "chat_round",
+            "tags": [
+              "climate",
+              "上海"
+            ]
+          },
+          {
+            "preview": "问题：北京气候怎么样 重写问题：北京气候怎么样？ 回答：北京气候四季分明，夏天很热，冬天很冷。 标签：climate,北...",
+            "score": 0.2236,
+            "timestamp": 1776405723.4663649,
+            "source": "chat_round",
+            "tags": [
+              "climate",
+              "北京"
+            ]
+          }
+        ],
+        "facts": {
+          "cities": [
+            "上海",
+            "北京"
+          ],
+          "topics": [
+            "climate"
+          ],
+          "memory_types": [
+            "fact"
+          ]
+        },
+        "sub_timings_ms": {
+          "memoryPrepare": 167.5,
+          "operatorClassify": 0.0,
+          "contextBuild": 0.0,
+          "existenceLookup": 0.0,
+          "answerGeneration": 0.01
+        }
+      },
+      "merge": {
+        "agent_outputs": {
+          "chat_agent": "刚刚的问题包括：\n1. 用户询问北京气候怎么样\n2. 用户询问上海气候怎么样"
+        },
+        "final_answer_preview": "刚刚的问题包括： 1. 用户询问北京气候怎么样 2. 用户询问上海气候怎么样"
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": true,
+        "stored_to_vector": false,
+        "stored_tags": [],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.0,
+          "vectorStore": 0.0,
+          "messagePrune": 0.0
+        }
+      }
+    },
+    "answer": "刚刚的问题包括：\n1. 用户询问北京气候怎么样\n2. 用户询问上海气候怎么样",
+    "detail": ""
+  },
+  {
+    "id": "simple_math",
+    "category": "tool",
+    "status_code": 200,
+    "expected_route": "tool_agent",
+    "actual_route": "tool_agent",
+    "doc_used": "-",
+    "memory_used": "-",
+    "request_ms": "3560.61",
+    "rag_ms": "-",
+    "memory_ms": "0.06",
+    "answer_len": 7,
+    "quality": "ok",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "rule-based route",
+        "intent": "tool",
+        "routes": [
+          "tool_agent"
+        ]
+      },
+      "tool_agent": {
+        "tool_type": "calculate",
+        "tool_input": "1+2等于多少",
+        "tool_calls": [
+          {
+            "id": "call_00_CIYvzzY3zMSqVdIBE0hf1ZgO",
+            "name": "calculate",
+            "arguments": {
+              "expression": "1+2"
+            }
+          }
+        ],
+        "tool_results": [
+          {
+            "id": "call_00_CIYvzzY3zMSqVdIBE0hf1ZgO",
+            "name": "calculate",
+            "output": "3"
+          }
+        ],
+        "tool_result": "1加2等于3。"
+      },
+      "merge": {
+        "agent_outputs": {
+          "tool_agent": "1加2等于3。"
+        },
+        "final_answer_preview": "1加2等于3。"
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": false,
+        "stored_to_vector": false,
+        "stored_tags": [],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.0,
+          "vectorStore": 0.0,
+          "messagePrune": 0.0
+        }
+      }
+    },
+    "answer": "1加2等于3。",
+    "detail": ""
+  },
+  {
+    "id": "wai_aria_should_not_route_to_tool",
+    "category": "routing",
+    "status_code": 200,
+    "expected_route": "rag_agent",
+    "actual_route": "rag_agent",
+    "doc_used": "True",
+    "memory_used": "False",
+    "request_ms": "2301.23",
+    "rag_ms": "2081.27",
+    "memory_ms": "216.21",
+    "answer_len": 40,
+    "quality": "good",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "rule-based route",
+        "intent": "retrieval",
+        "routes": [
+          "rag_agent"
+        ]
+      },
+      "rag_agent": {
+        "rewritten_query": "WAI-ARIA技术？",
+        "doc_used": true,
+        "memory_used": false,
+        "threshold": 0.5,
+        "doc_context_chars": 360,
+        "top_docs": [
+          {
+            "preview": "网络无障碍辅助功能（Accessibility，也被称为 a11y，因为以 A 开头，以 Y 结尾，中间一共 11 个字...",
+            "score": 0.4042
+          },
+          {
+            "preview": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 非可见区域中的数据不渲染或部分渲染的技术，从而达到极高的...",
+            "score": 0.2479
+          },
+          {
+            "preview": "上海气候和北京类似，但更热更潮湿。",
+            "score": 0.2057
+          },
+          {
+            "preview": "北京气候四季分明，夏天很热，冬天很冷。",
+            "score": 0.1865
+          }
+        ],
+        "filtered_docs": [
+          {
+            "preview": "网络无障碍辅助功能（Accessibility，也被称为 a11y，因为以 A 开头，以 Y 结尾，中间一共 11 个字...",
+            "score": 0.4042
+          }
+        ],
+        "pre_rerank_docs": [
+          {
+            "preview": "网络无障碍辅助功能（Accessibility，也被称为 a11y，因为以 A 开头，以 Y 结尾，中间一共 11 个字...",
+            "score": 0.4042
+          }
+        ],
+        "post_rerank_docs": [
+          {
+            "preview": "网络无障碍辅助功能（Accessibility，也被称为 a11y，因为以 A 开头，以 Y 结尾，中间一共 11 个字...",
+            "score": 0.4042
+          }
+        ],
+        "pre_rerank_memory": [],
+        "post_rerank_memory": [],
+        "sub_timings_ms": {
+          "rewrite": 0.0,
+          "docSearch": 185.71,
+          "docRerank": 0.0,
+          "memorySearch": 0.0,
+          "memoryRerank": 0.0,
+          "answerGeneration": 1894.87
+        }
+      },
+      "merge": {
+        "agent_outputs": {
+          "rag_agent": "WAI-ARIA是一个为残疾人士提供无障碍访问动态、可交互Web内容的技术规范。"
+        },
+        "final_answer_preview": "WAI-ARIA是一个为残疾人士提供无障碍访问动态、可交互Web内容的技术规范。"
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": false,
+        "stored_to_vector": true,
+        "stored_tags": [
+          "wai-aria"
+        ],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.01,
+          "vectorStore": 216.12,
+          "messagePrune": 0.0
+        }
+      }
+    },
+    "answer": "WAI-ARIA是一个为残疾人士提供无障碍访问动态、可交互Web内容的技术规范。",
+    "detail": ""
+  },
+  {
+    "id": "unknown_concept_fallback",
+    "category": "fallback",
+    "status_code": 200,
+    "expected_route": "rag_agent",
+    "actual_route": "rag_agent",
+    "doc_used": "False",
+    "memory_used": "False",
+    "request_ms": "340.95",
+    "rag_ms": "338.80",
+    "memory_ms": "0.05",
+    "answer_len": 4,
+    "quality": "poor",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "rule-based route",
+        "intent": "retrieval",
+        "routes": [
+          "rag_agent"
+        ]
+      },
+      "rag_agent": {
+        "rewritten_query": "量子果冻协议是什么？",
+        "doc_used": false,
+        "memory_used": false,
+        "threshold": 0.5,
+        "doc_context_chars": 0,
+        "top_docs": [
+          {
+            "preview": "上海气候和北京类似，但更热更潮湿。",
+            "score": 0.1954
+          },
+          {
+            "preview": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 非可见区域中的数据不渲染或部分渲染的技术，从而达到极高的...",
+            "score": 0.1849
+          },
+          {
+            "preview": "网络无障碍辅助功能（Accessibility，也被称为 a11y，因为以 A 开头，以 Y 结尾，中间一共 11 个字...",
+            "score": 0.1828
+          },
+          {
+            "preview": "北京气候四季分明，夏天很热，冬天很冷。",
+            "score": 0.1812
+          }
+        ],
+        "filtered_docs": [],
+        "pre_rerank_docs": [],
+        "post_rerank_docs": [],
+        "pre_rerank_memory": [],
+        "post_rerank_memory": [],
+        "sub_timings_ms": {
+          "rewrite": 0.0,
+          "docSearch": 141.85,
+          "docRerank": 0.0,
+          "memorySearch": 196.82,
+          "memoryRerank": 0.0,
+          "answerGeneration": 0.0
+        }
+      },
+      "merge": {
+        "agent_outputs": {
+          "rag_agent": "资料不足"
+        },
+        "final_answer_preview": "资料不足"
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": false,
+        "stored_to_vector": false,
+        "stored_tags": [],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.0,
+          "vectorStore": 0.0,
+          "messagePrune": 0.0
+        }
+      }
+    },
+    "answer": "资料不足",
+    "detail": ""
+  },
+  {
+    "id": "session_isolation_summary",
+    "category": "session_isolation",
+    "status_code": 200,
+    "expected_route": "chat_agent",
+    "actual_route": "chat_agent",
+    "doc_used": "-",
+    "memory_used": "False",
+    "request_ms": "1790.85",
+    "rag_ms": "-",
+    "memory_ms": "0.06",
+    "answer_len": 4,
+    "quality": "poor",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "meta/history query",
+        "intent": "chat",
+        "routes": [
+          "chat_agent"
+        ]
+      },
+      "chat_agent": {
+        "task_type": "summary",
+        "used_memory": false,
+        "used_summary": false,
+        "pre_rerank_memory": [],
+        "post_rerank_memory": [],
+        "facts": {
+          "cities": [],
+          "topics": [],
+          "memory_types": []
+        },
+        "sub_timings_ms": {
+          "memoryPrepare": 193.67,
+          "operatorClassify": 0.0,
+          "contextBuild": 0.01,
+          "existenceLookup": 0.0,
+          "answerGeneration": 1594.71
+        }
+      },
+      "merge": {
+        "agent_outputs": {
+          "chat_agent": "资料不足"
+        },
+        "final_answer_preview": "资料不足"
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": false,
+        "stored_to_vector": false,
+        "stored_tags": [],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.0,
+          "vectorStore": 0.0,
+          "messagePrune": 0.0
+        }
+      }
+    },
+    "answer": "资料不足",
+    "detail": ""
+  }
+]

@@ -1,0 +1,124 @@
+[
+  {
+    "id": "aria_definition",
+    "category": "knowledge",
+    "session_id": "eval-aria-definition",
+    "message": "WAI-ARIA技术是什么",
+    "expected_route": "rag_agent",
+    "must_include": ["WAI-ARIA"],
+    "must_not_include": ["工具暂时无法处理"]
+  },
+  {
+    "id": "virtual_list_definition",
+    "category": "knowledge",
+    "session_id": "eval-virtual-list-definition",
+    "message": "虚拟列表是什么",
+    "expected_route": "rag_agent",
+    "must_include": ["虚拟列表"],
+    "must_not_include": ["资料不足", "工具暂时无法处理"]
+  },
+  {
+    "id": "beijing_climate",
+    "category": "knowledge",
+    "session_id": "eval-beijing-climate",
+    "message": "北京气候怎么样",
+    "expected_route": "rag_agent",
+    "must_include": ["北京"],
+    "must_not_include": ["资料不足"]
+  },
+  {
+    "id": "shanghai_followup_after_beijing",
+    "category": "multi_turn",
+    "session_id": "eval-shanghai-followup",
+    "setup": ["北京气候怎么样"],
+    "message": "那上海呢",
+    "expected_route": "rag_agent",
+    "must_include": ["上海"],
+    "must_not_include": ["资料不足"]
+  },
+  {
+    "id": "history_summary_after_two_turns",
+    "category": "memory",
+    "session_id": "eval-history-summary",
+    "setup": ["北京气候怎么样", "那上海呢"],
+    "message": "总结一下刚刚的问题",
+    "expected_route": "chat_agent",
+    "must_include": ["北京", "上海"],
+    "must_not_include": ["资料不足"]
+  },
+  {
+    "id": "history_summary_after_rag_definition",
+    "category": "memory",
+    "session_id": "eval-history-rag-definition",
+    "setup": ["WAI-ARIA技术是什么"],
+    "message": "总结所有问题",
+    "expected_route": "chat_agent",
+    "must_include": ["WAI-ARIA"],
+    "must_not_include": ["资料不足"],
+    "debug_must_equal": {
+      "chat_agent.history_lookup_policy": "all_history",
+      "chat_agent.used_history": true
+    }
+  },
+  {
+    "id": "simple_math",
+    "category": "tool",
+    "session_id": "eval-simple-math",
+    "message": "1+2等于多少",
+    "expected_route": "tool_agent",
+    "must_include": ["3"],
+    "must_not_include": ["无法处理"]
+  },
+  {
+    "id": "beijing_weather_tool",
+    "category": "tool",
+    "session_id": "eval-beijing-weather-tool",
+    "message": "北京天气怎么样",
+    "expected_route": "tool_agent",
+    "must_include": ["北京", "26"],
+    "must_not_include": ["工具暂时无法处理"]
+  },
+  {
+    "id": "weather_and_math_mixed_tool",
+    "category": "tool",
+    "session_id": "eval-weather-and-math-mixed-tool",
+    "message": "北京天气怎么样，顺便算一下 3*7",
+    "expected_route": "tool_agent",
+    "must_include": ["北京", "21"],
+    "must_not_include": ["工具暂时无法处理"]
+  },
+  {
+    "id": "wai_aria_should_not_route_to_tool",
+    "category": "routing",
+    "session_id": "eval-wai-aria-routing",
+    "message": "WAI-ARIA技术",
+    "expected_route": "rag_agent",
+    "must_not_include": ["工具暂时无法处理"]
+  },
+  {
+    "id": "unknown_concept_fallback",
+    "category": "fallback",
+    "session_id": "eval-unknown-concept",
+    "message": "量子果冻协议是什么",
+    "expected_route": "rag_agent",
+    "must_include": ["资料不足"]
+  },
+  {
+    "id": "session_isolation_summary",
+    "category": "session_isolation",
+    "session_id": "eval-session-isolation-b",
+    "setup": [],
+    "message": "总结一下刚刚的问题",
+    "expected_route": "chat_agent",
+    "must_include": ["资料不足"]
+  },
+  {
+    "id": "novel_to_script_basic",
+    "category": "creative_agent",
+    "session_id": "eval-novel-to-script-basic",
+    "message": "把这段小说改成剧本：第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。\n【团队等级：1级，目前团队人数：1人；每天每人补助10元。】\n赵百汇用手指敲了敲桌面，桌子上干瘪的布口袋就鼓了起来，里面多出了10斤大米。\n“一天就10元钱，也只有买大米最划算了。”\n“2元一斤的大米，一天的补助只能买五斤。”\n希望三个丫头快点过考察期吧，到时候一天补助就是40元。\n“锦衣，锦衣。”\n“老爷，我进来了。”一个干干瘦瘦的丫头走了进来，身上粗布衣服破旧到处是补丁，不过洗得很干净。\n赵百汇拍了拍额头，“抱歉啊，是我的疏忽，这两天攒点钱，给你买一身衣服，这件衣服小了，不能再穿了。”\n赵锦衣赶紧摇头，“不用的老爷，这衣服我还能穿，等我回头改一改就行了，不用给我花钱。”\n来到客厅兼饭厅，11岁的锦绣和10岁的锦文正在往桌子上端饭，饭是13岁的锦衣做的。\n桌上放着四个碗，一个大碗里面的粥很稠，里面还有个鸡蛋，另外三个小碗里面的粥就很稀了，菜就一小碗咸菜。\n赵百汇无奈地说，“锦衣，我都说几次了，不要这样搞区别对待，我也不缺几碗粥的钱。”\n赵锦衣笑着说，“老爷，我们喝的粥已经很好了。”\n“算了，随你们吧。”\n吃完饭，赵百汇回屋把米袋子拿出来。\n“锦衣，这里面有十斤米，回头你拿去周老板的粮铺，然后再买点菜回来，其他的钱攒着。”\n“对了，现在攒了多少钱了？”\n“有三百四十六文。”\n赵百汇出门上了街，跨入牙人的门店，还没等他说话，留着两撇胡子的陈掌柜已经一脸猥琐笑容地迎了上来。\n“赵老爷，您可是来巧了！今天正好有好货色，绝对是您的心头好啊！”\n“带来给我看看吧。”赵百汇不想和这狗东西多说一句话。\n不多时，一个老年妇女带着一个看上去很小的丫头走了进来。\n赵百汇突然爆发出惊喜的笑容，正巧是锦衣的考核期过了，以后每天多10元补助。\n而陈掌柜却只以为是赵百汇看到小丫头开心了，露出更猥琐的笑容。",
+    "expected_route": "novel_script_agent",
+    "must_include": ["角色", "场景", "赵百汇"],
+    "must_not_include": ["工具暂时无法处理", "资料不足"]
+  }
+]

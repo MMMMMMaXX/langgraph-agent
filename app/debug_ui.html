@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Agent Debug UI</title>
+    <style>
+      :root {
+        --bg: #f4efe6;
+        --panel: rgba(255, 251, 245, 0.9);
+        --panel-strong: #fffdf8;
+        --ink: #18222f;
+        --muted: #6f7b88;
+        --line: rgba(24, 34, 47, 0.12);
+        --accent: #0e7c66;
+        --accent-soft: rgba(14, 124, 102, 0.12);
+        --warn: #af5c2f;
+        --shadow: 0 18px 48px rgba(24, 34, 47, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(14, 124, 102, 0.14), transparent 28%),
+          radial-gradient(circle at top right, rgba(175, 92, 47, 0.12), transparent 22%),
+          linear-gradient(180deg, #fbf7ef 0%, var(--bg) 100%);
+        font-family: "SF Pro Display", "PingFang SC", "Helvetica Neue", sans-serif;
+      }
+
+      .page {
+        width: min(1380px, calc(100vw - 32px));
+        margin: 32px auto 48px;
+      }
+
+      .hero {
+        display: grid;
+        gap: 10px;
+        margin-bottom: 24px;
+      }
+
+      .eyebrow {
+        font-size: 12px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--accent);
+        font-weight: 700;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(28px, 4vw, 52px);
+        line-height: 0.96;
+        letter-spacing: -0.04em;
+      }
+
+      .hero p {
+        margin: 0;
+        max-width: 860px;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.65;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 360px minmax(0, 1fr);
+        gap: 20px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(14px);
+      }
+
+      .composer {
+        padding: 22px;
+        position: sticky;
+        top: 20px;
+        align-self: start;
+      }
+
+      .section-title {
+        margin: 0 0 12px;
+        font-size: 14px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .field {
+        display: grid;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+
+      .field label {
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      input,
+      textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: var(--panel-strong);
+        color: var(--ink);
+        font: inherit;
+        padding: 14px 16px;
+        outline: none;
+        transition: border-color 120ms ease, box-shadow 120ms ease;
+      }
+
+      input:focus,
+      textarea:focus {
+        border-color: rgba(14, 124, 102, 0.45);
+        box-shadow: 0 0 0 4px var(--accent-soft);
+      }
+
+      textarea {
+        min-height: 144px;
+        resize: vertical;
+        line-height: 1.6;
+      }
+
+      .toggle {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 18px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+      }
+
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 12px 18px;
+        font: inherit;
+        cursor: pointer;
+        transition: transform 120ms ease, opacity 120ms ease;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .primary {
+        background: var(--accent);
+        color: white;
+        font-weight: 700;
+      }
+
+      .secondary {
+        background: white;
+        color: var(--ink);
+        border: 1px solid var(--line);
+      }
+
+      .status {
+        margin-top: 16px;
+        padding: 12px 14px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.7);
+        border: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 13px;
+        min-height: 44px;
+      }
+
+      .dashboard {
+        display: grid;
+        gap: 20px;
+        min-width: 0;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .metric {
+        padding: 18px;
+      }
+
+      .metric .label {
+        color: var(--muted);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .metric .value {
+        margin-top: 10px;
+        font-size: 28px;
+        font-weight: 700;
+        letter-spacing: -0.04em;
+      }
+
+      .stream-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+        gap: 20px;
+      }
+
+      .stream-panel,
+      .result-panel,
+      .json-panel {
+        padding: 20px;
+        min-width: 0;
+      }
+
+      .composer,
+      .metric,
+      .stream-panel,
+      .result-panel,
+      .json-panel,
+      .event-list,
+      .answer-box,
+      pre {
+        min-width: 0;
+      }
+
+      .event-list {
+        display: grid;
+        gap: 12px;
+        max-height: 560px;
+        overflow: auto;
+        padding-right: 6px;
+      }
+
+      .event-item {
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.82);
+        padding: 14px 16px;
+      }
+
+      .event-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 12px;
+        margin-bottom: 8px;
+      }
+
+      .event-head-left {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .event-type {
+        font-weight: 700;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .node-badge {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 5px 10px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        border: 1px solid transparent;
+      }
+
+      .node-rag_agent {
+        color: #8a4b00;
+        background: rgba(246, 181, 72, 0.16);
+        border-color: rgba(246, 181, 72, 0.28);
+      }
+
+      .node-chat_agent {
+        color: #005f62;
+        background: rgba(55, 183, 195, 0.16);
+        border-color: rgba(55, 183, 195, 0.28);
+      }
+
+      .node-tool_agent {
+        color: #5b3f99;
+        background: rgba(125, 92, 235, 0.14);
+        border-color: rgba(125, 92, 235, 0.24);
+      }
+
+      .node-merge {
+        color: #19613b;
+        background: rgba(68, 183, 104, 0.16);
+        border-color: rgba(68, 183, 104, 0.28);
+      }
+
+      .node-supervisor,
+      .node-memory {
+        color: #5d6570;
+        background: rgba(24, 34, 47, 0.08);
+        border-color: rgba(24, 34, 47, 0.14);
+      }
+
+      .event-time {
+        color: var(--muted);
+      }
+
+      .event-body {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        line-height: 1.55;
+        color: var(--ink);
+        font-size: 14px;
+        font-family: "SF Mono", "Menlo", "Monaco", monospace;
+        background: rgba(24, 34, 47, 0.04);
+        border: 1px solid rgba(24, 34, 47, 0.08);
+        border-radius: 14px;
+        padding: 12px;
+      }
+
+      .answer-box {
+        min-height: 180px;
+        max-height: 420px;
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 18px;
+        background: rgba(255, 255, 255, 0.86);
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        overflow-y: auto;
+        line-height: 1.75;
+        font-size: 16px;
+      }
+
+      .answer-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      .answer-source {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .answer-source-label {
+        font-weight: 600;
+      }
+
+      .meta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 16px 0 0;
+      }
+
+      .pill {
+        border-radius: 999px;
+        padding: 8px 12px;
+        background: white;
+        border: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      pre {
+        margin: 0;
+        max-height: 380px;
+        overflow: auto;
+        border-radius: 20px;
+        padding: 18px;
+        background: #171d26;
+        color: #d9e2ef;
+        line-height: 1.6;
+        font-size: 13px;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+
+      @media (max-width: 1100px) {
+        .layout,
+        .stream-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .composer {
+          position: static;
+        }
+
+        .metrics {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 640px) {
+        .page {
+          width: min(100vw - 20px, 1380px);
+          margin: 18px auto 36px;
+        }
+
+        .metrics {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <section class="hero">
+        <div class="eyebrow">Agent Observability</div>
+        <h1>LangGraph Streaming Debug Console</h1>
+        <p>
+          这个页面用于直接观察 `/chat/stream` 的 SSE 事件流。你可以看到请求开始、
+          节点开始与完成、答案 chunk、最终 done 结果，以及结构化 debug 信息。
+        </p>
+      </section>
+
+      <div class="layout">
+        <aside class="panel composer">
+          <h2 class="section-title">Request</h2>
+
+          <div class="field">
+            <label for="sessionId">Session ID</label>
+            <input id="sessionId" value="debug-ui" />
+          </div>
+
+          <div class="field">
+            <label for="message">Message</label>
+            <textarea id="message">总结一下刚刚的问题</textarea>
+          </div>
+
+          <label class="toggle">
+            <input id="debugFlag" type="checkbox" checked />
+            返回结构化 debug 信息
+          </label>
+
+          <div class="actions">
+            <button id="sendBtn" class="primary">Start Stream</button>
+            <button id="resetBtn" class="secondary">Reset</button>
+          </div>
+
+          <div id="statusBox" class="status">等待发起请求。</div>
+        </aside>
+
+        <main class="dashboard">
+          <section class="metrics">
+            <div class="panel metric">
+              <div class="label">Request ID</div>
+              <div class="value" id="requestIdValue">-</div>
+            </div>
+            <div class="panel metric">
+              <div class="label">Routes</div>
+              <div class="value" id="routesValue">-</div>
+            </div>
+            <div class="panel metric">
+              <div class="label">Node Events</div>
+              <div class="value" id="nodeCountValue">0</div>
+            </div>
+            <div class="panel metric">
+              <div class="label">Answer Chars</div>
+              <div class="value" id="answerCharsValue">0</div>
+            </div>
+          </section>
+
+          <section class="stream-grid">
+            <div class="panel stream-panel">
+              <h2 class="section-title">Event Timeline</h2>
+              <div id="eventList" class="event-list"></div>
+            </div>
+
+            <div style="display:grid; gap:20px;">
+              <section class="panel result-panel">
+                <h2 class="section-title">Live Answer</h2>
+                <div class="answer-header">
+                  <div class="answer-source">
+                    <span class="answer-source-label">Current Source</span>
+                    <span id="answerSourceBadge" class="node-badge node-supervisor">waiting</span>
+                  </div>
+                </div>
+                <div id="answerBox" class="answer-box">等待内容…</div>
+                <div id="metaRow" class="meta-row"></div>
+              </section>
+
+              <section class="panel json-panel">
+                <h2 class="section-title">Final Debug Payload</h2>
+                <pre id="debugJson">{}</pre>
+              </section>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script>
+      const sendBtn = document.getElementById("sendBtn");
+      const resetBtn = document.getElementById("resetBtn");
+      const sessionIdInput = document.getElementById("sessionId");
+      const messageInput = document.getElementById("message");
+      const debugFlagInput = document.getElementById("debugFlag");
+      const statusBox = document.getElementById("statusBox");
+      const eventList = document.getElementById("eventList");
+      const answerBox = document.getElementById("answerBox");
+      const debugJson = document.getElementById("debugJson");
+      const requestIdValue = document.getElementById("requestIdValue");
+      const routesValue = document.getElementById("routesValue");
+      const nodeCountValue = document.getElementById("nodeCountValue");
+      const answerCharsValue = document.getElementById("answerCharsValue");
+      const metaRow = document.getElementById("metaRow");
+      const answerSourceBadge = document.getElementById("answerSourceBadge");
+
+      let liveAnswer = "";
+      let nodeEvents = 0;
+      let chunkNodeCounts = {};
+      let currentAnswerNode = "waiting";
+
+      function setStatus(text) {
+        statusBox.textContent = text;
+      }
+
+      function resetUI() {
+        liveAnswer = "";
+        nodeEvents = 0;
+        chunkNodeCounts = {};
+        currentAnswerNode = "waiting";
+        eventList.innerHTML = "";
+        answerBox.textContent = "等待内容…";
+        debugJson.textContent = "{}";
+        requestIdValue.textContent = "-";
+        routesValue.textContent = "-";
+        nodeCountValue.textContent = "0";
+        answerCharsValue.textContent = "0";
+        metaRow.innerHTML = "";
+        setAnswerSource("waiting");
+        setStatus("等待发起请求。");
+      }
+
+      function formatTime() {
+        return new Date().toLocaleTimeString("zh-CN", {
+          hour12: false,
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+      }
+
+      function nodeClassName(nodeName) {
+        if (!nodeName) {
+          return "node-supervisor";
+        }
+        return `node-${nodeName}`;
+      }
+
+      function nodeLabel(nodeName) {
+        if (!nodeName || nodeName === "waiting") {
+          return "waiting";
+        }
+        return nodeName;
+      }
+
+      function setAnswerSource(nodeName) {
+        currentAnswerNode = nodeName || "waiting";
+        answerSourceBadge.className = `node-badge ${nodeClassName(currentAnswerNode)}`;
+        answerSourceBadge.textContent = nodeLabel(currentAnswerNode);
+      }
+
+      function appendEvent(type, payload) {
+        const card = document.createElement("article");
+        card.className = "event-item";
+        const nodeName = payload.node || "";
+        const badge = nodeName
+          ? `<span class="node-badge ${nodeClassName(nodeName)}">${nodeLabel(nodeName)}</span>`
+          : "";
+        card.innerHTML = `
+          <div class="event-head">
+            <div class="event-head-left">
+              <span class="event-type">${type}</span>
+              ${badge}
+            </div>
+            <span class="event-time">${formatTime()}</span>
+          </div>
+          <pre class="event-body">${JSON.stringify(payload, null, 2)}</pre>
+        `;
+        eventList.prepend(card);
+      }
+
+      function truncateText(value, maxLen = 220) {
+        if (!value) {
+          return "";
+        }
+        const text = String(value);
+        if (text.length <= maxLen) {
+          return text;
+        }
+        return `${text.slice(0, maxLen)}…`;
+      }
+
+      function appendReactStep(step) {
+        const card = document.createElement("article");
+        card.className = "event-item";
+        const modeBadge = step.mode
+          ? `<span class="node-badge ${step.mode === "react_fallback_rule" ? "node-memory" : "node-tool"}">${step.mode}</span>`
+          : "";
+        const toolBadge = step.selected_tool
+          ? `<span class="node-badge ${nodeClassName(step.selected_tool)}">${step.selected_tool}</span>`
+          : "";
+        const durationPills = [
+          step.planner_duration_ms != null
+            ? `<span class="pill">planner: ${step.planner_duration_ms}ms</span>`
+            : "",
+          step.tool_duration_ms != null
+            ? `<span class="pill">tool: ${step.tool_duration_ms}ms</span>`
+            : "",
+          step.finalize_duration_ms != null
+            ? `<span class="pill">finalizer: ${step.finalize_duration_ms}ms</span>`
+            : "",
+        ]
+          .filter(Boolean)
+          .join("");
+        const thoughtText = step.planner_thought || "-";
+        const actionText = step.selected_tool || "-";
+        const toolInputText = Object.keys(step.tool_input || {}).length
+          ? JSON.stringify(step.tool_input, null, 2)
+          : "{}";
+        const observationText = step.tool_output_preview || "-";
+        card.innerHTML = `
+          <div class="event-head">
+            <div class="event-head-left">
+              <span class="event-type">react_iteration_${step.iteration}</span>
+              ${modeBadge}
+              ${toolBadge}
+            </div>
+            <span class="event-time">${formatTime()}</span>
+          </div>
+          <div class="meta-row" style="margin-bottom: 12px;">${durationPills}</div>
+          <div class="field" style="margin-bottom: 12px;">
+            <label>Thought</label>
+            <pre class="event-body">${thoughtText}</pre>
+          </div>
+          <div class="field" style="margin-bottom: 12px;">
+            <label>Action</label>
+            <pre class="event-body">${actionText}</pre>
+          </div>
+          <div class="field" style="margin-bottom: 12px;">
+            <label>Tool Input</label>
+            <pre class="event-body">${toolInputText}</pre>
+          </div>
+          <div class="field" style="margin-bottom: 0;">
+            <label>Observation</label>
+            <pre class="event-body">${observationText}</pre>
+          </div>
+        `;
+        eventList.prepend(card);
+      }
+
+      function renderNovelScriptReactTimeline(debugPayload) {
+        const agent = debugPayload?.nodes?.novel_script_agent;
+        if (!agent) {
+          return;
+        }
+
+        const iterationTimings = Array.isArray(agent.iteration_timings)
+          ? agent.iteration_timings
+          : [];
+        const toolHistory = Array.isArray(agent.tool_history) ? agent.tool_history : [];
+        const stepsByIteration = new Map();
+
+        for (const item of iterationTimings) {
+          const iteration = item.iteration;
+          if (!stepsByIteration.has(iteration)) {
+            stepsByIteration.set(iteration, {
+              iteration,
+              planner_duration_ms: null,
+              selected_tool: "",
+              planner_thought: "",
+              mode: "",
+              tool_duration_ms: null,
+              tool_input: {},
+              tool_output_preview: "",
+              finalize_duration_ms: null,
+            });
+          }
+          const step = stepsByIteration.get(iteration);
+          if (item.stage === "planner") {
+            step.planner_duration_ms = item.duration_ms;
+            step.selected_tool = item.selected_tool || step.selected_tool;
+            step.planner_thought = item.thought || step.planner_thought;
+            step.mode = item.mode || step.mode;
+          } else if (
+            ["split_into_scenes", "extract_story_facts", "write_script_scene", "review_script"].includes(
+              item.stage
+            )
+          ) {
+            step.tool_duration_ms = item.duration_ms;
+            step.selected_tool = item.selected_tool || step.selected_tool || item.stage;
+          } else if (item.stage === "finalizer") {
+            step.finalize_duration_ms = item.duration_ms;
+            step.selected_tool = step.selected_tool || "finalize";
+          }
+        }
+
+        let toolHistoryIndex = 0;
+        const orderedIterations = [...stepsByIteration.keys()].sort((a, b) => a - b);
+        for (const iteration of orderedIterations) {
+          const step = stepsByIteration.get(iteration);
+          if (
+            ["split_into_scenes", "extract_story_facts", "write_script_scene", "review_script"].includes(
+              step.selected_tool
+            ) &&
+            toolHistory[toolHistoryIndex]
+          ) {
+            const history = toolHistory[toolHistoryIndex];
+            step.tool_input = history.tool_input || {};
+            step.tool_output_preview = truncateText(history.tool_output_preview || "", 260);
+            if (!step.planner_thought) {
+              step.planner_thought = history.thought || "";
+            }
+            toolHistoryIndex += 1;
+          }
+        }
+
+        const reactSteps = orderedIterations
+          .map((iteration) => stepsByIteration.get(iteration))
+          .filter((step) => step.selected_tool || step.planner_thought);
+
+        for (const step of reactSteps.reverse()) {
+          appendReactStep(step);
+        }
+      }
+
+      function setMetaPills(payload) {
+        const routes = payload.routes || [];
+        const summary = payload.summary || "";
+        const timings = payload.debug?.node_timings || {};
+        const routeText = routes.length ? routes.join(" -> ") : "-";
+        routesValue.textContent = routeText;
+
+        const pills = [];
+        pills.push(`<span class="pill">summary: ${summary ? "yes" : "no"}</span>`);
+        pills.push(`<span class="pill">live source: ${nodeLabel(currentAnswerNode)}</span>`);
+        for (const [node, count] of Object.entries(chunkNodeCounts)) {
+          pills.push(`<span class="pill">${node}: ${count} chunks</span>`);
+        }
+        for (const [name, value] of Object.entries(timings)) {
+          pills.push(`<span class="pill">${name}: ${value}ms</span>`);
+        }
+        metaRow.innerHTML = pills.join("");
+      }
+
+      async function consumeStream(response) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) {
+            break;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split("\n\n");
+          buffer = parts.pop() || "";
+
+          for (const rawEvent of parts) {
+            if (!rawEvent.trim()) {
+              continue;
+            }
+            if (rawEvent.startsWith(":")) {
+              continue;
+            }
+
+            let eventName = "message";
+            const dataLines = [];
+
+            for (const line of rawEvent.split("\n")) {
+              if (line.startsWith("event:")) {
+                eventName = line.slice(6).trim();
+              } else if (line.startsWith("data:")) {
+                dataLines.push(line.slice(5).trim());
+              }
+            }
+
+            let payload = {};
+            try {
+              payload = JSON.parse(dataLines.join("\n"));
+            } catch (error) {
+              payload = { parse_error: String(error), raw: dataLines.join("\n") };
+            }
+
+            appendEvent(eventName, payload);
+
+            if (eventName === "start") {
+              requestIdValue.textContent = payload.request_id || "-";
+              setStatus("请求已建立，等待节点事件…");
+            }
+
+            if (eventName === "node_started" || eventName === "node_completed") {
+              nodeEvents += 1;
+              nodeCountValue.textContent = String(nodeEvents);
+            }
+
+            if (eventName === "chunk") {
+              const chunkNode = payload.node || "unknown";
+              chunkNodeCounts[chunkNode] = (chunkNodeCounts[chunkNode] || 0) + 1;
+              setAnswerSource(chunkNode);
+              liveAnswer += payload.delta || "";
+              answerBox.textContent = liveAnswer || "等待内容…";
+              answerCharsValue.textContent = String(liveAnswer.length);
+              metaRow.innerHTML = Object.entries(chunkNodeCounts)
+                .map(([node, count]) => `<span class="pill">${node}: ${count} chunks</span>`)
+                .join("");
+              setStatus(`正在接收 ${chunkNode} 的答案 chunk…`);
+            }
+
+            if (eventName === "done") {
+              const finalAnswer = payload.answer || liveAnswer;
+              liveAnswer = finalAnswer;
+              answerBox.textContent = finalAnswer || "无答案";
+              answerCharsValue.textContent = String(finalAnswer.length);
+              debugJson.textContent = JSON.stringify(payload.debug || {}, null, 2);
+              setMetaPills(payload);
+              renderNovelScriptReactTimeline(payload.debug || {});
+              setStatus("请求完成。");
+            }
+
+            if (eventName === "error") {
+              setStatus(`请求失败：${payload.detail || "未知错误"}`);
+              debugJson.textContent = JSON.stringify(payload, null, 2);
+            }
+          }
+        }
+      }
+
+      async function startStream() {
+        resetUI();
+        sendBtn.disabled = true;
+        setStatus("正在发起流式请求…");
+
+        try {
+          const response = await fetch("/chat/stream", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              session_id: sessionIdInput.value.trim(),
+              message: messageInput.value.trim(),
+              debug: debugFlagInput.checked,
+            }),
+          });
+
+          if (!response.ok || !response.body) {
+            const text = await response.text();
+            throw new Error(text || `HTTP ${response.status}`);
+          }
+
+          await consumeStream(response);
+        } catch (error) {
+          setStatus(`请求异常：${String(error)}`);
+          appendEvent("client_error", { detail: String(error) });
+        } finally {
+          sendBtn.disabled = false;
+        }
+      }
+
+      sendBtn.addEventListener("click", startStream);
+      resetBtn.addEventListener("click", resetUI);
+      resetUI();
+    </script>
+  </body>
+</html>

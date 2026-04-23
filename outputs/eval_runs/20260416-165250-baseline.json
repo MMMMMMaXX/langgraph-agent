@@ -1,0 +1,17 @@
+[
+  {
+    "id": "aria_definition",
+    "status_code": 500,
+    "expected_route": "rag_agent",
+    "actual_route": "-",
+    "doc_used": "-",
+    "memory_used": "-",
+    "request_ms": "1386.08",
+    "rag_ms": "-",
+    "memory_ms": "-",
+    "answer_len": 0,
+    "quality": "poor",
+    "answer": "",
+    "detail": "agent execution failed"
+  }
+]

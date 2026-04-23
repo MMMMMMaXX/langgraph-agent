@@ -1,0 +1,3498 @@
+[
+  {
+    "id": "aria_definition",
+    "category": "knowledge",
+    "status_code": 200,
+    "expected_route": "rag_agent",
+    "actual_route": "rag_agent",
+    "doc_used": "True",
+    "memory_used": "False",
+    "request_ms": "2329.74",
+    "rag_ms": "2270.42",
+    "memory_ms": "8.35",
+    "answer_len": 60,
+    "quality": "good",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "rule-based route",
+        "intent": "retrieval",
+        "routes": [
+          "rag_agent"
+        ]
+      },
+      "rag_agent": {
+        "llm_profiles": {
+          "rewrite": {
+            "kind": "chat",
+            "profile": "rewrite",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          "doc_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          "memory_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "embedding_profiles": {
+          "doc_query": {
+            "kind": "embedding",
+            "profile": "query_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          },
+          "memory_query": {
+            "kind": "embedding",
+            "profile": "query_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          },
+          "doc_index": {
+            "kind": "embedding",
+            "profile": "doc_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          },
+          "memory_index": {
+            "kind": "embedding",
+            "profile": "memory_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          }
+        },
+        "rewritten_query": "WAI-ARIA技术是什么？",
+        "doc_used": true,
+        "memory_used": false,
+        "streamed_answer": false,
+        "threshold": 0.5,
+        "doc_context_chars": 280,
+        "answer_strategy": "definition_short",
+        "answer_context_chars": 280,
+        "answer_max_tokens": 100,
+        "top_docs": [
+          {
+            "preview": "Internet Explorer 中的 JAWS、Google Chrome 中的 ChromeVox等。WAI-AR...",
+            "id": "0::chunk::1",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 1,
+            "start_char": 191,
+            "end_char": 383,
+            "chunk_char_len": 192,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7558,
+            "semantic_score": 0.6243,
+            "keyword_score_norm": 1.0
+          },
+          {
+            "preview": "Rich InternetApplications 的缩写，指网络无障碍倡议 - 无障碍互联网应用。是可以让屏幕阅读器准...",
+            "id": "0::chunk::2",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 2,
+            "start_char": 333,
+            "end_char": 495,
+            "chunk_char_len": 162,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7541,
+            "semantic_score": 0.6217,
+            "keyword_score_norm": 1.0
+          },
+          {
+            "preview": "网络无障碍辅助功能（Accessibility，也被称为 a11y，因为以 A 开头，以 Y 结尾，中间一共 11 个字...",
+            "id": "0::chunk::0",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 245,
+            "chunk_char_len": 245,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense"
+            ],
+            "score": 0.3105,
+            "semantic_score": 0.4777,
+            "keyword_score_norm": 0.0
+          },
+          {
+            "preview": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 非可见区域中的数据不渲染或部分渲染的技术，从而达到极高的...",
+            "id": "3::chunk::0",
+            "doc_id": "3",
+            "doc_title": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 ",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 160,
+            "chunk_char_len": 160,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense"
+            ],
+            "score": 0.2326,
+            "semantic_score": 0.3578,
+            "keyword_score_norm": 0.0
+          },
+          {
+            "preview": "上海气候和北京类似，但更热更潮湿。",
+            "id": "2::chunk::0",
+            "doc_id": "2",
+            "doc_title": "上海气候和北京类似，但更热更潮湿。",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 17,
+            "chunk_char_len": 17,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense"
+            ],
+            "score": 0.1818,
+            "semantic_score": 0.2796,
+            "keyword_score_norm": 0.0
+          }
+        ],
+        "filtered_docs": [
+          {
+            "preview": "Internet Explorer 中的 JAWS、Google Chrome 中的 ChromeVox等。WAI-AR...",
+            "id": "0::chunk::1",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 1,
+            "start_char": 191,
+            "end_char": 383,
+            "chunk_char_len": 192,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7558,
+            "semantic_score": 0.6243,
+            "keyword_score_norm": 1.0
+          },
+          {
+            "preview": "Rich InternetApplications 的缩写，指网络无障碍倡议 - 无障碍互联网应用。是可以让屏幕阅读器准...",
+            "id": "0::chunk::2",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 2,
+            "start_char": 333,
+            "end_char": 495,
+            "chunk_char_len": 162,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7541,
+            "semantic_score": 0.6217,
+            "keyword_score_norm": 1.0
+          }
+        ],
+        "pre_rerank_docs": [
+          {
+            "preview": "Internet Explorer 中的 JAWS、Google Chrome 中的 ChromeVox等。WAI-AR...",
+            "id": "0::chunk::1",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 1,
+            "start_char": 191,
+            "end_char": 383,
+            "chunk_char_len": 192,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7558,
+            "semantic_score": 0.6243,
+            "keyword_score_norm": 1.0
+          },
+          {
+            "preview": "Rich InternetApplications 的缩写，指网络无障碍倡议 - 无障碍互联网应用。是可以让屏幕阅读器准...",
+            "id": "0::chunk::2",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 2,
+            "start_char": 333,
+            "end_char": 495,
+            "chunk_char_len": 162,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7541,
+            "semantic_score": 0.6217,
+            "keyword_score_norm": 1.0
+          }
+        ],
+        "post_rerank_docs": [
+          {
+            "preview": "Internet Explorer 中的 JAWS、Google Chrome 中的 ChromeVox等。WAI-AR...",
+            "id": "0::chunk::1",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 1,
+            "start_char": 191,
+            "end_char": 383,
+            "chunk_char_len": 192,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7558,
+            "semantic_score": 0.6243,
+            "keyword_score_norm": 1.0
+          },
+          {
+            "preview": "Rich InternetApplications 的缩写，指网络无障碍倡议 - 无障碍互联网应用。是可以让屏幕阅读器准...",
+            "id": "0::chunk::2",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 2,
+            "start_char": 333,
+            "end_char": 495,
+            "chunk_char_len": 162,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7541,
+            "semantic_score": 0.6217,
+            "keyword_score_norm": 1.0
+          }
+        ],
+        "merged_docs": [
+          {
+            "preview": "Internet Explorer 中的 JAWS、Google Chrome 中的 ChromeVox等。WAI-AR...",
+            "id": "0::chunk::1+0::chunk::2",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 1,
+            "start_char": 191,
+            "end_char": 495,
+            "chunk_char_len": 355,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "merged_chunk_ids": [
+              "0::chunk::1",
+              "0::chunk::2"
+            ],
+            "merged_chunk_indexes": [
+              1,
+              2
+            ],
+            "score": 0.7558,
+            "semantic_score": 0.6243,
+            "keyword_score_norm": 1.0
+          }
+        ],
+        "pre_rerank_memory": [],
+        "post_rerank_memory": [],
+        "retrieval_debug": {
+          "doc": {
+            "collection": "docs",
+            "where": null,
+            "requested_top_k": 5,
+            "candidate_top_k": 20,
+            "returned_count": 5,
+            "filtered_count": 2,
+            "consumed_count": 2,
+            "rerank_skipped": true,
+            "rerank_skip_reason": "adjacent_high_confidence",
+            "merged_count": 1,
+            "merged": true
+          },
+          "memory": {
+            "collection": "memory",
+            "where": null,
+            "enabled": false,
+            "skip_reason": "doc_hit",
+            "requested_top_k": 5,
+            "candidate_top_k": 20,
+            "returned_count": 0,
+            "consumed_count": 0
+          }
+        },
+        "sub_timings_ms": {
+          "rewrite": 0.0,
+          "docSearch": 1079.62,
+          "docRerank": 0.0,
+          "memorySearch": 0.0,
+          "memoryRerank": 0.0,
+          "answerGeneration": 1190.26
+        },
+        "errors": []
+      },
+      "merge": {
+        "llm_profiles": {
+          "merge_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "agent_outputs": {
+          "rag_agent": "WAI-ARIA是网络无障碍倡议-无障碍互联网应用的技术规范，通过aria让屏幕阅读器准确识别网页中的内容、变化和状态。"
+        },
+        "final_answer_preview": "WAI-ARIA是网络无障碍倡议-无障碍互联网应用的技术规范，通过aria让屏幕阅读器准确识别网页中的内容、变化和状态。",
+        "streamed_answer": false,
+        "error": ""
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": false,
+        "stored_to_vector": false,
+        "skipped_vector_store": true,
+        "vector_store_skip_reason": "rag_definition_doc_hit",
+        "stored_to_history": true,
+        "skipped_history_store": false,
+        "history_store_skip_reason": "",
+        "conversation_history_path": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260422-161711-baseline.conversation_history.sqlite3",
+        "conversation_history_backend": "sqlite",
+        "memory_write_decision": {
+          "should_write": false,
+          "skip_reason": "rag_definition_doc_hit",
+          "memory_type": "fact",
+          "tags": [
+            "wai-aria"
+          ],
+          "memory_key": "general:semantic:81103671eef6",
+          "confidence": 0.8,
+          "source_route": "rag_agent"
+        },
+        "stored_tags": [],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.01,
+          "vectorStore": 0.0,
+          "historyStore": 8.09,
+          "messagePrune": 0.0
+        },
+        "embedding_profiles": {
+          "vector_store": {
+            "kind": "embedding",
+            "profile": "memory_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          }
+        },
+        "errors": []
+      }
+    },
+    "answer": "WAI-ARIA是网络无障碍倡议-无障碍互联网应用的技术规范，通过aria让屏幕阅读器准确识别网页中的内容、变化和状态。",
+    "detail": ""
+  },
+  {
+    "id": "virtual_list_definition",
+    "category": "knowledge",
+    "status_code": 200,
+    "expected_route": "rag_agent",
+    "actual_route": "rag_agent",
+    "doc_used": "True",
+    "memory_used": "False",
+    "request_ms": "1150.25",
+    "rag_ms": "1144.02",
+    "memory_ms": "1.11",
+    "answer_len": 53,
+    "quality": "good",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "rule-based route",
+        "intent": "retrieval",
+        "routes": [
+          "rag_agent"
+        ]
+      },
+      "rag_agent": {
+        "llm_profiles": {
+          "rewrite": {
+            "kind": "chat",
+            "profile": "rewrite",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          "doc_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          "memory_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "embedding_profiles": {
+          "doc_query": {
+            "kind": "embedding",
+            "profile": "query_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          },
+          "memory_query": {
+            "kind": "embedding",
+            "profile": "query_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          },
+          "doc_index": {
+            "kind": "embedding",
+            "profile": "doc_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          },
+          "memory_index": {
+            "kind": "embedding",
+            "profile": "memory_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          }
+        },
+        "rewritten_query": "虚拟列表是什么？",
+        "doc_used": true,
+        "memory_used": false,
+        "streamed_answer": false,
+        "threshold": 0.5,
+        "doc_context_chars": 160,
+        "answer_strategy": "definition_short",
+        "answer_context_chars": 280,
+        "answer_max_tokens": 100,
+        "top_docs": [
+          {
+            "preview": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 非可见区域中的数据不渲染或部分渲染的技术，从而达到极高的...",
+            "id": "3::chunk::0",
+            "doc_id": "3",
+            "doc_title": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 ",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 160,
+            "chunk_char_len": 160,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7612,
+            "semantic_score": 0.6325,
+            "keyword_score_norm": 1.0
+          },
+          {
+            "preview": "上海气候和北京类似，但更热更潮湿。",
+            "id": "2::chunk::0",
+            "doc_id": "2",
+            "doc_title": "上海气候和北京类似，但更热更潮湿。",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 17,
+            "chunk_char_len": 17,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense"
+            ],
+            "score": 0.2257,
+            "semantic_score": 0.3473,
+            "keyword_score_norm": 0.0
+          },
+          {
+            "preview": "Rich InternetApplications 的缩写，指网络无障碍倡议 - 无障碍互联网应用。是可以让屏幕阅读器准...",
+            "id": "0::chunk::2",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 2,
+            "start_char": 333,
+            "end_char": 495,
+            "chunk_char_len": 162,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense"
+            ],
+            "score": 0.211,
+            "semantic_score": 0.3246,
+            "keyword_score_norm": 0.0
+          },
+          {
+            "preview": "北京气候四季分明，夏天很热，冬天很冷。",
+            "id": "1::chunk::0",
+            "doc_id": "1",
+            "doc_title": "北京气候四季分明，夏天很热，冬天很冷。",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 19,
+            "chunk_char_len": 19,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense"
+            ],
+            "score": 0.1912,
+            "semantic_score": 0.2942,
+            "keyword_score_norm": 0.0
+          },
+          {
+            "preview": "网络无障碍辅助功能（Accessibility，也被称为 a11y，因为以 A 开头，以 Y 结尾，中间一共 11 个字...",
+            "id": "0::chunk::0",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 245,
+            "chunk_char_len": 245,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense"
+            ],
+            "score": 0.1729,
+            "semantic_score": 0.266,
+            "keyword_score_norm": 0.0
+          }
+        ],
+        "filtered_docs": [
+          {
+            "preview": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 非可见区域中的数据不渲染或部分渲染的技术，从而达到极高的...",
+            "id": "3::chunk::0",
+            "doc_id": "3",
+            "doc_title": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 ",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 160,
+            "chunk_char_len": 160,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7612,
+            "semantic_score": 0.6325,
+            "keyword_score_norm": 1.0
+          }
+        ],
+        "pre_rerank_docs": [
+          {
+            "preview": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 非可见区域中的数据不渲染或部分渲染的技术，从而达到极高的...",
+            "id": "3::chunk::0",
+            "doc_id": "3",
+            "doc_title": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 ",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 160,
+            "chunk_char_len": 160,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7612,
+            "semantic_score": 0.6325,
+            "keyword_score_norm": 1.0
+          }
+        ],
+        "post_rerank_docs": [
+          {
+            "preview": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 非可见区域中的数据不渲染或部分渲染的技术，从而达到极高的...",
+            "id": "3::chunk::0",
+            "doc_id": "3",
+            "doc_title": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 ",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 160,
+            "chunk_char_len": 160,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7612,
+            "semantic_score": 0.6325,
+            "keyword_score_norm": 1.0
+          }
+        ],
+        "merged_docs": [
+          {
+            "preview": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 非可见区域中的数据不渲染或部分渲染的技术，从而达到极高的...",
+            "id": "3::chunk::0",
+            "doc_id": "3",
+            "doc_title": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 ",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 160,
+            "chunk_char_len": 160,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "merged_chunk_ids": [
+              "3::chunk::0"
+            ],
+            "merged_chunk_indexes": [
+              0
+            ],
+            "score": 0.7612,
+            "semantic_score": 0.6325,
+            "keyword_score_norm": 1.0
+          }
+        ],
+        "pre_rerank_memory": [],
+        "post_rerank_memory": [],
+        "retrieval_debug": {
+          "doc": {
+            "collection": "docs",
+            "where": null,
+            "requested_top_k": 5,
+            "candidate_top_k": 20,
+            "returned_count": 5,
+            "filtered_count": 1,
+            "consumed_count": 1,
+            "rerank_skipped": true,
+            "rerank_skip_reason": "single_candidate",
+            "merged_count": 1,
+            "merged": false
+          },
+          "memory": {
+            "collection": "memory",
+            "where": null,
+            "enabled": false,
+            "skip_reason": "doc_hit",
+            "requested_top_k": 5,
+            "candidate_top_k": 20,
+            "returned_count": 0,
+            "consumed_count": 0
+          }
+        },
+        "sub_timings_ms": {
+          "rewrite": 0.0,
+          "docSearch": 289.77,
+          "docRerank": 0.0,
+          "memorySearch": 0.0,
+          "memoryRerank": 0.0,
+          "answerGeneration": 854.04
+        },
+        "errors": []
+      },
+      "merge": {
+        "llm_profiles": {
+          "merge_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "agent_outputs": {
+          "rag_agent": "虚拟列表是按需显示的技术，只渲染屏幕可见区域的列表项。其最关键作用是提升渲染性能，避免一次性加载大量数据。"
+        },
+        "final_answer_preview": "虚拟列表是按需显示的技术，只渲染屏幕可见区域的列表项。其最关键作用是提升渲染性能，避免一次性加载大量数据。",
+        "streamed_answer": false,
+        "error": ""
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": false,
+        "stored_to_vector": false,
+        "skipped_vector_store": true,
+        "vector_store_skip_reason": "rag_definition_doc_hit",
+        "stored_to_history": true,
+        "skipped_history_store": false,
+        "history_store_skip_reason": "",
+        "conversation_history_path": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260422-161711-baseline.conversation_history.sqlite3",
+        "conversation_history_backend": "sqlite",
+        "memory_write_decision": {
+          "should_write": false,
+          "skip_reason": "rag_definition_doc_hit",
+          "memory_type": "fact",
+          "tags": [
+            "virtual-list"
+          ],
+          "memory_key": "general:semantic:380ed637bd85",
+          "confidence": 0.8,
+          "source_route": "rag_agent"
+        },
+        "stored_tags": [],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.0,
+          "vectorStore": 0.0,
+          "historyStore": 1.01,
+          "messagePrune": 0.0
+        },
+        "embedding_profiles": {
+          "vector_store": {
+            "kind": "embedding",
+            "profile": "memory_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          }
+        },
+        "errors": []
+      }
+    },
+    "answer": "虚拟列表是按需显示的技术，只渲染屏幕可见区域的列表项。其最关键作用是提升渲染性能，避免一次性加载大量数据。",
+    "detail": ""
+  },
+  {
+    "id": "beijing_climate",
+    "category": "knowledge",
+    "status_code": 200,
+    "expected_route": "rag_agent",
+    "actual_route": "rag_agent",
+    "doc_used": "True",
+    "memory_used": "False",
+    "request_ms": "1601.70",
+    "rag_ms": "1400.12",
+    "memory_ms": "196.44",
+    "answer_len": 19,
+    "quality": "ok",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "rule-based route",
+        "intent": "retrieval",
+        "routes": [
+          "rag_agent"
+        ]
+      },
+      "rag_agent": {
+        "llm_profiles": {
+          "rewrite": {
+            "kind": "chat",
+            "profile": "rewrite",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          "doc_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          "memory_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "embedding_profiles": {
+          "doc_query": {
+            "kind": "embedding",
+            "profile": "query_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          },
+          "memory_query": {
+            "kind": "embedding",
+            "profile": "query_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          },
+          "doc_index": {
+            "kind": "embedding",
+            "profile": "doc_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          },
+          "memory_index": {
+            "kind": "embedding",
+            "profile": "memory_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          }
+        },
+        "rewritten_query": "北京气候怎么样？",
+        "doc_used": true,
+        "memory_used": false,
+        "streamed_answer": false,
+        "threshold": 0.5,
+        "doc_context_chars": 19,
+        "answer_strategy": "default_short",
+        "answer_context_chars": 360,
+        "answer_max_tokens": 180,
+        "top_docs": [
+          {
+            "preview": "北京气候四季分明，夏天很热，冬天很冷。",
+            "id": "1::chunk::0",
+            "doc_id": "1",
+            "doc_title": "北京气候四季分明，夏天很热，冬天很冷。",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 19,
+            "chunk_char_len": 19,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7647,
+            "semantic_score": 0.638,
+            "keyword_score_norm": 1.0
+          },
+          {
+            "preview": "上海气候和北京类似，但更热更潮湿。",
+            "id": "2::chunk::0",
+            "doc_id": "2",
+            "doc_title": "上海气候和北京类似，但更热更潮湿。",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 17,
+            "chunk_char_len": 17,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7172,
+            "semantic_score": 0.565,
+            "keyword_score_norm": 1.0
+          },
+          {
+            "preview": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 非可见区域中的数据不渲染或部分渲染的技术，从而达到极高的...",
+            "id": "3::chunk::0",
+            "doc_id": "3",
+            "doc_title": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 ",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 160,
+            "chunk_char_len": 160,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense"
+            ],
+            "score": 0.1036,
+            "semantic_score": 0.1593,
+            "keyword_score_norm": 0.0
+          },
+          {
+            "preview": "Rich InternetApplications 的缩写，指网络无障碍倡议 - 无障碍互联网应用。是可以让屏幕阅读器准...",
+            "id": "0::chunk::2",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 2,
+            "start_char": 333,
+            "end_char": 495,
+            "chunk_char_len": 162,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense"
+            ],
+            "score": 0.1,
+            "semantic_score": 0.1538,
+            "keyword_score_norm": 0.0
+          },
+          {
+            "preview": "网络无障碍辅助功能（Accessibility，也被称为 a11y，因为以 A 开头，以 Y 结尾，中间一共 11 个字...",
+            "id": "0::chunk::0",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 245,
+            "chunk_char_len": 245,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense"
+            ],
+            "score": 0.0624,
+            "semantic_score": 0.096,
+            "keyword_score_norm": 0.0
+          }
+        ],
+        "filtered_docs": [
+          {
+            "preview": "北京气候四季分明，夏天很热，冬天很冷。",
+            "id": "1::chunk::0",
+            "doc_id": "1",
+            "doc_title": "北京气候四季分明，夏天很热，冬天很冷。",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 19,
+            "chunk_char_len": 19,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7647,
+            "semantic_score": 0.638,
+            "keyword_score_norm": 1.0
+          },
+          {
+            "preview": "上海气候和北京类似，但更热更潮湿。",
+            "id": "2::chunk::0",
+            "doc_id": "2",
+            "doc_title": "上海气候和北京类似，但更热更潮湿。",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 17,
+            "chunk_char_len": 17,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7172,
+            "semantic_score": 0.565,
+            "keyword_score_norm": 1.0
+          }
+        ],
+        "pre_rerank_docs": [
+          {
+            "preview": "北京气候四季分明，夏天很热，冬天很冷。",
+            "id": "1::chunk::0",
+            "doc_id": "1",
+            "doc_title": "北京气候四季分明，夏天很热，冬天很冷。",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 19,
+            "chunk_char_len": 19,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7647,
+            "semantic_score": 0.638,
+            "keyword_score_norm": 1.0
+          },
+          {
+            "preview": "上海气候和北京类似，但更热更潮湿。",
+            "id": "2::chunk::0",
+            "doc_id": "2",
+            "doc_title": "上海气候和北京类似，但更热更潮湿。",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 17,
+            "chunk_char_len": 17,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7172,
+            "semantic_score": 0.565,
+            "keyword_score_norm": 1.0
+          }
+        ],
+        "post_rerank_docs": [
+          {
+            "preview": "北京气候四季分明，夏天很热，冬天很冷。",
+            "id": "1::chunk::0",
+            "doc_id": "1",
+            "doc_title": "北京气候四季分明，夏天很热，冬天很冷。",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 19,
+            "chunk_char_len": 19,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7647,
+            "semantic_score": 0.638,
+            "keyword_score_norm": 1.0
+          }
+        ],
+        "merged_docs": [
+          {
+            "preview": "北京气候四季分明，夏天很热，冬天很冷。",
+            "id": "1::chunk::0",
+            "doc_id": "1",
+            "doc_title": "北京气候四季分明，夏天很热，冬天很冷。",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 19,
+            "chunk_char_len": 19,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "merged_chunk_ids": [
+              "1::chunk::0"
+            ],
+            "merged_chunk_indexes": [
+              0
+            ],
+            "score": 0.7647,
+            "semantic_score": 0.638,
+            "keyword_score_norm": 1.0
+          }
+        ],
+        "pre_rerank_memory": [],
+        "post_rerank_memory": [],
+        "retrieval_debug": {
+          "doc": {
+            "collection": "docs",
+            "where": null,
+            "requested_top_k": 5,
+            "candidate_top_k": 20,
+            "returned_count": 5,
+            "filtered_count": 2,
+            "consumed_count": 1,
+            "rerank_skipped": false,
+            "rerank_skip_reason": "",
+            "merged_count": 1,
+            "merged": false
+          },
+          "memory": {
+            "collection": "memory",
+            "where": null,
+            "enabled": false,
+            "skip_reason": "doc_hit",
+            "requested_top_k": 5,
+            "candidate_top_k": 20,
+            "returned_count": 0,
+            "consumed_count": 0
+          }
+        },
+        "sub_timings_ms": {
+          "rewrite": 0.0,
+          "docSearch": 255.44,
+          "docRerank": 488.93,
+          "memorySearch": 0.0,
+          "memoryRerank": 0.0,
+          "answerGeneration": 655.37
+        },
+        "errors": []
+      },
+      "merge": {
+        "llm_profiles": {
+          "merge_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "agent_outputs": {
+          "rag_agent": "北京气候四季分明，夏天很热，冬天很冷。"
+        },
+        "final_answer_preview": "北京气候四季分明，夏天很热，冬天很冷。",
+        "streamed_answer": false,
+        "error": ""
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": false,
+        "stored_to_vector": true,
+        "skipped_vector_store": false,
+        "vector_store_skip_reason": "",
+        "stored_to_history": true,
+        "skipped_history_store": false,
+        "history_store_skip_reason": "",
+        "conversation_history_path": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260422-161711-baseline.conversation_history.sqlite3",
+        "conversation_history_backend": "sqlite",
+        "memory_write_decision": {
+          "should_write": true,
+          "skip_reason": "",
+          "memory_type": "fact",
+          "tags": [
+            "climate",
+            "北京"
+          ],
+          "memory_key": "北京:climate",
+          "confidence": 0.8,
+          "source_route": "rag_agent"
+        },
+        "stored_tags": [
+          "climate",
+          "北京"
+        ],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.0,
+          "vectorStore": 194.98,
+          "historyStore": 1.32,
+          "messagePrune": 0.0
+        },
+        "embedding_profiles": {
+          "vector_store": {
+            "kind": "embedding",
+            "profile": "memory_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          }
+        },
+        "errors": []
+      }
+    },
+    "answer": "北京气候四季分明，夏天很热，冬天很冷。",
+    "detail": ""
+  },
+  {
+    "id": "shanghai_followup_after_beijing",
+    "category": "multi_turn",
+    "status_code": 200,
+    "expected_route": "rag_agent",
+    "actual_route": "rag_agent",
+    "doc_used": "True",
+    "memory_used": "False",
+    "request_ms": "3131.65",
+    "rag_ms": "734.10",
+    "memory_ms": "206.00",
+    "answer_len": 17,
+    "quality": "ok",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "llm fallback",
+        "intent": "retrieval",
+        "routes": [
+          "rag_agent"
+        ]
+      },
+      "rag_agent": {
+        "llm_profiles": {
+          "rewrite": {
+            "kind": "chat",
+            "profile": "rewrite",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          "doc_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          "memory_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "embedding_profiles": {
+          "doc_query": {
+            "kind": "embedding",
+            "profile": "query_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          },
+          "memory_query": {
+            "kind": "embedding",
+            "profile": "query_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          },
+          "doc_index": {
+            "kind": "embedding",
+            "profile": "doc_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          },
+          "memory_index": {
+            "kind": "embedding",
+            "profile": "memory_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          }
+        },
+        "rewritten_query": "上海气候怎么样？",
+        "doc_used": true,
+        "memory_used": false,
+        "streamed_answer": false,
+        "threshold": 0.5,
+        "doc_context_chars": 17,
+        "answer_strategy": "default_short",
+        "answer_context_chars": 360,
+        "answer_max_tokens": 180,
+        "top_docs": [
+          {
+            "preview": "上海气候和北京类似，但更热更潮湿。",
+            "id": "2::chunk::0",
+            "doc_id": "2",
+            "doc_title": "上海气候和北京类似，但更热更潮湿。",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 17,
+            "chunk_char_len": 17,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7624,
+            "semantic_score": 0.6345,
+            "keyword_score_norm": 1.0
+          },
+          {
+            "preview": "北京气候四季分明，夏天很热，冬天很冷。",
+            "id": "1::chunk::0",
+            "doc_id": "1",
+            "doc_title": "北京气候四季分明，夏天很热，冬天很冷。",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 19,
+            "chunk_char_len": 19,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.4446,
+            "semantic_score": 0.5045,
+            "keyword_score_norm": 0.3333
+          },
+          {
+            "preview": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 非可见区域中的数据不渲染或部分渲染的技术，从而达到极高的...",
+            "id": "3::chunk::0",
+            "doc_id": "3",
+            "doc_title": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 ",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 160,
+            "chunk_char_len": 160,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense"
+            ],
+            "score": 0.1067,
+            "semantic_score": 0.1642,
+            "keyword_score_norm": 0.0
+          },
+          {
+            "preview": "Rich InternetApplications 的缩写，指网络无障碍倡议 - 无障碍互联网应用。是可以让屏幕阅读器准...",
+            "id": "0::chunk::2",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 2,
+            "start_char": 333,
+            "end_char": 495,
+            "chunk_char_len": 162,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense"
+            ],
+            "score": 0.097,
+            "semantic_score": 0.1492,
+            "keyword_score_norm": 0.0
+          },
+          {
+            "preview": "Internet Explorer 中的 JAWS、Google Chrome 中的 ChromeVox等。WAI-AR...",
+            "id": "0::chunk::1",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 1,
+            "start_char": 191,
+            "end_char": 383,
+            "chunk_char_len": 192,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense"
+            ],
+            "score": 0.0622,
+            "semantic_score": 0.0957,
+            "keyword_score_norm": 0.0
+          }
+        ],
+        "filtered_docs": [
+          {
+            "preview": "上海气候和北京类似，但更热更潮湿。",
+            "id": "2::chunk::0",
+            "doc_id": "2",
+            "doc_title": "上海气候和北京类似，但更热更潮湿。",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 17,
+            "chunk_char_len": 17,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7624,
+            "semantic_score": 0.6345,
+            "keyword_score_norm": 1.0
+          }
+        ],
+        "pre_rerank_docs": [
+          {
+            "preview": "上海气候和北京类似，但更热更潮湿。",
+            "id": "2::chunk::0",
+            "doc_id": "2",
+            "doc_title": "上海气候和北京类似，但更热更潮湿。",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 17,
+            "chunk_char_len": 17,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7624,
+            "semantic_score": 0.6345,
+            "keyword_score_norm": 1.0
+          }
+        ],
+        "post_rerank_docs": [
+          {
+            "preview": "上海气候和北京类似，但更热更潮湿。",
+            "id": "2::chunk::0",
+            "doc_id": "2",
+            "doc_title": "上海气候和北京类似，但更热更潮湿。",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 17,
+            "chunk_char_len": 17,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7624,
+            "semantic_score": 0.6345,
+            "keyword_score_norm": 1.0
+          }
+        ],
+        "merged_docs": [
+          {
+            "preview": "上海气候和北京类似，但更热更潮湿。",
+            "id": "2::chunk::0",
+            "doc_id": "2",
+            "doc_title": "上海气候和北京类似，但更热更潮湿。",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 17,
+            "chunk_char_len": 17,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "merged_chunk_ids": [
+              "2::chunk::0"
+            ],
+            "merged_chunk_indexes": [
+              0
+            ],
+            "score": 0.7624,
+            "semantic_score": 0.6345,
+            "keyword_score_norm": 1.0
+          }
+        ],
+        "pre_rerank_memory": [],
+        "post_rerank_memory": [],
+        "retrieval_debug": {
+          "doc": {
+            "collection": "docs",
+            "where": null,
+            "requested_top_k": 5,
+            "candidate_top_k": 20,
+            "returned_count": 5,
+            "filtered_count": 1,
+            "consumed_count": 1,
+            "rerank_skipped": true,
+            "rerank_skip_reason": "single_candidate",
+            "merged_count": 1,
+            "merged": false
+          },
+          "memory": {
+            "collection": "memory",
+            "where": null,
+            "enabled": false,
+            "skip_reason": "doc_hit",
+            "requested_top_k": 5,
+            "candidate_top_k": 20,
+            "returned_count": 0,
+            "consumed_count": 0
+          }
+        },
+        "sub_timings_ms": {
+          "rewrite": 0.0,
+          "docSearch": 203.8,
+          "docRerank": 0.0,
+          "memorySearch": 0.0,
+          "memoryRerank": 0.0,
+          "answerGeneration": 529.89
+        },
+        "errors": []
+      },
+      "merge": {
+        "llm_profiles": {
+          "merge_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "agent_outputs": {
+          "rag_agent": "上海气候和北京类似，但更热更潮湿。"
+        },
+        "final_answer_preview": "上海气候和北京类似，但更热更潮湿。",
+        "streamed_answer": false,
+        "error": ""
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": false,
+        "stored_to_vector": true,
+        "skipped_vector_store": false,
+        "vector_store_skip_reason": "",
+        "stored_to_history": true,
+        "skipped_history_store": false,
+        "history_store_skip_reason": "",
+        "conversation_history_path": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260422-161711-baseline.conversation_history.sqlite3",
+        "conversation_history_backend": "sqlite",
+        "memory_write_decision": {
+          "should_write": true,
+          "skip_reason": "",
+          "memory_type": "fact",
+          "tags": [
+            "climate",
+            "上海"
+          ],
+          "memory_key": "上海:climate",
+          "confidence": 0.8,
+          "source_route": "rag_agent"
+        },
+        "stored_tags": [
+          "climate",
+          "上海"
+        ],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.01,
+          "vectorStore": 204.48,
+          "historyStore": 1.36,
+          "messagePrune": 0.0
+        },
+        "embedding_profiles": {
+          "vector_store": {
+            "kind": "embedding",
+            "profile": "memory_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          }
+        },
+        "errors": []
+      }
+    },
+    "answer": "上海气候和北京类似，但更热更潮湿。",
+    "detail": ""
+  },
+  {
+    "id": "history_summary_after_two_turns",
+    "category": "memory",
+    "status_code": 200,
+    "expected_route": "chat_agent",
+    "actual_route": "chat_agent",
+    "doc_used": "True",
+    "memory_used": "True",
+    "request_ms": "3171.03",
+    "rag_ms": "-",
+    "memory_ms": "0.09",
+    "answer_len": 35,
+    "quality": "good",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "meta/history query",
+        "intent": "chat",
+        "routes": [
+          "chat_agent"
+        ]
+      },
+      "chat_agent": {
+        "llm_profiles": {
+          "answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          "summary": {
+            "kind": "chat",
+            "profile": "summary",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "task_type": "summary",
+        "memory_lookup_policy": "working_memory_only",
+        "history_lookup_policy": "none",
+        "used_memory": true,
+        "used_history": false,
+        "used_summary": false,
+        "streamed_answer": false,
+        "pre_rerank_memory": [],
+        "post_rerank_memory": [],
+        "history_hits": [],
+        "retrieval_debug": {
+          "memory": {
+            "policy": "working_memory_only",
+            "collection": "",
+            "where": null,
+            "returned_count": 0,
+            "consumed_count": 0,
+            "working_memory_item_count": 2
+          },
+          "history": {
+            "backend": "sqlite",
+            "policy": "none",
+            "path": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260422-161711-baseline.conversation_history.sqlite3",
+            "effective_path": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260422-161711-baseline.conversation_history.sqlite3",
+            "returned_count": 0,
+            "consumed_count": 0
+          }
+        },
+        "facts": {
+          "cities": [],
+          "topics": [],
+          "memory_types": []
+        },
+        "sub_timings_ms": {
+          "memoryPrepare": 0.01,
+          "operatorClassify": 0.0,
+          "contextBuild": 0.0,
+          "existenceLookup": 0.0,
+          "answerGeneration": 0.01
+        },
+        "errors": []
+      },
+      "merge": {
+        "llm_profiles": {
+          "merge_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "agent_outputs": {
+          "chat_agent": "刚刚的问题包括：\n1. 用户询问北京气候怎么样\n2. 用户询问那上海呢"
+        },
+        "final_answer_preview": "刚刚的问题包括： 1. 用户询问北京气候怎么样 2. 用户询问那上海呢",
+        "streamed_answer": false,
+        "error": ""
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": true,
+        "stored_to_vector": false,
+        "skipped_vector_store": true,
+        "vector_store_skip_reason": "meta_query",
+        "stored_to_history": false,
+        "skipped_history_store": true,
+        "history_store_skip_reason": "meta_query",
+        "conversation_history_path": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260422-161711-baseline.conversation_history.sqlite3",
+        "conversation_history_backend": "sqlite",
+        "memory_write_decision": {
+          "should_write": false,
+          "skip_reason": "meta_query",
+          "memory_type": "summary",
+          "tags": [],
+          "memory_key": "general:semantic:d48eda5d2096",
+          "confidence": 0.8,
+          "source_route": "chat_agent"
+        },
+        "stored_tags": [],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.0,
+          "vectorStore": 0.0,
+          "historyStore": 0.0,
+          "messagePrune": 0.0
+        },
+        "embedding_profiles": {
+          "vector_store": {
+            "kind": "embedding",
+            "profile": "memory_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          }
+        },
+        "errors": []
+      }
+    },
+    "answer": "刚刚的问题包括：\n1. 用户询问北京气候怎么样\n2. 用户询问那上海呢",
+    "detail": ""
+  },
+  {
+    "id": "history_summary_after_rag_definition",
+    "category": "memory",
+    "status_code": 200,
+    "expected_route": "chat_agent",
+    "actual_route": "chat_agent",
+    "doc_used": "True",
+    "memory_used": "True",
+    "request_ms": "1138.62",
+    "rag_ms": "-",
+    "memory_ms": "0.08",
+    "answer_len": 28,
+    "quality": "good",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "meta/history query",
+        "intent": "chat",
+        "routes": [
+          "chat_agent"
+        ]
+      },
+      "chat_agent": {
+        "llm_profiles": {
+          "answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          "summary": {
+            "kind": "chat",
+            "profile": "summary",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "task_type": "summary",
+        "memory_lookup_policy": "working_memory_only",
+        "history_lookup_policy": "all_history",
+        "used_memory": true,
+        "used_history": true,
+        "used_summary": false,
+        "streamed_answer": false,
+        "pre_rerank_memory": [],
+        "post_rerank_memory": [],
+        "history_hits": [
+          {
+            "preview": "WAI-ARIA技术是什么？",
+            "timestamp": 1776845845.1433458,
+            "routes": [
+              "rag_agent"
+            ],
+            "tags": [
+              "wai-aria"
+            ],
+            "stored_to_vector": false,
+            "vector_store_skip_reason": "rag_definition_doc_hit"
+          }
+        ],
+        "retrieval_debug": {
+          "memory": {
+            "policy": "working_memory_only",
+            "collection": "",
+            "where": null,
+            "returned_count": 0,
+            "consumed_count": 0,
+            "working_memory_item_count": 0
+          },
+          "history": {
+            "backend": "sqlite",
+            "policy": "all_history",
+            "path": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260422-161711-baseline.conversation_history.sqlite3",
+            "effective_path": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260422-161711-baseline.conversation_history.sqlite3",
+            "returned_count": 1,
+            "consumed_count": 1
+          }
+        },
+        "facts": {
+          "cities": [],
+          "topics": [],
+          "memory_types": []
+        },
+        "sub_timings_ms": {
+          "memoryPrepare": 0.01,
+          "operatorClassify": 0.0,
+          "contextBuild": 0.0,
+          "existenceLookup": 0.0,
+          "answerGeneration": 0.55
+        },
+        "errors": []
+      },
+      "merge": {
+        "llm_profiles": {
+          "merge_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "agent_outputs": {
+          "chat_agent": "历史问题包括：\n1. 用户询问WAI-ARIA技术是什么"
+        },
+        "final_answer_preview": "历史问题包括： 1. 用户询问WAI-ARIA技术是什么",
+        "streamed_answer": false,
+        "error": ""
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": true,
+        "stored_to_vector": false,
+        "skipped_vector_store": true,
+        "vector_store_skip_reason": "meta_query",
+        "stored_to_history": false,
+        "skipped_history_store": true,
+        "history_store_skip_reason": "meta_query",
+        "conversation_history_path": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260422-161711-baseline.conversation_history.sqlite3",
+        "conversation_history_backend": "sqlite",
+        "memory_write_decision": {
+          "should_write": false,
+          "skip_reason": "meta_query",
+          "memory_type": "summary",
+          "tags": [],
+          "memory_key": "general:semantic:142dcacddfde",
+          "confidence": 0.8,
+          "source_route": "chat_agent"
+        },
+        "stored_tags": [],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.0,
+          "vectorStore": 0.0,
+          "historyStore": 0.0,
+          "messagePrune": 0.0
+        },
+        "embedding_profiles": {
+          "vector_store": {
+            "kind": "embedding",
+            "profile": "memory_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          }
+        },
+        "errors": []
+      }
+    },
+    "answer": "历史问题包括：\n1. 用户询问WAI-ARIA技术是什么",
+    "detail": ""
+  },
+  {
+    "id": "simple_math",
+    "category": "tool",
+    "status_code": 200,
+    "expected_route": "tool_agent",
+    "actual_route": "tool_agent",
+    "doc_used": "-",
+    "memory_used": "-",
+    "request_ms": "1235.20",
+    "rag_ms": "-",
+    "memory_ms": "1.73",
+    "answer_len": 8,
+    "quality": "ok",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "rule-based route",
+        "intent": "tool",
+        "routes": [
+          "tool_agent"
+        ]
+      },
+      "tool_agent": {
+        "llm_profiles": {
+          "tool_chat": {
+            "kind": "chat",
+            "profile": "tool_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "tool_type": "calculate",
+        "tool_input": "1+2等于多少",
+        "tool_calls": [
+          {
+            "id": "call_00_xRBdG9jT0gzv3tKVKvnxMhRD",
+            "name": "calculate",
+            "arguments": {
+              "expression": "1+2"
+            }
+          }
+        ],
+        "tool_results": [
+          {
+            "id": "call_00_xRBdG9jT0gzv3tKVKvnxMhRD",
+            "name": "calculate",
+            "output": "3"
+          }
+        ],
+        "finalize_with_llm": false,
+        "streamed_answer": false,
+        "error": "",
+        "tool_result": "计算结果是 3。"
+      },
+      "merge": {
+        "llm_profiles": {
+          "merge_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "agent_outputs": {
+          "tool_agent": "计算结果是 3。"
+        },
+        "final_answer_preview": "计算结果是 3。",
+        "streamed_answer": false,
+        "error": ""
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": false,
+        "stored_to_vector": false,
+        "skipped_vector_store": true,
+        "vector_store_skip_reason": "tool_request",
+        "stored_to_history": true,
+        "skipped_history_store": false,
+        "history_store_skip_reason": "",
+        "conversation_history_path": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260422-161711-baseline.conversation_history.sqlite3",
+        "conversation_history_backend": "sqlite",
+        "memory_write_decision": {
+          "should_write": false,
+          "skip_reason": "tool_request",
+          "memory_type": "fact",
+          "tags": [],
+          "memory_key": "general:semantic:36d5c9d794d9",
+          "confidence": 0.8,
+          "source_route": "tool_agent"
+        },
+        "stored_tags": [],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.01,
+          "vectorStore": 0.0,
+          "historyStore": 1.58,
+          "messagePrune": 0.0
+        },
+        "embedding_profiles": {
+          "vector_store": {
+            "kind": "embedding",
+            "profile": "memory_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          }
+        },
+        "errors": []
+      }
+    },
+    "answer": "计算结果是 3。",
+    "detail": ""
+  },
+  {
+    "id": "beijing_weather_tool",
+    "category": "tool",
+    "status_code": 200,
+    "expected_route": "tool_agent",
+    "actual_route": "tool_agent",
+    "doc_used": "-",
+    "memory_used": "-",
+    "request_ms": "997.11",
+    "rag_ms": "-",
+    "memory_ms": "1.41",
+    "answer_len": 16,
+    "quality": "ok",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "rule-based route",
+        "intent": "tool",
+        "routes": [
+          "tool_agent"
+        ]
+      },
+      "tool_agent": {
+        "llm_profiles": {
+          "tool_chat": {
+            "kind": "chat",
+            "profile": "tool_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "tool_type": "get_weather",
+        "tool_input": "北京天气怎么样",
+        "tool_calls": [
+          {
+            "id": "call_00_VvFsgliUbA1ljC6cpVHUJsx9",
+            "name": "get_weather",
+            "arguments": {
+              "city": "北京"
+            }
+          }
+        ],
+        "tool_results": [
+          {
+            "id": "call_00_VvFsgliUbA1ljC6cpVHUJsx9",
+            "name": "get_weather",
+            "output": "北京今天天气晴，气温 26°C。"
+          }
+        ],
+        "finalize_with_llm": false,
+        "streamed_answer": false,
+        "error": "",
+        "tool_result": "北京今天天气晴，气温 26°C。"
+      },
+      "merge": {
+        "llm_profiles": {
+          "merge_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "agent_outputs": {
+          "tool_agent": "北京今天天气晴，气温 26°C。"
+        },
+        "final_answer_preview": "北京今天天气晴，气温 26°C。",
+        "streamed_answer": false,
+        "error": ""
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": false,
+        "stored_to_vector": false,
+        "skipped_vector_store": true,
+        "vector_store_skip_reason": "tool_request",
+        "stored_to_history": true,
+        "skipped_history_store": false,
+        "history_store_skip_reason": "",
+        "conversation_history_path": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260422-161711-baseline.conversation_history.sqlite3",
+        "conversation_history_backend": "sqlite",
+        "memory_write_decision": {
+          "should_write": false,
+          "skip_reason": "tool_request",
+          "memory_type": "fact",
+          "tags": [
+            "weather",
+            "北京"
+          ],
+          "memory_key": "北京:weather",
+          "confidence": 0.8,
+          "source_route": "tool_agent"
+        },
+        "stored_tags": [],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.0,
+          "vectorStore": 0.0,
+          "historyStore": 1.3,
+          "messagePrune": 0.0
+        },
+        "embedding_profiles": {
+          "vector_store": {
+            "kind": "embedding",
+            "profile": "memory_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          }
+        },
+        "errors": []
+      }
+    },
+    "answer": "北京今天天气晴，气温 26°C。",
+    "detail": ""
+  },
+  {
+    "id": "weather_and_math_mixed_tool",
+    "category": "tool",
+    "status_code": 200,
+    "expected_route": "tool_agent",
+    "actual_route": "tool_agent",
+    "doc_used": "-",
+    "memory_used": "-",
+    "request_ms": "2250.15",
+    "rag_ms": "-",
+    "memory_ms": "2.33",
+    "answer_len": 30,
+    "quality": "good",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "rule-based route",
+        "intent": "tool",
+        "routes": [
+          "tool_agent"
+        ]
+      },
+      "tool_agent": {
+        "llm_profiles": {
+          "tool_chat": {
+            "kind": "chat",
+            "profile": "tool_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "tool_type": "get_weather,calculate",
+        "tool_input": "北京天气怎么样，顺便算一下 3*7",
+        "tool_calls": [
+          {
+            "id": "call_00_9ysoV1O4smPzH64a2EYRHpAm",
+            "name": "get_weather",
+            "arguments": {
+              "city": "北京"
+            }
+          },
+          {
+            "id": "call_01_kHUwBKsPA2fiG6VgB6Dsfhhf",
+            "name": "calculate",
+            "arguments": {
+              "expression": "3*7"
+            }
+          }
+        ],
+        "tool_results": [
+          {
+            "id": "call_00_9ysoV1O4smPzH64a2EYRHpAm",
+            "name": "get_weather",
+            "output": "北京今天天气晴，气温 26°C。"
+          },
+          {
+            "id": "call_01_kHUwBKsPA2fiG6VgB6Dsfhhf",
+            "name": "calculate",
+            "output": "21"
+          }
+        ],
+        "finalize_with_llm": true,
+        "streamed_answer": false,
+        "error": "",
+        "tool_result": "北京今天天气晴朗，气温26°C。另外，3乘以7的结果是21。"
+      },
+      "merge": {
+        "llm_profiles": {
+          "merge_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "agent_outputs": {
+          "tool_agent": "北京今天天气晴朗，气温26°C。另外，3乘以7的结果是21。"
+        },
+        "final_answer_preview": "北京今天天气晴朗，气温26°C。另外，3乘以7的结果是21。",
+        "streamed_answer": false,
+        "error": ""
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": false,
+        "stored_to_vector": false,
+        "skipped_vector_store": true,
+        "vector_store_skip_reason": "tool_request",
+        "stored_to_history": true,
+        "skipped_history_store": false,
+        "history_store_skip_reason": "",
+        "conversation_history_path": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260422-161711-baseline.conversation_history.sqlite3",
+        "conversation_history_backend": "sqlite",
+        "memory_write_decision": {
+          "should_write": false,
+          "skip_reason": "tool_request",
+          "memory_type": "fact",
+          "tags": [
+            "weather",
+            "北京"
+          ],
+          "memory_key": "北京:weather",
+          "confidence": 0.8,
+          "source_route": "tool_agent"
+        },
+        "stored_tags": [],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.01,
+          "vectorStore": 0.0,
+          "historyStore": 2.1,
+          "messagePrune": 0.0
+        },
+        "embedding_profiles": {
+          "vector_store": {
+            "kind": "embedding",
+            "profile": "memory_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          }
+        },
+        "errors": []
+      }
+    },
+    "answer": "北京今天天气晴朗，气温26°C。另外，3乘以7的结果是21。",
+    "detail": ""
+  },
+  {
+    "id": "wai_aria_should_not_route_to_tool",
+    "category": "routing",
+    "status_code": 200,
+    "expected_route": "rag_agent",
+    "actual_route": "rag_agent",
+    "doc_used": "True",
+    "memory_used": "False",
+    "request_ms": "2295.34",
+    "rag_ms": "2004.46",
+    "memory_ms": "278.12",
+    "answer_len": 90,
+    "quality": "good",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "rule-based route",
+        "intent": "retrieval",
+        "routes": [
+          "rag_agent"
+        ]
+      },
+      "rag_agent": {
+        "llm_profiles": {
+          "rewrite": {
+            "kind": "chat",
+            "profile": "rewrite",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          "doc_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          "memory_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "embedding_profiles": {
+          "doc_query": {
+            "kind": "embedding",
+            "profile": "query_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          },
+          "memory_query": {
+            "kind": "embedding",
+            "profile": "query_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          },
+          "doc_index": {
+            "kind": "embedding",
+            "profile": "doc_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          },
+          "memory_index": {
+            "kind": "embedding",
+            "profile": "memory_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          }
+        },
+        "rewritten_query": "WAI-ARIA技术？",
+        "doc_used": true,
+        "memory_used": false,
+        "streamed_answer": false,
+        "threshold": 0.5,
+        "doc_context_chars": 355,
+        "answer_strategy": "default_short",
+        "answer_context_chars": 360,
+        "answer_max_tokens": 180,
+        "top_docs": [
+          {
+            "preview": "Rich InternetApplications 的缩写，指网络无障碍倡议 - 无障碍互联网应用。是可以让屏幕阅读器准...",
+            "id": "0::chunk::2",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 2,
+            "start_char": 333,
+            "end_char": 495,
+            "chunk_char_len": 162,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7441,
+            "semantic_score": 0.6063,
+            "keyword_score_norm": 1.0
+          },
+          {
+            "preview": "Internet Explorer 中的 JAWS、Google Chrome 中的 ChromeVox等。WAI-AR...",
+            "id": "0::chunk::1",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 1,
+            "start_char": 191,
+            "end_char": 383,
+            "chunk_char_len": 192,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7245,
+            "semantic_score": 0.5762,
+            "keyword_score_norm": 1.0
+          },
+          {
+            "preview": "网络无障碍辅助功能（Accessibility，也被称为 a11y，因为以 A 开头，以 Y 结尾，中间一共 11 个字...",
+            "id": "0::chunk::0",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 245,
+            "chunk_char_len": 245,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense"
+            ],
+            "score": 0.2991,
+            "semantic_score": 0.4602,
+            "keyword_score_norm": 0.0
+          },
+          {
+            "preview": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 非可见区域中的数据不渲染或部分渲染的技术，从而达到极高的...",
+            "id": "3::chunk::0",
+            "doc_id": "3",
+            "doc_title": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 ",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 160,
+            "chunk_char_len": 160,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense"
+            ],
+            "score": 0.2479,
+            "semantic_score": 0.3813,
+            "keyword_score_norm": 0.0
+          },
+          {
+            "preview": "上海气候和北京类似，但更热更潮湿。",
+            "id": "2::chunk::0",
+            "doc_id": "2",
+            "doc_title": "上海气候和北京类似，但更热更潮湿。",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 17,
+            "chunk_char_len": 17,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense"
+            ],
+            "score": 0.2057,
+            "semantic_score": 0.3165,
+            "keyword_score_norm": 0.0
+          }
+        ],
+        "filtered_docs": [
+          {
+            "preview": "Rich InternetApplications 的缩写，指网络无障碍倡议 - 无障碍互联网应用。是可以让屏幕阅读器准...",
+            "id": "0::chunk::2",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 2,
+            "start_char": 333,
+            "end_char": 495,
+            "chunk_char_len": 162,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7441,
+            "semantic_score": 0.6063,
+            "keyword_score_norm": 1.0
+          },
+          {
+            "preview": "Internet Explorer 中的 JAWS、Google Chrome 中的 ChromeVox等。WAI-AR...",
+            "id": "0::chunk::1",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 1,
+            "start_char": 191,
+            "end_char": 383,
+            "chunk_char_len": 192,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7245,
+            "semantic_score": 0.5762,
+            "keyword_score_norm": 1.0
+          }
+        ],
+        "pre_rerank_docs": [
+          {
+            "preview": "Rich InternetApplications 的缩写，指网络无障碍倡议 - 无障碍互联网应用。是可以让屏幕阅读器准...",
+            "id": "0::chunk::2",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 2,
+            "start_char": 333,
+            "end_char": 495,
+            "chunk_char_len": 162,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7441,
+            "semantic_score": 0.6063,
+            "keyword_score_norm": 1.0
+          },
+          {
+            "preview": "Internet Explorer 中的 JAWS、Google Chrome 中的 ChromeVox等。WAI-AR...",
+            "id": "0::chunk::1",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 1,
+            "start_char": 191,
+            "end_char": 383,
+            "chunk_char_len": 192,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7245,
+            "semantic_score": 0.5762,
+            "keyword_score_norm": 1.0
+          }
+        ],
+        "post_rerank_docs": [
+          {
+            "preview": "Rich InternetApplications 的缩写，指网络无障碍倡议 - 无障碍互联网应用。是可以让屏幕阅读器准...",
+            "id": "0::chunk::2",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 2,
+            "start_char": 333,
+            "end_char": 495,
+            "chunk_char_len": 162,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7441,
+            "semantic_score": 0.6063,
+            "keyword_score_norm": 1.0
+          },
+          {
+            "preview": "Internet Explorer 中的 JAWS、Google Chrome 中的 ChromeVox等。WAI-AR...",
+            "id": "0::chunk::1",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 1,
+            "start_char": 191,
+            "end_char": 383,
+            "chunk_char_len": 192,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "score": 0.7245,
+            "semantic_score": 0.5762,
+            "keyword_score_norm": 1.0
+          }
+        ],
+        "merged_docs": [
+          {
+            "preview": "Internet Explorer 中的 JAWS、Google Chrome 中的 ChromeVox等。WAI-AR...",
+            "id": "0::chunk::1+0::chunk::2",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 1,
+            "start_char": 191,
+            "end_char": 495,
+            "chunk_char_len": 355,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense",
+              "keyword"
+            ],
+            "merged_chunk_ids": [
+              "0::chunk::1",
+              "0::chunk::2"
+            ],
+            "merged_chunk_indexes": [
+              1,
+              2
+            ],
+            "score": 0.7441,
+            "semantic_score": 0.6063,
+            "keyword_score_norm": 1.0
+          }
+        ],
+        "pre_rerank_memory": [],
+        "post_rerank_memory": [],
+        "retrieval_debug": {
+          "doc": {
+            "collection": "docs",
+            "where": null,
+            "requested_top_k": 5,
+            "candidate_top_k": 20,
+            "returned_count": 5,
+            "filtered_count": 2,
+            "consumed_count": 2,
+            "rerank_skipped": true,
+            "rerank_skip_reason": "adjacent_high_confidence",
+            "merged_count": 1,
+            "merged": true
+          },
+          "memory": {
+            "collection": "memory",
+            "where": null,
+            "enabled": false,
+            "skip_reason": "doc_hit",
+            "requested_top_k": 5,
+            "candidate_top_k": 20,
+            "returned_count": 0,
+            "consumed_count": 0
+          }
+        },
+        "sub_timings_ms": {
+          "rewrite": 0.0,
+          "docSearch": 679.11,
+          "docRerank": 0.0,
+          "memorySearch": 0.0,
+          "memoryRerank": 0.0,
+          "answerGeneration": 1324.92
+        },
+        "errors": []
+      },
+      "merge": {
+        "llm_profiles": {
+          "merge_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "agent_outputs": {
+          "rag_agent": "WAI-ARIA 是一个为残疾人士提供无障碍访问动态、可交互 Web 内容的技术规范。它让屏幕阅读器准确识别网页内容、变化和状态。通过 aria-label 等属性构建无障碍模式。"
+        },
+        "final_answer_preview": "WAI-ARIA 是一个为残疾人士提供无障碍访问动态、可交互 Web 内容的技术规范。它让屏幕阅读器准确识别网页内容、变化和状态。通过 aria-label 等属性构建无障碍模式。",
+        "streamed_answer": false,
+        "error": ""
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": false,
+        "stored_to_vector": true,
+        "skipped_vector_store": false,
+        "vector_store_skip_reason": "",
+        "stored_to_history": true,
+        "skipped_history_store": false,
+        "history_store_skip_reason": "",
+        "conversation_history_path": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260422-161711-baseline.conversation_history.sqlite3",
+        "conversation_history_backend": "sqlite",
+        "memory_write_decision": {
+          "should_write": true,
+          "skip_reason": "",
+          "memory_type": "fact",
+          "tags": [
+            "wai-aria"
+          ],
+          "memory_key": "general:semantic:218d6320d110",
+          "confidence": 0.8,
+          "source_route": "rag_agent"
+        },
+        "stored_tags": [
+          "wai-aria"
+        ],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.01,
+          "vectorStore": 274.98,
+          "historyStore": 2.68,
+          "messagePrune": 0.0
+        },
+        "embedding_profiles": {
+          "vector_store": {
+            "kind": "embedding",
+            "profile": "memory_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          }
+        },
+        "errors": []
+      }
+    },
+    "answer": "WAI-ARIA 是一个为残疾人士提供无障碍访问动态、可交互 Web 内容的技术规范。它让屏幕阅读器准确识别网页内容、变化和状态。通过 aria-label 等属性构建无障碍模式。",
+    "detail": ""
+  },
+  {
+    "id": "unknown_concept_fallback",
+    "category": "fallback",
+    "status_code": 200,
+    "expected_route": "rag_agent",
+    "actual_route": "rag_agent",
+    "doc_used": "False",
+    "memory_used": "False",
+    "request_ms": "474.96",
+    "rag_ms": "461.20",
+    "memory_ms": "1.49",
+    "answer_len": 4,
+    "quality": "poor",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "rule-based route",
+        "intent": "retrieval",
+        "routes": [
+          "rag_agent"
+        ]
+      },
+      "rag_agent": {
+        "llm_profiles": {
+          "rewrite": {
+            "kind": "chat",
+            "profile": "rewrite",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          "doc_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          "memory_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "embedding_profiles": {
+          "doc_query": {
+            "kind": "embedding",
+            "profile": "query_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          },
+          "memory_query": {
+            "kind": "embedding",
+            "profile": "query_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          },
+          "doc_index": {
+            "kind": "embedding",
+            "profile": "doc_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          },
+          "memory_index": {
+            "kind": "embedding",
+            "profile": "memory_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          }
+        },
+        "rewritten_query": "量子果冻协议是什么？",
+        "doc_used": false,
+        "memory_used": false,
+        "streamed_answer": false,
+        "threshold": 0.5,
+        "doc_context_chars": 0,
+        "answer_strategy": "definition_short",
+        "answer_context_chars": 280,
+        "answer_max_tokens": 100,
+        "top_docs": [
+          {
+            "preview": "Rich InternetApplications 的缩写，指网络无障碍倡议 - 无障碍互联网应用。是可以让屏幕阅读器准...",
+            "id": "0::chunk::2",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 2,
+            "start_char": 333,
+            "end_char": 495,
+            "chunk_char_len": 162,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense"
+            ],
+            "score": 0.2144,
+            "semantic_score": 0.3298,
+            "keyword_score_norm": 0.0
+          },
+          {
+            "preview": "上海气候和北京类似，但更热更潮湿。",
+            "id": "2::chunk::0",
+            "doc_id": "2",
+            "doc_title": "上海气候和北京类似，但更热更潮湿。",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 17,
+            "chunk_char_len": 17,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense"
+            ],
+            "score": 0.1954,
+            "semantic_score": 0.3006,
+            "keyword_score_norm": 0.0
+          },
+          {
+            "preview": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 非可见区域中的数据不渲染或部分渲染的技术，从而达到极高的...",
+            "id": "3::chunk::0",
+            "doc_id": "3",
+            "doc_title": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 ",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 160,
+            "chunk_char_len": 160,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense"
+            ],
+            "score": 0.1849,
+            "semantic_score": 0.2845,
+            "keyword_score_norm": 0.0
+          },
+          {
+            "preview": "北京气候四季分明，夏天很热，冬天很冷。",
+            "id": "1::chunk::0",
+            "doc_id": "1",
+            "doc_title": "北京气候四季分明，夏天很热，冬天很冷。",
+            "source": "db.json",
+            "chunk_index": 0,
+            "start_char": 0,
+            "end_char": 19,
+            "chunk_char_len": 19,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense"
+            ],
+            "score": 0.1811,
+            "semantic_score": 0.2786,
+            "keyword_score_norm": 0.0
+          },
+          {
+            "preview": "Internet Explorer 中的 JAWS、Google Chrome 中的 ChromeVox等。WAI-AR...",
+            "id": "0::chunk::1",
+            "doc_id": "0",
+            "doc_title": "网络无障碍辅助功能（Accessibility，也被称为 a11",
+            "source": "db.json",
+            "chunk_index": 1,
+            "start_char": 191,
+            "end_char": 383,
+            "chunk_char_len": 192,
+            "retrieval_source": "dense",
+            "retrieval_sources": [
+              "dense"
+            ],
+            "score": 0.151,
+            "semantic_score": 0.2323,
+            "keyword_score_norm": 0.0
+          }
+        ],
+        "filtered_docs": [],
+        "pre_rerank_docs": [],
+        "post_rerank_docs": [],
+        "merged_docs": [],
+        "pre_rerank_memory": [],
+        "post_rerank_memory": [],
+        "retrieval_debug": {
+          "doc": {
+            "collection": "docs",
+            "where": null,
+            "requested_top_k": 5,
+            "candidate_top_k": 20,
+            "returned_count": 5,
+            "filtered_count": 0,
+            "consumed_count": 0,
+            "rerank_skipped": true,
+            "rerank_skip_reason": "single_candidate",
+            "merged_count": 0,
+            "merged": false
+          },
+          "memory": {
+            "collection": "memory",
+            "where": {
+              "session_id": "eval-unknown-concept"
+            },
+            "enabled": true,
+            "skip_reason": "",
+            "requested_top_k": 5,
+            "candidate_top_k": 20,
+            "returned_count": 0,
+            "consumed_count": 0
+          }
+        },
+        "sub_timings_ms": {
+          "rewrite": 0.0,
+          "docSearch": 249.64,
+          "docRerank": 0.0,
+          "memorySearch": 211.37,
+          "memoryRerank": 0.0,
+          "answerGeneration": 0.0
+        },
+        "errors": []
+      },
+      "merge": {
+        "llm_profiles": {
+          "merge_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "agent_outputs": {
+          "rag_agent": "资料不足"
+        },
+        "final_answer_preview": "资料不足",
+        "streamed_answer": false,
+        "error": ""
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": false,
+        "stored_to_vector": false,
+        "skipped_vector_store": true,
+        "vector_store_skip_reason": "bad_answer",
+        "stored_to_history": true,
+        "skipped_history_store": false,
+        "history_store_skip_reason": "",
+        "conversation_history_path": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260422-161711-baseline.conversation_history.sqlite3",
+        "conversation_history_backend": "sqlite",
+        "memory_write_decision": {
+          "should_write": false,
+          "skip_reason": "bad_answer",
+          "memory_type": "fact",
+          "tags": [],
+          "memory_key": "general:semantic:0e7527860550",
+          "confidence": 0.8,
+          "source_route": "rag_agent"
+        },
+        "stored_tags": [],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.0,
+          "vectorStore": 0.0,
+          "historyStore": 1.31,
+          "messagePrune": 0.0
+        },
+        "embedding_profiles": {
+          "vector_store": {
+            "kind": "embedding",
+            "profile": "memory_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          }
+        },
+        "errors": []
+      }
+    },
+    "answer": "资料不足",
+    "detail": ""
+  },
+  {
+    "id": "session_isolation_summary",
+    "category": "session_isolation",
+    "status_code": 200,
+    "expected_route": "chat_agent",
+    "actual_route": "chat_agent",
+    "doc_used": "-",
+    "memory_used": "False",
+    "request_ms": "4.39",
+    "rag_ms": "-",
+    "memory_ms": "0.08",
+    "answer_len": 4,
+    "quality": "poor",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "meta/history query",
+        "intent": "chat",
+        "routes": [
+          "chat_agent"
+        ]
+      },
+      "chat_agent": {
+        "llm_profiles": {
+          "answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          "summary": {
+            "kind": "chat",
+            "profile": "summary",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "task_type": "summary",
+        "memory_lookup_policy": "working_memory_only",
+        "history_lookup_policy": "recent_history",
+        "used_memory": false,
+        "used_history": false,
+        "used_summary": false,
+        "streamed_answer": false,
+        "pre_rerank_memory": [],
+        "post_rerank_memory": [],
+        "history_hits": [],
+        "retrieval_debug": {
+          "memory": {
+            "policy": "working_memory_only",
+            "collection": "",
+            "where": null,
+            "returned_count": 0,
+            "consumed_count": 0,
+            "working_memory_item_count": 0
+          },
+          "history": {
+            "backend": "sqlite",
+            "policy": "recent_history",
+            "path": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260422-161711-baseline.conversation_history.sqlite3",
+            "effective_path": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260422-161711-baseline.conversation_history.sqlite3",
+            "returned_count": 0,
+            "consumed_count": 0
+          }
+        },
+        "facts": {
+          "cities": [],
+          "topics": [],
+          "memory_types": []
+        },
+        "sub_timings_ms": {
+          "memoryPrepare": 0.01,
+          "operatorClassify": 0.0,
+          "contextBuild": 0.0,
+          "existenceLookup": 0.0,
+          "answerGeneration": 0.39
+        },
+        "errors": []
+      },
+      "merge": {
+        "llm_profiles": {
+          "merge_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "agent_outputs": {
+          "chat_agent": "资料不足"
+        },
+        "final_answer_preview": "资料不足",
+        "streamed_answer": false,
+        "error": ""
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": true,
+        "stored_to_vector": false,
+        "skipped_vector_store": true,
+        "vector_store_skip_reason": "bad_answer",
+        "stored_to_history": false,
+        "skipped_history_store": true,
+        "history_store_skip_reason": "meta_query",
+        "conversation_history_path": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260422-161711-baseline.conversation_history.sqlite3",
+        "conversation_history_backend": "sqlite",
+        "memory_write_decision": {
+          "should_write": false,
+          "skip_reason": "bad_answer",
+          "memory_type": "summary",
+          "tags": [],
+          "memory_key": "general:semantic:d48eda5d2096",
+          "confidence": 0.8,
+          "source_route": "chat_agent"
+        },
+        "stored_tags": [],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.0,
+          "vectorStore": 0.0,
+          "historyStore": 0.0,
+          "messagePrune": 0.0
+        },
+        "embedding_profiles": {
+          "vector_store": {
+            "kind": "embedding",
+            "profile": "memory_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          }
+        },
+        "errors": []
+      }
+    },
+    "answer": "资料不足",
+    "detail": ""
+  },
+  {
+    "id": "novel_to_script_basic",
+    "category": "creative_agent",
+    "status_code": 200,
+    "expected_route": "novel_script_agent",
+    "actual_route": "novel_script_agent",
+    "doc_used": "-",
+    "memory_used": "-",
+    "request_ms": "17917.24",
+    "rag_ms": "-",
+    "memory_ms": "7.81",
+    "answer_len": 1115,
+    "quality": "good",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "creative script adaptation query",
+        "intent": "creative",
+        "routes": [
+          "novel_script_agent"
+        ]
+      },
+      "novel_script_agent": {
+        "source_text_preview": "第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。 【团队等级：1级，目前团队人数：1人；每天每人补助10元。】 赵百汇用手指敲了敲桌面，桌子上干瘪的布口袋就鼓了起来，里面多出了10斤大米。 “一天就10元钱，也只有买大米最划算了。” “2元一斤的大米，一天的补助只...",
+        "source_text_len": 804,
+        "chapter_count": 1,
+        "llm_profiles": {
+          "creative_planner": {
+            "kind": "chat",
+            "profile": "creative_planner",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          "creative_write": {
+            "kind": "chat",
+            "profile": "creative_write",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          "creative_review": {
+            "kind": "chat",
+            "profile": "creative_review",
+            "provider": "glm",
+            "model": "embedding-3"
+          }
+        },
+        "scene_count": 1,
+        "draft_count": 1,
+        "review_count": 0,
+        "iteration_count": 5,
+        "timing_breakdown_ms": {
+          "planner_context_build": 0.3,
+          "planner_llm_call": 7926.98,
+          "planner_parse": 0.11,
+          "planner": 7927.69,
+          "extract_story_facts": 3418.85,
+          "split_into_scenes": 0.18,
+          "write_script_scene": 6524.37,
+          "finalizer": 0.54
+        },
+        "iteration_timings": [
+          {
+            "iteration": 0,
+            "stage": "planner_context_build",
+            "duration_ms": 0.03,
+            "context_chars": 575,
+            "scene_count": 0,
+            "draft_count": 0,
+            "review_count": 0,
+            "kind": "chat",
+            "profile": "creative_planner",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          {
+            "iteration": 0,
+            "stage": "planner_llm_call",
+            "duration_ms": 1289.18,
+            "context_chars": 575,
+            "answer_chars": 124,
+            "kind": "chat",
+            "profile": "creative_planner",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          {
+            "iteration": 0,
+            "stage": "planner_parse",
+            "duration_ms": 0.02,
+            "selected_tool": "extract_story_facts",
+            "kind": "chat",
+            "profile": "creative_planner",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          {
+            "iteration": 1,
+            "stage": "planner",
+            "duration_ms": 1289.26,
+            "mode": "react_llm",
+            "selected_tool": "extract_story_facts",
+            "thought": "当前故事事实和场景计划都为空，需要先提取故事事实，为后续的场景拆分和剧本创作打下基础。",
+            "context_chars": 575,
+            "planner_answer_chars": 124,
+            "kind": "chat",
+            "profile": "creative_planner",
+            "provider": "deepseek",
+            "model": "deepseek-chat",
+            "error": ""
+          },
+          {
+            "iteration": 1,
+            "stage": "extract_story_facts",
+            "duration_ms": 2153.48,
+            "selected_tool": "extract_story_facts",
+            "scene_count": 0,
+            "draft_count": 0,
+            "review_count": 0,
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          {
+            "iteration": 1,
+            "stage": "planner_context_build",
+            "duration_ms": 0.05,
+            "context_chars": 575,
+            "scene_count": 0,
+            "draft_count": 0,
+            "review_count": 0,
+            "kind": "chat",
+            "profile": "creative_planner",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          {
+            "iteration": 1,
+            "stage": "planner_llm_call",
+            "duration_ms": 1610.99,
+            "context_chars": 575,
+            "answer_chars": 205,
+            "kind": "chat",
+            "profile": "creative_planner",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          {
+            "iteration": 1,
+            "stage": "planner_parse",
+            "duration_ms": 0.02,
+            "selected_tool": "split_into_scenes",
+            "kind": "chat",
+            "profile": "creative_planner",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          {
+            "iteration": 2,
+            "stage": "planner",
+            "duration_ms": 1611.15,
+            "mode": "react_llm",
+            "selected_tool": "split_into_scenes",
+            "thought": "当前 scene_plan_count 为 0，story_facts 为空，还没有任何场景计划或故事事实。需要先拆解原文并抽取关键信息，才能为后续剧本创作奠定",
+            "context_chars": 575,
+            "planner_answer_chars": 205,
+            "kind": "chat",
+            "profile": "creative_planner",
+            "provider": "deepseek",
+            "model": "deepseek-chat",
+            "error": ""
+          },
+          {
+            "iteration": 2,
+            "stage": "split_into_scenes",
+            "duration_ms": 0.18,
+            "selected_tool": "split_into_scenes",
+            "scene_count": 1,
+            "draft_count": 0,
+            "review_count": 0
+          },
+          {
+            "iteration": 2,
+            "stage": "planner_context_build",
+            "duration_ms": 0.07,
+            "context_chars": 453,
+            "scene_count": 1,
+            "draft_count": 0,
+            "review_count": 0,
+            "kind": "chat",
+            "profile": "creative_planner",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          {
+            "iteration": 2,
+            "stage": "planner_llm_call",
+            "duration_ms": 1631.07,
+            "context_chars": 453,
+            "answer_chars": 140,
+            "kind": "chat",
+            "profile": "creative_planner",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          {
+            "iteration": 2,
+            "stage": "planner_parse",
+            "duration_ms": 0.01,
+            "selected_tool": "extract_story_facts",
+            "kind": "chat",
+            "profile": "creative_planner",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          {
+            "iteration": 3,
+            "stage": "planner",
+            "duration_ms": 1631.19,
+            "mode": "react_llm",
+            "selected_tool": "extract_story_facts",
+            "thought": "场景计划已创建但 story_facts 为空，需要先提取故事事实（角色、地点、冲突、目标）来为后续剧本写作提供基础。",
+            "context_chars": 453,
+            "planner_answer_chars": 140,
+            "kind": "chat",
+            "profile": "creative_planner",
+            "provider": "deepseek",
+            "model": "deepseek-chat",
+            "error": ""
+          },
+          {
+            "iteration": 3,
+            "stage": "extract_story_facts",
+            "duration_ms": 1265.37,
+            "selected_tool": "extract_story_facts",
+            "scene_count": 1,
+            "draft_count": 0,
+            "review_count": 0,
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          {
+            "iteration": 3,
+            "stage": "planner_context_build",
+            "duration_ms": 0.08,
+            "context_chars": 487,
+            "scene_count": 1,
+            "draft_count": 0,
+            "review_count": 0,
+            "kind": "chat",
+            "profile": "creative_planner",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          {
+            "iteration": 3,
+            "stage": "planner_llm_call",
+            "duration_ms": 1405.03,
+            "context_chars": 487,
+            "answer_chars": 151,
+            "kind": "chat",
+            "profile": "creative_planner",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          {
+            "iteration": 3,
+            "stage": "planner_parse",
+            "duration_ms": 0.03,
+            "selected_tool": "write_script_scene",
+            "kind": "chat",
+            "profile": "creative_planner",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          {
+            "iteration": 4,
+            "stage": "planner",
+            "duration_ms": 1405.22,
+            "mode": "react_llm",
+            "selected_tool": "write_script_scene",
+            "thought": "场景计划已存在，但场景草稿数量为0，未生成任何场景，因此需要先为第一个场景生成剧本。",
+            "context_chars": 487,
+            "planner_answer_chars": 151,
+            "kind": "chat",
+            "profile": "creative_planner",
+            "provider": "deepseek",
+            "model": "deepseek-chat",
+            "error": ""
+          },
+          {
+            "iteration": 4,
+            "stage": "write_script_scene",
+            "duration_ms": 6524.37,
+            "selected_tool": "write_script_scene",
+            "scene_count": 1,
+            "draft_count": 1,
+            "review_count": 0,
+            "kind": "chat",
+            "profile": "creative_write",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          {
+            "iteration": 4,
+            "stage": "planner_context_build",
+            "duration_ms": 0.07,
+            "context_chars": 606,
+            "scene_count": 1,
+            "draft_count": 1,
+            "review_count": 0,
+            "kind": "chat",
+            "profile": "creative_planner",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          {
+            "iteration": 4,
+            "stage": "planner_llm_call",
+            "duration_ms": 1990.71,
+            "context_chars": 606,
+            "answer_chars": 232,
+            "kind": "chat",
+            "profile": "creative_planner",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          {
+            "iteration": 4,
+            "stage": "planner_parse",
+            "duration_ms": 0.03,
+            "selected_tool": "finalize",
+            "kind": "chat",
+            "profile": "creative_planner",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          {
+            "iteration": 5,
+            "stage": "planner",
+            "duration_ms": 1990.87,
+            "mode": "react_llm",
+            "selected_tool": "finalize",
+            "thought": "当前 scene_plan 和 scene_draft 都已经完成（各1个），story_facts 已提取但 locations 和 conflicts 为空",
+            "context_chars": 606,
+            "planner_answer_chars": 232,
+            "kind": "chat",
+            "profile": "creative_planner",
+            "provider": "deepseek",
+            "model": "deepseek-chat",
+            "error": ""
+          },
+          {
+            "iteration": 5,
+            "stage": "finalizer",
+            "duration_ms": 0.54,
+            "strategy": "deterministic_assembler",
+            "answer_chars": 1115
+          }
+        ],
+        "tool_history": [
+          {
+            "thought": "当前故事事实和场景计划都为空，需要先提取故事事实，为后续的场景拆分和剧本创作打下基础。",
+            "selected_tool": "extract_story_facts",
+            "tool_input": {
+              "text": "第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。\n【团队等级：1级，目前团队人数：1人；每天每人补助10元。】\n赵百汇用手指敲了敲桌面，桌子上干瘪的布口袋就鼓了起来，里面多出了10斤大米。\n“一天就10元钱，也只有买大米最划算了。”\n“2元一斤的大米，一天的补助只能买五斤。”\n希望三个丫头快点过考察期吧，到时候一天补助就是40元。\n“锦衣，锦衣。”\n“老爷，我进来了。”一个干干瘦瘦的丫头走了进来，身上粗布衣服破旧到处是补丁，不过洗得很干净。\n赵百汇拍了拍额头，“抱歉啊，是我的疏忽，这两天攒点钱，给你买一身衣服，这件衣服小了，不能再穿了。”\n赵锦衣赶紧摇头，“不用的老爷，这衣服我还能穿，等我回头改一改就行了，不用给我花钱。”\n来到客厅兼饭厅，11岁的锦绣和10岁的锦文正在往桌子上端饭，饭是13岁的锦衣做的。\n桌上放着四个碗，一个大碗里面的粥很稠，里面还有个鸡蛋，另外三个小碗里面的粥就很稀了，菜就一小碗咸菜。\n赵百汇无奈地说，“锦衣，我都说几次了，不要这样搞区别对待，我也不缺几碗粥的钱。”\n赵锦衣笑着说，“老爷，我们喝的粥已经很好了。”\n“算了，随你们吧。”\n吃完饭，赵百汇回屋把米袋子拿出来。\n“锦衣，这里面有十斤米，回头你拿去周老板的粮铺，然后再买点菜回来，其他的钱攒着。”\n“对了，现在攒了多少钱了？”\n“有三百四十六文。”\n赵百汇出门上了街，跨入牙人的门店，还没等他说话，留着两撇胡子的陈掌柜已经一脸猥琐笑容地迎了上来。\n“赵老爷，您可是来巧了！今天正好有好货色，绝对是您的心头好啊！”\n“带来给我看看吧。”赵百汇不想和这狗东西多说一句话。\n不多时，一个老年妇女带着一个看上去很小的丫头走了进来。\n赵百汇突然爆发出惊喜的笑容，正巧是锦衣的考核期过了，以后每天多10元补助。\n而陈掌柜却只以为是赵百汇看到小丫头开心了，露出更猥琐的笑容。"
+            },
+            "tool_output_preview": "{'characters': [], 'locations': [], 'conflicts': [], 'goals': [], 'raw': '{\\n  \"characters\": [\"赵百汇\", \"赵锦衣\", \"锦绣\", \"锦文\", \"陈掌柜\", \"老年妇女\", \"小丫头\"],\\n  \"locations\": [\"客厅兼饭厅\", \"牙人的门店\"],\\n  \"conflicts\": [\"赵百汇"
+          },
+          {
+            "thought": "当前 scene_plan_count 为 0，story_facts 为空，还没有任何场景计划或故事事实。需要先拆解原文并抽取关键信息，才能为后续剧本创作奠定基础。根据规则，优先 split_into_scenes，因为 scene_plan 为空。",
+            "selected_tool": "split_into_scenes",
+            "tool_input": {
+              "text": "第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。\n【团队等级：1级，目前团队人数：1人；每天每人补助10元。】\n赵百汇用手指敲了敲桌面，桌子上干瘪的布口袋就鼓了起来，里面多出了10斤大米。\n“一天就10元钱，也只有买大米最划算了。”\n“2元一斤的大米，一天的补助只能买五斤。”\n希望三个丫头快点过考察期吧，到时候一天补助就是40元。\n“锦衣，锦衣。”\n“老爷，我进来了。”一个干干瘦瘦的丫头走了进来，身上粗布衣服破旧到处是补丁，不过洗得很干净。\n赵百汇拍了拍额头，“抱歉啊，是我的疏忽，这两天攒点钱，给你买一身衣服，这件衣服小了，不能再穿了。”\n赵锦衣赶紧摇头，“不用的老爷，这衣服我还能穿，等我回头改一改就行了，不用给我花钱。”\n来到客厅兼饭厅，11岁的锦绣和10岁的锦文正在往桌子上端饭，饭是13岁的锦衣做的。\n桌上放着四个碗，一个大碗里面的粥很稠，里面还有个鸡蛋，另外三个小碗里面的粥就很稀了，菜就一小碗咸菜。\n赵百汇无奈地说，“锦衣，我都说几次了，不要这样搞区别对待，我也不缺几碗粥的钱。”\n赵锦衣笑着说，“老爷，我们喝的粥已经很好了。”\n“算了，随你们吧。”\n吃完饭，赵百汇回屋把米袋子拿出来。\n“锦衣，这里面有十斤米，回头你拿去周老板的粮铺，然后再买点菜回来，其他的钱攒着。”\n“对了，现在攒了多少钱了？”\n“有三百四十六文。”\n赵百汇出门上了街，跨入牙人的门店，还没等他说话，留着两撇胡子的陈掌柜已经一脸猥琐笑容地迎了上来。\n“赵老爷，您可是来巧了！今天正好有好货色，绝对是您的心头好啊！”\n“带来给我看看吧。”赵百汇不想和这狗东西多说一句话。\n不多时，一个老年妇女带着一个看上去很小的丫头走了进来。\n赵百汇突然爆发出惊喜的笑容，正巧是锦衣的考核期过了，以后每天多10元补助。\n而陈掌柜却只以为是赵百汇看到小丫头开心了，露出更猥琐的笑容。",
+              "target_scene_count": 1
+            },
+            "tool_output_preview": "{'scenes': [{'scene_id': 'scene_1', 'summary': '第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。\\n【团队等级：1级，目前团队人数：1人；每天每人补助10', 'source_text': '第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。"
+          },
+          {
+            "thought": "场景计划已创建但 story_facts 为空，需要先提取故事事实（角色、地点、冲突、目标）来为后续剧本写作提供基础。",
+            "selected_tool": "extract_story_facts",
+            "tool_input": {
+              "text": "scene_1: 第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。\n【团队等级：1级，目前团队人数：1人；每天每人补助10"
+            },
+            "tool_output_preview": "{'characters': ['赵百汇'], 'locations': [], 'conflicts': [], 'goals': ['卖大米', '租房子', '买三个小丫头', '骗补助']}"
+          },
+          {
+            "thought": "场景计划已存在，但场景草稿数量为0，未生成任何场景，因此需要先为第一个场景生成剧本。",
+            "selected_tool": "write_script_scene",
+            "tool_input": {
+              "scene_id": "scene_1",
+              "source_text": "第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。\n【团队等级：1级，目前团队人数：1人；每天每人补助10元。】\n赵百汇用手指敲了敲桌面，桌子上干瘪的布口袋就鼓了起来，里面多出了10斤大米。\n“一天就10元钱，也只有买大米最划算了。”\n“2元一斤的大米，一天的补助只能买五斤。”\n希望三个丫头快点过考察期吧，到时候一天补助就是40元。\n“锦衣，锦衣。”\n“老爷，我进来了。”一个干干瘦瘦的丫头走了进来，身上粗布衣服破旧到处是补丁，不过洗得很干净。\n赵百汇拍了拍额头，“抱歉啊，是我的疏忽，这两天攒点钱，给你买一身衣服，这件衣服小了，不能再穿了。”\n赵锦衣赶紧摇头，“不用的老爷，这衣服我还能穿，等我回头改一改就行了，不用给我花钱。”\n来到客厅兼饭厅，11岁的锦绣和10岁的锦文正在往桌子上端饭，饭是13岁的锦衣做的。\n桌上放着四个碗，一个大碗里面的粥很稠，里面还有个鸡蛋，另外三个小碗里面的粥就很稀了，菜就一小碗咸菜。\n赵百汇无奈地说，“锦衣，我都说几次了，不要这样搞区别对待，我也不缺几碗粥的钱。”\n赵锦衣笑着说，“老爷，我们喝的粥已经很好了。”\n“算了，随你们吧。”\n吃完饭，赵百汇回屋把米袋子拿出来。\n“锦衣，这里面有十斤米，回头你拿去周老板的粮铺，然后再买点菜回来，其他的钱攒着。”\n“对了，现在攒了多少钱了？”\n“有三百四十六文。”\n赵百汇出门上了街，跨入牙人的门店，还没等他说话，留着两撇胡子的陈掌柜已经一脸猥琐笑容地迎了上来。\n“赵老爷，您可是来巧了！今天正好有好货色，绝对是您的心头好啊！”\n“带来给我看看吧。”赵百汇不想和这狗东西多说一句话。\n不多时，一个老年妇女带着一个看上去很小的丫头走了进来。\n赵百汇突然爆发出惊喜的笑容，正巧是锦衣的考核期过了，以后每天多10元补助。\n而陈掌柜却只以为是赵百汇看到小丫头开心了，露出更猥琐的笑容。",
+              "summary": "第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。\n【团队等级：1级，目前团队人数：1人；每天每人补助10",
+              "story_facts": {
+                "characters": [
+                  "赵百汇"
+                ],
+                "locations": [],
+                "conflicts": [],
+                "goals": [
+                  "卖大米",
+                  "租房子",
+                  "买三个小丫头",
+                  "骗补助"
+                ]
+              },
+              "script_style": "影视短剧",
+              "rewrite_reason": ""
+            },
+            "tool_output_preview": "{'scene_id': 'scene_1', 'script': '# 场景：牙人门店\\n\\n**内景 牙人门店 - 白天**\\n\\n赵百汇推门走进，陈掌柜立刻迎上来，脸上堆满猥琐笑容。\\n\\n**陈掌柜**\\n（搓着手）\\n赵老爷！您可来巧了！今天正好有好货色，绝对是您的心头好啊！\\n\\n**赵百汇**\\n（面无表情）\\n带来给我看看吧。\\n\\n陈掌柜转身一招手，一个老年妇女拉着一个瘦小的丫头"
+          }
+        ],
+        "finalizer_strategy": "deterministic_assembler"
+      },
+      "merge": {
+        "llm_profiles": {
+          "merge_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "agent_outputs": {
+          "novel_script_agent": "# 《第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。》\n\n## 改编标题\n第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。\n\n## 角色表\n- **赵百汇**\n\n## 地点列表\n- 暂未明确地点信息\n\n## 剧情段落列表\n- **剧情段落1**：第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。\n【团队等级：1级，目前团队人数：1人；每天每人补助10\n\n## 正文剧本\n### 剧情段落1\n\n# 场景：牙人门店\n\n**内景 牙人门店 - 白天**\n\n赵百汇推门走进，陈掌柜立刻迎上来，脸上堆满猥琐笑容。\n\n**陈掌柜**\n（搓着手）\n赵老爷！您可来巧了！今天正好有好货色，绝对是您的心头好啊！\n\n**赵百汇**\n（面无表情）\n带来给我看看吧。\n\n陈掌柜转身一招手，一个老年妇女拉着一个瘦小的丫头走进来。丫头低着头，浑身发抖。\n\n赵百汇突然愣住——他眼前浮现出一个数字：【团队人数：2人】。\n\n（他嘴角不受控制地翘起）\n\n**陈掌柜**\n（凑近，压低声音）\n怎么样？十岁，干净利落，保证没毛病……\n\n赵百汇回过神来，笑容收敛。\n\n**赵百汇**\n（叹气）\n多少钱？\n\n**陈掌柜**\n（伸出一根手指）\n一百文。这可是最低价了。\n\n赵百汇沉默两秒，从怀里掏出钱袋，数出铜钱。\n\n**赵百汇**\n（把钱拍在桌上）\n带走。\n\n---\n\n**内景 赵百汇家 - 傍晚**\n\n赵百汇带着小丫头推门进屋。锦衣正在收拾碗筷，看到来人愣了一下。\n\n**赵锦衣**\n（迎上前）\n老爷，这是……\n\n**赵百汇**\n（揉了揉太阳穴）\n新来的。叫...叫锦什么吧，你们商量着起。\n\n小丫头缩在赵百汇身后，露出半张脸偷看。锦衣走过去，蹲下身子。\n\n**赵锦衣**\n（轻声）\n别怕，我叫锦衣。你饿不饿？\n\n小丫头摇摇头，又点点头。\n\n**赵百汇**\n（转身朝里屋走）\n锦衣，明天去周老板那儿买十斤米。钱够吧？\n\n**赵锦衣**\n（抬起头）\n够的，老爷。加上今天的，攒了三百四十六文。\n\n赵百汇脚步一顿，没回头。\n\n**赵百汇**\n（自言自语）\n快了...等你们三个都过考察期，一天四十...\n\n他走进里屋，门轻轻关上。\n\n锦衣牵起小丫头的手，朝厨房走去。灶台上的稀粥还在冒着热气。\n\n（场景淡出）\n\n## 改编说明\n1. 本次输出采用单剧情段落确定性组装，直接复用已生成场景草稿，避免 finalizer 再次整篇重写。\n2. 角色表、地点列表和剧情段落列表均基于已生成内容自动汇总并去重。"
+        },
+        "final_answer_preview": "# 《第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。》  ## 改编标题 第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。  ## 角色表 - **赵百汇**  ## 地点列表 - 暂未明确地点信息  ##...",
+        "streamed_answer": false,
+        "error": ""
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": false,
+        "stored_to_vector": false,
+        "skipped_vector_store": true,
+        "vector_store_skip_reason": "creative_output",
+        "stored_to_history": true,
+        "skipped_history_store": false,
+        "history_store_skip_reason": "",
+        "conversation_history_path": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260422-161711-baseline.conversation_history.sqlite3",
+        "conversation_history_backend": "sqlite",
+        "memory_write_decision": {
+          "should_write": false,
+          "skip_reason": "creative_output",
+          "memory_type": "fact",
+          "tags": [],
+          "memory_key": "general:semantic:0ddec74b71ae",
+          "confidence": 0.8,
+          "source_route": "novel_script_agent"
+        },
+        "stored_tags": [],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.01,
+          "vectorStore": 0.0,
+          "historyStore": 7.42,
+          "messagePrune": 0.0
+        },
+        "embedding_profiles": {
+          "vector_store": {
+            "kind": "embedding",
+            "profile": "memory_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          }
+        },
+        "errors": []
+      }
+    },
+    "answer": "# 《第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。》\n\n## 改编标题\n第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。\n\n## 角色表\n- **赵百汇**\n\n## 地点列表\n- 暂未明确地点信息\n\n## 剧情段落列表\n- **剧情段落1**：第一章：初到贵宝地，赵百汇干的第一件事就是卖大米，租房子，买了三个豆芽菜一样的小丫头，目的是为了骗补助。\n【团队等级：1级，目前团队人数：1人；每天每人补助10\n\n## 正文剧本\n### 剧情段落1\n\n# 场景：牙人门店\n\n**内景 牙人门店 - 白天**\n\n赵百汇推门走进，陈掌柜立刻迎上来，脸上堆满猥琐笑容。\n\n**陈掌柜**\n（搓着手）\n赵老爷！您可来巧了！今天正好有好货色，绝对是您的心头好啊！\n\n**赵百汇**\n（面无表情）\n带来给我看看吧。\n\n陈掌柜转身一招手，一个老年妇女拉着一个瘦小的丫头走进来。丫头低着头，浑身发抖。\n\n赵百汇突然愣住——他眼前浮现出一个数字：【团队人数：2人】。\n\n（他嘴角不受控制地翘起）\n\n**陈掌柜**\n（凑近，压低声音）\n怎么样？十岁，干净利落，保证没毛病……\n\n赵百汇回过神来，笑容收敛。\n\n**赵百汇**\n（叹气）\n多少钱？\n\n**陈掌柜**\n（伸出一根手指）\n一百文。这可是最低价了。\n\n赵百汇沉默两秒，从怀里掏出钱袋，数出铜钱。\n\n**赵百汇**\n（把钱拍在桌上）\n带走。\n\n---\n\n**内景 赵百汇家 - 傍晚**\n\n赵百汇带着小丫头推门进屋。锦衣正在收拾碗筷，看到来人愣了一下。\n\n**赵锦衣**\n（迎上前）\n老爷，这是……\n\n**赵百汇**\n（揉了揉太阳穴）\n新来的。叫...叫锦什么吧，你们商量着起。\n\n小丫头缩在赵百汇身后，露出半张脸偷看。锦衣走过去，蹲下身子。\n\n**赵锦衣**\n（轻声）\n别怕，我叫锦衣。你饿不饿？\n\n小丫头摇摇头，又点点头。\n\n**赵百汇**\n（转身朝里屋走）\n锦衣，明天去周老板那儿买十斤米。钱够吧？\n\n**赵锦衣**\n（抬起头）\n够的，老爷。加上今天的，攒了三百四十六文。\n\n赵百汇脚步一顿，没回头。\n\n**赵百汇**\n（自言自语）\n快了...等你们三个都过考察期，一天四十...\n\n他走进里屋，门轻轻关上。\n\n锦衣牵起小丫头的手，朝厨房走去。灶台上的稀粥还在冒着热气。\n\n（场景淡出）\n\n## 改编说明\n1. 本次输出采用单剧情段落确定性组装，直接复用已生成场景草稿，避免 finalizer 再次整篇重写。\n2. 角色表、地点列表和剧情段落列表均基于已生成内容自动汇总并去重。",
+    "detail": ""
+  }
+]

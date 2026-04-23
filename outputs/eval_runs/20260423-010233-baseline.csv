@@ -1,0 +1,6 @@
+id,status_code,category,expected_route,actual_route,doc_used,memory_used,request_ms,rag_ms,memory_ms,answer_len,quality,assertion,assertion_detail,answer,detail
+history_summary_after_two_turns,200,memory,chat_agent,chat_agent,True,True,10055.48,-,0.06,35,good,pass,,"刚刚的问题包括：
+1. 用户询问北京气候怎么样
+2. 用户询问那上海呢",
+history_summary_after_rag_definition,200,memory,chat_agent,chat_agent,True,True,3095.81,-,0.07,28,good,pass,,"历史问题包括：
+1. 用户询问WAI-ARIA技术是什么",

@@ -1,0 +1,5 @@
+id,status_code,expected_route,actual_route,doc_used,memory_used,request_ms,rag_ms,memory_ms,answer_len,quality,answer,detail
+aria_definition,200,rag_agent,rag_agent,-,-,3430.79,-,-,115,good,WAI-ARIA技术是为残疾人士等提供无障碍访问动态、可交互Web内容的技术规范。它是Web Accessibility Initiative - Accessible Rich Internet Applications的简称。,
+virtual_list_definition,200,rag_agent,rag_agent,-,-,4572.95,-,-,104,good,"虚拟列表是一种按需显示技术，只渲染可见区域的内容，对非可见区域不渲染或部分渲染，以实现极高的渲染性能。
+
+补充：例如，当有1万条记录需要渲染时，如果屏幕可见区域只能显示10条，则首次渲染只需加载这10条数据。",

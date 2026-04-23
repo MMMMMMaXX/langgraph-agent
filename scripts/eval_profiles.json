@@ -1,0 +1,38 @@
+[
+  {
+    "name": "baseline",
+    "description": "默认基线配置，优先保证知识召回与回答完整性。",
+    "env": {
+      "DOC_SCORE_THRESHOLD": "0.5",
+      "DOC_SOFT_MATCH_THRESHOLD": "0.35",
+      "MAX_DOC_CONTEXT_CHARS": "360",
+      "MAX_DOC_CONTEXT_BLOCKS": "2",
+      "MAX_DOC_ANSWER_TOKENS": "180",
+      "MAX_MEMORY_ANSWER_TOKENS": "140"
+    }
+  },
+  {
+    "name": "concise",
+    "description": "偏短回答配置，减少生成长度，观察延迟与信息损失之间的平衡。",
+    "env": {
+      "DOC_SCORE_THRESHOLD": "0.45",
+      "DOC_SOFT_MATCH_THRESHOLD": "0.35",
+      "MAX_DOC_CONTEXT_CHARS": "240",
+      "MAX_DOC_CONTEXT_BLOCKS": "1",
+      "MAX_DOC_ANSWER_TOKENS": "120",
+      "MAX_MEMORY_ANSWER_TOKENS": "100"
+    }
+  },
+  {
+    "name": "balanced",
+    "description": "折中配置，尽量兼顾解释性和响应速度。",
+    "env": {
+      "DOC_SCORE_THRESHOLD": "0.5",
+      "DOC_SOFT_MATCH_THRESHOLD": "0.35",
+      "MAX_DOC_CONTEXT_CHARS": "300",
+      "MAX_DOC_CONTEXT_BLOCKS": "2",
+      "MAX_DOC_ANSWER_TOKENS": "140",
+      "MAX_MEMORY_ANSWER_TOKENS": "120"
+    }
+  }
+]

@@ -1,0 +1,18 @@
+{
+  "profile": "baseline",
+  "description": "默认基线配置，优先保证知识召回与回答完整性。",
+  "env": {
+    "DOC_SCORE_THRESHOLD": "0.5",
+    "DOC_SOFT_MATCH_THRESHOLD": "0.35",
+    "MAX_DOC_CONTEXT_CHARS": "360",
+    "MAX_DOC_CONTEXT_BLOCKS": "2",
+    "MAX_DOC_ANSWER_TOKENS": "180",
+    "MAX_MEMORY_ANSWER_TOKENS": "140"
+  },
+  "case_ids": "",
+  "base_url": "",
+  "json_output": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260422-161711-baseline.json",
+  "csv_output": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260422-161711-baseline.csv",
+  "conversation_history_output": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260422-161711-baseline.conversation_history.sqlite3",
+  "started_at": "2026-04-22T16:17:11"
+}

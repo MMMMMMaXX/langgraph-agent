@@ -1,0 +1,305 @@
+[
+  {
+    "id": "history_summary_after_two_turns",
+    "category": "memory",
+    "status_code": 200,
+    "expected_route": "chat_agent",
+    "actual_route": "chat_agent",
+    "doc_used": "True",
+    "memory_used": "True",
+    "request_ms": "10055.48",
+    "rag_ms": "-",
+    "memory_ms": "0.06",
+    "answer_len": 35,
+    "quality": "good",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "meta/history query",
+        "intent": "chat",
+        "routes": [
+          "chat_agent"
+        ]
+      },
+      "chat_agent": {
+        "llm_profiles": {
+          "answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          "summary": {
+            "kind": "chat",
+            "profile": "summary",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "task_type": "summary",
+        "memory_lookup_policy": "working_memory_only",
+        "history_lookup_policy": "none",
+        "used_memory": true,
+        "used_history": false,
+        "used_summary": false,
+        "streamed_answer": false,
+        "pre_rerank_memory": [],
+        "post_rerank_memory": [],
+        "history_hits": [],
+        "retrieval_debug": {
+          "memory": {
+            "policy": "working_memory_only",
+            "collection": "",
+            "where": null,
+            "returned_count": 0,
+            "consumed_count": 0,
+            "working_memory_item_count": 2
+          },
+          "history": {
+            "backend": "sqlite",
+            "policy": "none",
+            "path": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260423-010233-baseline.conversation_history.sqlite3",
+            "effective_path": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260423-010233-baseline.conversation_history.sqlite3",
+            "returned_count": 0,
+            "consumed_count": 0
+          }
+        },
+        "facts": {
+          "cities": [],
+          "topics": [],
+          "memory_types": []
+        },
+        "sub_timings_ms": {
+          "memoryPrepare": 0.01,
+          "operatorClassify": 0.0,
+          "contextBuild": 0.0,
+          "existenceLookup": 0.0,
+          "answerGeneration": 0.01
+        },
+        "errors": []
+      },
+      "merge": {
+        "llm_profiles": {
+          "merge_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "agent_outputs": {
+          "chat_agent": "刚刚的问题包括：\n1. 用户询问北京气候怎么样\n2. 用户询问那上海呢"
+        },
+        "final_answer_preview": "刚刚的问题包括： 1. 用户询问北京气候怎么样 2. 用户询问那上海呢",
+        "streamed_answer": false,
+        "error": ""
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": true,
+        "stored_to_vector": false,
+        "skipped_vector_store": true,
+        "vector_store_skip_reason": "meta_query",
+        "stored_to_history": false,
+        "skipped_history_store": true,
+        "history_store_skip_reason": "meta_query",
+        "conversation_history_path": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260423-010233-baseline.conversation_history.sqlite3",
+        "conversation_history_backend": "sqlite",
+        "memory_write_decision": {
+          "should_write": false,
+          "skip_reason": "meta_query",
+          "memory_type": "summary",
+          "tags": [],
+          "memory_key": "general:semantic:d48eda5d2096",
+          "confidence": 0.8,
+          "source_route": "chat_agent"
+        },
+        "stored_tags": [],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.0,
+          "vectorStore": 0.0,
+          "historyStore": 0.0,
+          "messagePrune": 0.0
+        },
+        "embedding_profiles": {
+          "vector_store": {
+            "kind": "embedding",
+            "profile": "memory_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          }
+        },
+        "errors": []
+      },
+      "embedding_cache": {
+        "hits": 0,
+        "misses": 0,
+        "stores": 0,
+        "size": 0,
+        "max_items": 128
+      }
+    },
+    "answer": "刚刚的问题包括：\n1. 用户询问北京气候怎么样\n2. 用户询问那上海呢",
+    "detail": ""
+  },
+  {
+    "id": "history_summary_after_rag_definition",
+    "category": "memory",
+    "status_code": 200,
+    "expected_route": "chat_agent",
+    "actual_route": "chat_agent",
+    "doc_used": "True",
+    "memory_used": "True",
+    "request_ms": "3095.81",
+    "rag_ms": "-",
+    "memory_ms": "0.07",
+    "answer_len": 28,
+    "quality": "good",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "meta/history query",
+        "intent": "chat",
+        "routes": [
+          "chat_agent"
+        ]
+      },
+      "chat_agent": {
+        "llm_profiles": {
+          "answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          "summary": {
+            "kind": "chat",
+            "profile": "summary",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "task_type": "summary",
+        "memory_lookup_policy": "working_memory_only",
+        "history_lookup_policy": "all_history",
+        "used_memory": true,
+        "used_history": true,
+        "used_summary": false,
+        "streamed_answer": false,
+        "pre_rerank_memory": [],
+        "post_rerank_memory": [],
+        "history_hits": [
+          {
+            "preview": "WAI-ARIA技术是什么？",
+            "timestamp": 1776877367.543241,
+            "routes": [
+              "rag_agent"
+            ],
+            "tags": [
+              "wai-aria"
+            ],
+            "stored_to_vector": false,
+            "vector_store_skip_reason": "rag_definition_doc_hit"
+          }
+        ],
+        "retrieval_debug": {
+          "memory": {
+            "policy": "working_memory_only",
+            "collection": "",
+            "where": null,
+            "returned_count": 0,
+            "consumed_count": 0,
+            "working_memory_item_count": 0
+          },
+          "history": {
+            "backend": "sqlite",
+            "policy": "all_history",
+            "path": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260423-010233-baseline.conversation_history.sqlite3",
+            "effective_path": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260423-010233-baseline.conversation_history.sqlite3",
+            "returned_count": 1,
+            "consumed_count": 1
+          }
+        },
+        "facts": {
+          "cities": [],
+          "topics": [],
+          "memory_types": []
+        },
+        "sub_timings_ms": {
+          "memoryPrepare": 0.01,
+          "operatorClassify": 0.0,
+          "contextBuild": 0.0,
+          "existenceLookup": 0.0,
+          "answerGeneration": 0.38
+        },
+        "errors": []
+      },
+      "merge": {
+        "llm_profiles": {
+          "merge_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "agent_outputs": {
+          "chat_agent": "历史问题包括：\n1. 用户询问WAI-ARIA技术是什么"
+        },
+        "final_answer_preview": "历史问题包括： 1. 用户询问WAI-ARIA技术是什么",
+        "streamed_answer": false,
+        "error": ""
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": true,
+        "stored_to_vector": false,
+        "skipped_vector_store": true,
+        "vector_store_skip_reason": "meta_query",
+        "stored_to_history": false,
+        "skipped_history_store": true,
+        "history_store_skip_reason": "meta_query",
+        "conversation_history_path": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260423-010233-baseline.conversation_history.sqlite3",
+        "conversation_history_backend": "sqlite",
+        "memory_write_decision": {
+          "should_write": false,
+          "skip_reason": "meta_query",
+          "memory_type": "summary",
+          "tags": [],
+          "memory_key": "general:semantic:142dcacddfde",
+          "confidence": 0.8,
+          "source_route": "chat_agent"
+        },
+        "stored_tags": [],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.0,
+          "vectorStore": 0.0,
+          "historyStore": 0.0,
+          "messagePrune": 0.0
+        },
+        "embedding_profiles": {
+          "vector_store": {
+            "kind": "embedding",
+            "profile": "memory_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          }
+        },
+        "errors": []
+      },
+      "embedding_cache": {
+        "hits": 0,
+        "misses": 0,
+        "stores": 0,
+        "size": 0,
+        "max_items": 128
+      }
+    },
+    "answer": "历史问题包括：\n1. 用户询问WAI-ARIA技术是什么",
+    "detail": ""
+  }
+]

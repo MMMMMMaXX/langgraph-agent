@@ -1,0 +1,5 @@
+id,status_code,category,expected_route,actual_route,doc_used,memory_used,request_ms,rag_ms,memory_ms,answer_len,quality,assertion,assertion_detail,answer,detail
+simple_math,200,tool,tool_agent,tool_agent,-,-,3634.41,-,366.91,8,ok,pass,,计算结果是 3。,
+beijing_weather_tool,200,tool,tool_agent,"tool_agent,rag_agent",True,False,9359.55,3382.36,407.91,37,good,pass,,北京今天天气晴朗，气温 26°C。这里的气候四季分明，夏季炎热，冬季寒冷。,
+weather_and_math_mixed_tool,200,tool,tool_agent,"tool_agent,rag_agent",True,False,13444.46,4027.92,539.67,32,good,pass,,北京今天天气晴朗，气温26°C。此外，3乘以7的计算结果是21。,
+wai_aria_should_not_route_to_tool,200,routing,rag_agent,rag_agent,True,False,3144.81,2730.84,411.25,38,good,pass,,WAI-ARIA是为残疾人士提供无障碍访问动态、可交互Web内容的技术规范。,

@@ -1,0 +1,17 @@
+{
+  "profile": "balanced",
+  "description": "折中配置，尽量兼顾解释性和响应速度。",
+  "env": {
+    "DOC_SCORE_THRESHOLD": "0.5",
+    "DOC_SOFT_MATCH_THRESHOLD": "0.35",
+    "MAX_DOC_CONTEXT_CHARS": "300",
+    "MAX_DOC_CONTEXT_BLOCKS": "2",
+    "MAX_DOC_ANSWER_TOKENS": "140",
+    "MAX_MEMORY_ANSWER_TOKENS": "120"
+  },
+  "case_ids": "aria_definition",
+  "base_url": "",
+  "json_output": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260416-165321-balanced.json",
+  "csv_output": "/Users/manxin/baidu/ai-max/langgraph-agent/outputs/eval_runs/20260416-165321-balanced.csv",
+  "started_at": "2026-04-16T16:53:21"
+}

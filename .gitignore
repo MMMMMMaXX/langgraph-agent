@@ -1,0 +1,42 @@
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual env
+.venv/
+venv/
+env/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Logs & local data
+*.log
+logs/
+data/chroma/
+data/vector_store/
+data/*.sqlite*
+data/*.jsonl
+data/db.json
+data/doc_embeddings.json
+data/memory_db.json
+.comate/
+
+# Build
+build/
+dist/

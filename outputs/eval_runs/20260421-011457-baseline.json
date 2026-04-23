@@ -1,0 +1,513 @@
+[
+  {
+    "id": "aria_definition",
+    "category": "knowledge",
+    "status_code": 200,
+    "expected_route": "rag_agent",
+    "actual_route": "rag_agent",
+    "doc_used": "True",
+    "memory_used": "False",
+    "request_ms": "4667.31",
+    "rag_ms": "4231.75",
+    "memory_ms": "419.21",
+    "answer_len": 100,
+    "quality": "good",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "rule-based route",
+        "intent": "retrieval",
+        "routes": [
+          "rag_agent"
+        ]
+      },
+      "rag_agent": {
+        "llm_profiles": {
+          "rewrite": {
+            "kind": "chat",
+            "profile": "rewrite",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          "doc_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          "memory_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "embedding_profiles": {
+          "doc_query": {
+            "kind": "embedding",
+            "profile": "query_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          },
+          "memory_query": {
+            "kind": "embedding",
+            "profile": "query_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          },
+          "doc_index": {
+            "kind": "embedding",
+            "profile": "doc_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          },
+          "memory_index": {
+            "kind": "embedding",
+            "profile": "memory_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          }
+        },
+        "rewritten_query": "WAI-ARIA技术是什么？",
+        "doc_used": true,
+        "memory_used": false,
+        "streamed_answer": false,
+        "threshold": 0.5,
+        "doc_context_chars": 275,
+        "top_docs": [
+          {
+            "preview": "gle Chrome 中的 ChromeVox等。WAI-ARIA 是一个为残疾人士等提供无障碍访问动态、可交互 Web...",
+            "score": 0.4223
+          },
+          {
+            "preview": "网络无障碍辅助功能（Accessibility，也被称为 a11y，因为以 A 开头，以 Y 结尾，中间一共 11 个字...",
+            "score": 0.3851
+          },
+          {
+            "preview": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 非可见区域中的数据不渲染或部分渲染的技术，从而达到极高的...",
+            "score": 0.2327
+          },
+          {
+            "preview": "上海气候和北京类似，但更热更潮湿。",
+            "score": 0.1817
+          },
+          {
+            "preview": "北京气候四季分明，夏天很热，冬天很冷。",
+            "score": 0.1657
+          }
+        ],
+        "filtered_docs": [
+          {
+            "preview": "gle Chrome 中的 ChromeVox等。WAI-ARIA 是一个为残疾人士等提供无障碍访问动态、可交互 Web...",
+            "score": 0.4223
+          }
+        ],
+        "pre_rerank_docs": [
+          {
+            "preview": "gle Chrome 中的 ChromeVox等。WAI-ARIA 是一个为残疾人士等提供无障碍访问动态、可交互 Web...",
+            "score": 0.4223
+          }
+        ],
+        "post_rerank_docs": [
+          {
+            "preview": "gle Chrome 中的 ChromeVox等。WAI-ARIA 是一个为残疾人士等提供无障碍访问动态、可交互 Web...",
+            "score": 0.4223
+          }
+        ],
+        "pre_rerank_memory": [],
+        "post_rerank_memory": [],
+        "sub_timings_ms": {
+          "rewrite": 0.0,
+          "docSearch": 860.57,
+          "docRerank": 0.0,
+          "memorySearch": 0.0,
+          "memoryRerank": 0.0,
+          "answerGeneration": 3369.69
+        },
+        "errors": []
+      },
+      "merge": {
+        "llm_profiles": {
+          "merge_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "agent_outputs": {
+          "rag_agent": "WAI-ARIA技术是一个为残疾人士提供无障碍访问动态、可交互Web内容的技术规范。  \n最关键的是，它通过aria-label等属性配合其他技术方式，让屏幕阅读器能准确识别网页中的内容、变化和状态。"
+        },
+        "final_answer_preview": "WAI-ARIA技术是一个为残疾人士提供无障碍访问动态、可交互Web内容的技术规范。   最关键的是，它通过aria-label等属性配合其他技术方式，让屏幕阅读器能准确识别网页中的内容、变化和状态。",
+        "streamed_answer": false,
+        "error": ""
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": false,
+        "stored_to_vector": true,
+        "skipped_vector_store": false,
+        "stored_tags": [
+          "wai-aria"
+        ],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.01,
+          "vectorStore": 419.09,
+          "messagePrune": 0.0
+        },
+        "embedding_profiles": {
+          "vector_store": {
+            "kind": "embedding",
+            "profile": "memory_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          }
+        },
+        "errors": []
+      }
+    },
+    "answer": "WAI-ARIA技术是一个为残疾人士提供无障碍访问动态、可交互Web内容的技术规范。  \n最关键的是，它通过aria-label等属性配合其他技术方式，让屏幕阅读器能准确识别网页中的内容、变化和状态。",
+    "detail": ""
+  },
+  {
+    "id": "virtual_list_definition",
+    "category": "knowledge",
+    "status_code": 200,
+    "expected_route": "rag_agent",
+    "actual_route": "rag_agent",
+    "doc_used": "True",
+    "memory_used": "False",
+    "request_ms": "3532.75",
+    "rag_ms": "3355.20",
+    "memory_ms": "174.27",
+    "answer_len": 82,
+    "quality": "good",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "rule-based route",
+        "intent": "retrieval",
+        "routes": [
+          "rag_agent"
+        ]
+      },
+      "rag_agent": {
+        "llm_profiles": {
+          "rewrite": {
+            "kind": "chat",
+            "profile": "rewrite",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          "doc_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          "memory_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "embedding_profiles": {
+          "doc_query": {
+            "kind": "embedding",
+            "profile": "query_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          },
+          "memory_query": {
+            "kind": "embedding",
+            "profile": "query_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          },
+          "doc_index": {
+            "kind": "embedding",
+            "profile": "doc_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          },
+          "memory_index": {
+            "kind": "embedding",
+            "profile": "memory_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          }
+        },
+        "rewritten_query": "虚拟列表是什么？",
+        "doc_used": true,
+        "memory_used": false,
+        "streamed_answer": false,
+        "threshold": 0.5,
+        "doc_context_chars": 160,
+        "top_docs": [
+          {
+            "preview": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 非可见区域中的数据不渲染或部分渲染的技术，从而达到极高的...",
+            "score": 0.4112
+          },
+          {
+            "preview": "上海气候和北京类似，但更热更潮湿。",
+            "score": 0.2258
+          },
+          {
+            "preview": "gle Chrome 中的 ChromeVox等。WAI-ARIA 是一个为残疾人士等提供无障碍访问动态、可交互 Web...",
+            "score": 0.2126
+          },
+          {
+            "preview": "北京气候四季分明，夏天很热，冬天很冷。",
+            "score": 0.1913
+          },
+          {
+            "preview": "网络无障碍辅助功能（Accessibility，也被称为 a11y，因为以 A 开头，以 Y 结尾，中间一共 11 个字...",
+            "score": 0.1806
+          }
+        ],
+        "filtered_docs": [
+          {
+            "preview": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 非可见区域中的数据不渲染或部分渲染的技术，从而达到极高的...",
+            "score": 0.4112
+          }
+        ],
+        "pre_rerank_docs": [
+          {
+            "preview": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 非可见区域中的数据不渲染或部分渲染的技术，从而达到极高的...",
+            "score": 0.4112
+          }
+        ],
+        "post_rerank_docs": [
+          {
+            "preview": "虚拟列表其实是按需显示的一种实现，即只对 可见区域进行渲染，对 非可见区域中的数据不渲染或部分渲染的技术，从而达到极高的...",
+            "score": 0.4112
+          }
+        ],
+        "pre_rerank_memory": [],
+        "post_rerank_memory": [],
+        "sub_timings_ms": {
+          "rewrite": 0.0,
+          "docSearch": 232.64,
+          "docRerank": 0.0,
+          "memorySearch": 0.0,
+          "memoryRerank": 0.0,
+          "answerGeneration": 3122.28
+        },
+        "errors": []
+      },
+      "merge": {
+        "llm_profiles": {
+          "merge_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "agent_outputs": {
+          "rag_agent": "虚拟列表是一种只渲染可见区域内容的技术，通过不渲染或部分渲染非可见区域来提升渲染性能。  \n例如，在首次渲染时，如果屏幕只能显示10个列表项，就只加载这10条数据。"
+        },
+        "final_answer_preview": "虚拟列表是一种只渲染可见区域内容的技术，通过不渲染或部分渲染非可见区域来提升渲染性能。   例如，在首次渲染时，如果屏幕只能显示10个列表项，就只加载这10条数据。",
+        "streamed_answer": false,
+        "error": ""
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": false,
+        "stored_to_vector": true,
+        "skipped_vector_store": false,
+        "stored_tags": [
+          "virtual-list"
+        ],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.0,
+          "vectorStore": 174.14,
+          "messagePrune": 0.0
+        },
+        "embedding_profiles": {
+          "vector_store": {
+            "kind": "embedding",
+            "profile": "memory_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          }
+        },
+        "errors": []
+      }
+    },
+    "answer": "虚拟列表是一种只渲染可见区域内容的技术，通过不渲染或部分渲染非可见区域来提升渲染性能。  \n例如，在首次渲染时，如果屏幕只能显示10个列表项，就只加载这10条数据。",
+    "detail": ""
+  },
+  {
+    "id": "history_summary_after_two_turns",
+    "category": "memory",
+    "status_code": 200,
+    "expected_route": "chat_agent",
+    "actual_route": "chat_agent",
+    "doc_used": "-",
+    "memory_used": "True",
+    "request_ms": "8029.81",
+    "rag_ms": "-",
+    "memory_ms": "0.06",
+    "answer_len": 50,
+    "quality": "good",
+    "assertion": "pass",
+    "assertion_detail": "",
+    "debug_nodes": {
+      "supervisor": {
+        "route_reason": "meta/history query",
+        "intent": "chat",
+        "routes": [
+          "chat_agent"
+        ]
+      },
+      "chat_agent": {
+        "llm_profiles": {
+          "answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          },
+          "summary": {
+            "kind": "chat",
+            "profile": "summary",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "task_type": "summary",
+        "used_memory": true,
+        "used_summary": false,
+        "streamed_answer": false,
+        "pre_rerank_memory": [
+          {
+            "preview": "问题：北京气候怎么样 重写问题：北京气候怎么样？ 回答：北京气候四季分明，夏天很热，冬天很冷。 标签：climate,北...",
+            "score": 0.2236,
+            "timestamp": 1776705309.773973,
+            "source": "chat_round",
+            "tags": [
+              "climate",
+              "北京"
+            ]
+          },
+          {
+            "preview": "问题：那上海呢 重写问题：上海气候怎么样？ 回答：上海气候与北京类似，但更热更潮湿。 标签：climate,上海",
+            "score": 0.2236,
+            "timestamp": 1776677160.244426,
+            "source": "chat_round",
+            "tags": [
+              "climate",
+              "上海"
+            ]
+          },
+          {
+            "preview": "问题：那上海呢 重写问题：那上海呢 回答：上海气候与北京类似，但更热更潮湿。 标签：上海",
+            "score": 0.219,
+            "timestamp": 1776705314.6689742,
+            "source": "chat_round",
+            "tags": [
+              "上海"
+            ]
+          }
+        ],
+        "post_rerank_memory": [
+          {
+            "preview": "问题：北京气候怎么样 重写问题：北京气候怎么样？ 回答：北京气候四季分明，夏天很热，冬天很冷。 标签：climate,北...",
+            "score": 0.2236,
+            "timestamp": 1776705309.773973,
+            "source": "chat_round",
+            "tags": [
+              "climate",
+              "北京"
+            ]
+          },
+          {
+            "preview": "问题：那上海呢 重写问题：上海气候怎么样？ 回答：上海气候与北京类似，但更热更潮湿。 标签：climate,上海",
+            "score": 0.2236,
+            "timestamp": 1776677160.244426,
+            "source": "chat_round",
+            "tags": [
+              "climate",
+              "上海"
+            ]
+          },
+          {
+            "preview": "问题：那上海呢 重写问题：那上海呢 回答：上海气候与北京类似，但更热更潮湿。 标签：上海",
+            "score": 0.219,
+            "timestamp": 1776705314.6689742,
+            "source": "chat_round",
+            "tags": [
+              "上海"
+            ]
+          }
+        ],
+        "facts": {
+          "cities": [
+            "北京",
+            "上海"
+          ],
+          "topics": [
+            "climate"
+          ],
+          "memory_types": [
+            "fact"
+          ]
+        },
+        "sub_timings_ms": {
+          "memoryPrepare": 160.56,
+          "operatorClassify": 0.0,
+          "contextBuild": 0.0,
+          "existenceLookup": 0.0,
+          "answerGeneration": 0.01
+        },
+        "errors": []
+      },
+      "merge": {
+        "llm_profiles": {
+          "merge_answer": {
+            "kind": "chat",
+            "profile": "default_chat",
+            "provider": "deepseek",
+            "model": "deepseek-chat"
+          }
+        },
+        "agent_outputs": {
+          "chat_agent": "刚刚的问题包括：\n1. 用户询问上海气候怎么样\n2. 用户询问北京气候怎么样\n3. 用户询问那上海呢"
+        },
+        "final_answer_preview": "刚刚的问题包括： 1. 用户询问上海气候怎么样 2. 用户询问北京气候怎么样 3. 用户询问那上海呢",
+        "streamed_answer": false,
+        "error": ""
+      },
+      "memory": {
+        "refreshed_summary": false,
+        "skipped_summary_refresh": true,
+        "stored_to_vector": false,
+        "skipped_vector_store": false,
+        "stored_tags": [],
+        "summary_preview": "",
+        "sub_timings_ms": {
+          "summaryRefresh": 0.0,
+          "vectorStore": 0.0,
+          "messagePrune": 0.0
+        },
+        "embedding_profiles": {
+          "vector_store": {
+            "kind": "embedding",
+            "profile": "memory_embedding",
+            "provider": "embedding",
+            "model": "embedding-3"
+          }
+        },
+        "errors": []
+      }
+    },
+    "answer": "刚刚的问题包括：\n1. 用户询问上海气候怎么样\n2. 用户询问北京气候怎么样\n3. 用户询问那上海呢",
+    "detail": ""
+  }
+]
