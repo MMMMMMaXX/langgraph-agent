@@ -2,8 +2,6 @@
 
 一个基于 [LangGraph](https://github.com/langchain-ai/langgraph) 的多 Agent 编排系统，以 supervisor 路由为核心，组合了 **chat / RAG / 工具调用 / 长文创作（小说改编剧本）** 四类 Agent，带有持久化会话历史、向量记忆、LangSmith 追踪与 SSE 流式接口。
 
-项目定位：个人学习型但认真打磨的 AI Agent 工程实践项目，面向“从前端工程师视角理解并动手构建 Agent”这一路径。
-
 ---
 
 ## 1. 能力速览
@@ -113,15 +111,15 @@ cp .env.example app/.env
 
 最常用的配置项：
 
-| 变量 | 含义 |
-| --- | --- |
-| `DEEPSEEK_API_KEY` / `GLM_API_KEY` / `OPENAI_API_KEY` | LLM provider 密钥（至少一个） |
-| `DEFAULT_CHAT_PROVIDER` | 普通 chat/创作调用默认 provider |
-| `CREATIVE_PLANNER_PROVIDER` / `CREATIVE_WRITE_PROVIDER` / `CREATIVE_REVIEW_PROVIDER` | 剧本创作链路 3 段的 provider |
-| `EMBEDDING_PROVIDER` / `EMBEDDING_MODEL` | embedding profile |
-| `CHROMA_PERSIST_DIR` | 向量库持久化目录，默认 `data/chroma` |
-| `LANGSMITH_TRACING` / `LANGSMITH_API_KEY` / `LANGSMITH_PROJECT` | 开启 LangSmith 追踪 |
-| `APP_LOG_LEVEL` | 结构化日志级别，默认 INFO |
+| 变量                                                                                 | 含义                                 |
+| ------------------------------------------------------------------------------------ | ------------------------------------ |
+| `DEEPSEEK_API_KEY` / `GLM_API_KEY` / `OPENAI_API_KEY`                                | LLM provider 密钥（至少一个）        |
+| `DEFAULT_CHAT_PROVIDER`                                                              | 普通 chat/创作调用默认 provider      |
+| `CREATIVE_PLANNER_PROVIDER` / `CREATIVE_WRITE_PROVIDER` / `CREATIVE_REVIEW_PROVIDER` | 剧本创作链路 3 段的 provider         |
+| `EMBEDDING_PROVIDER` / `EMBEDDING_MODEL`                                             | embedding profile                    |
+| `CHROMA_PERSIST_DIR`                                                                 | 向量库持久化目录，默认 `data/chroma` |
+| `LANGSMITH_TRACING` / `LANGSMITH_API_KEY` / `LANGSMITH_PROJECT`                      | 开启 LangSmith 追踪                  |
+| `APP_LOG_LEVEL`                                                                      | 结构化日志级别，默认 INFO            |
 
 完整说明见 `.env.example`，分块带中文注释。
 
