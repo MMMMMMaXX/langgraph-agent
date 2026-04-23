@@ -37,6 +37,9 @@ data/doc_embeddings.json
 data/memory_db.json
 .comate/
 
+# Eval artifacts (仅保留 baseline 与 reports，run 产物不入库)
+outputs/eval_runs/
+
 # Build
 build/
 dist/
