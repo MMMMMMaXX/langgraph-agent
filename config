@@ -1,0 +1,12 @@
+Host icode.baidu.com
+HostkeyAlgorithms +ssh-rsa
+PubkeyAcceptedAlgorithms +ssh-rsa
+User manxin
+IdentityFile ~/.ssh/id_rsa.manxin
+
+Host github.com
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/id_ed25519_github
+    IdentitiesOnly yesO
+
