@@ -1,5 +1,7 @@
+import hashlib
 import json
 import os
+import threading
 import time
 from collections.abc import Callable
 from contextvars import ContextVar
@@ -322,6 +324,9 @@ PROVIDER_CONFIGS = _build_provider_configs()
 CHAT_PROFILE_REGISTRY = _build_profile_registry()
 EMBEDDING_PROFILE_REGISTRY = _build_embedding_profile_registry()
 _CLIENT_CACHE: dict[str, OpenAI] = {}
+# 客户端缓存锁：防止高并发下多个线程同时 miss 后重复创建 OpenAI client，
+# 造成连接池浪费。锁只保护字典读写本身，不覆盖任何业务调用。
+_CLIENT_CACHE_LOCK = threading.Lock()
 
 DEFAULT_CHAT_TIMEOUT_SECONDS = 45.0
 DEFAULT_EMBEDDING_TIMEOUT_SECONDS = 30.0
@@ -459,18 +464,37 @@ def _store_cached_embedding(
 
 
 def _get_client(provider: ProviderConfig) -> OpenAI:
-    cache_key = f"{provider.name}|{provider.base_url or ''}|{provider.api_key or ''}"
+    """获取（或创建并缓存）OpenAI 客户端。
+
+    线程安全：使用 double-checked locking 模式
+      1) 无锁快路径：命中即返回，避免热点争抢
+      2) 加锁慢路径：再次检查，防止 TOCTOU 重复创建
+    缓存 key 使用 API key 的 SHA256 前缀（不存明文），即使 cache key 被
+    意外写入日志也不会泄漏凭证。
+    """
+
+    api_key_fingerprint = hashlib.sha256(
+        (provider.api_key or "").encode("utf-8")
+    ).hexdigest()[:16]
+    cache_key = f"{provider.name}|{provider.base_url or ''}|{api_key_fingerprint}"
+
+    # Fast path: 无锁读取，命中直接返回
     client = _CLIENT_CACHE.get(cache_key)
     if client is not None:
         return client
 
-    client = OpenAI(
-        api_key=provider.api_key,
-        base_url=provider.base_url,
-        max_retries=0,
-    )
-    _CLIENT_CACHE[cache_key] = client
-    return client
+    # Slow path: 加锁后再次检查，避免并发重复创建
+    with _CLIENT_CACHE_LOCK:
+        client = _CLIENT_CACHE.get(cache_key)
+        if client is not None:
+            return client
+        client = OpenAI(
+            api_key=provider.api_key,
+            base_url=provider.base_url,
+            max_retries=0,
+        )
+        _CLIENT_CACHE[cache_key] = client
+        return client
 
 
 def _get_request_timeout(kind: str) -> float:

@@ -11,6 +11,7 @@ def merge_node(state: AgentState) -> AgentState:
     outputs = state.get("agent_outputs", {})
     message = state["messages"][-1]["content"]
     on_delta, stream_state = build_answer_streamer(state, NODE_MERGE)
+    merge_error = ""
 
     if not outputs:
         answer = "资料不足"
@@ -18,7 +19,6 @@ def merge_node(state: AgentState) -> AgentState:
         answer = list(outputs.values())[0]
     else:
         merged_input = "\n".join([f"{k}: {v}" for k, v in outputs.items()])
-        merge_error = ""
 
         try:
             answer = chat(
@@ -36,8 +36,20 @@ def merge_node(state: AgentState) -> AgentState:
                 profile=PROFILE_DEFAULT_CHAT,
             )
         except LLMCallError as exc:
-            merge_error = str(exc)
-            answer = " ".join(str(v).strip() for v in outputs.values() if str(v).strip())
+            # 已知的 LLM 调用失败（超时、鉴权、限流等）：降级拼接各 agent 输出
+            merge_error = f"llm_call_error: {exc}"
+            answer = " ".join(
+                str(v).strip() for v in outputs.values() if str(v).strip()
+            )
+            if not answer:
+                answer = "资料不足"
+        except Exception as exc:
+            # 兜底：prompt 构造异常、编码错误、stream 回调内部异常等非预期情况。
+            # 不能让 merge 节点抛出，否则整个 graph 失败；保留 repr 方便排查。
+            merge_error = f"unexpected_error: {exc!r}"
+            answer = " ".join(
+                str(v).strip() for v in outputs.values() if str(v).strip()
+            )
             if not answer:
                 answer = "资料不足"
 
@@ -51,7 +63,7 @@ def merge_node(state: AgentState) -> AgentState:
                 "agent_outputs": state.get("agent_outputs", {}),
                 "final_answer_preview": preview(answer, 160),
                 "streamed_answer": stream_state["used"],
-                "error": merge_error if len(outputs) > 1 else "",
+                "error": merge_error,
             }
         },
     }
@@ -65,7 +77,7 @@ def merge_node(state: AgentState) -> AgentState:
         extra={
             "agentOutputs": state.get("agent_outputs", {}),
             "finalAnswerPreview": preview(answer, 160),
-            "error": merge_error if len(outputs) > 1 else "",
+            "error": merge_error,
         },
     )
     return next_state

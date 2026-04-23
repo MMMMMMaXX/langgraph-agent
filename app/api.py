@@ -17,16 +17,30 @@ from app.utils.logger import log_request, now_ms
 app = FastAPI(title="LangGraph Agent API")
 DEBUG_UI_PATH = Path(__file__).resolve().parent / "debug_ui.html"
 
+# ---------------------------------------------------------------------------
+# Session 并发模型
+# ---------------------------------------------------------------------------
+# session_store       : 全局 session 状态字典（内存）
+# session_store_guard : 保护 session_store / session_locks 两张字典本身的
+#                       "目录锁"，只用于瞬时 get/put 操作，不包含业务逻辑
+# session_locks       : 每个 session 一把 RLock，保证同一 session 的请求串行
+#                       （graph.invoke 期间持有，跨 session 请求仍可并发）
+#
+# 锁顺序约定（严格遵守，任何新增调用必须遵循）：
+#   1) 先取 session_store_guard（短暂）查/建 session_lock，立即释放
+#   2) 再取 session_lock 执行 graph.invoke（长时间）
+#   3) 需要读写 session_store 时，在 session_lock 内再短暂取 guard
+# 反向嵌套（先 session_lock 再 guard 长期持有）会造成死锁，禁止。
+# ---------------------------------------------------------------------------
 session_store: dict[str, AgentState] = {}
 session_store_guard = threading.Lock()
 session_locks: dict[str, threading.RLock] = {}
 
 
 def get_session_lock(session_id: str) -> threading.RLock:
-    """获取单个 session 的互斥锁。
+    """获取单个 session 的互斥锁（瞬时操作，不会阻塞业务）。
 
-    同一 session 的请求必须串行执行，否则 `get -> run -> set` 会丢消息。
-    不同 session 使用不同锁，仍然可以并发处理。
+    只在 guard 内做字典查/建，立刻释放 guard，不持有任何长时间锁。
     """
 
     with session_store_guard:
@@ -77,7 +91,40 @@ def debug_ui() -> FileResponse:
     return FileResponse(DEBUG_UI_PATH)
 
 
+def _snapshot_session_state(session_id: str) -> AgentState:
+    """在 guard 内拿到 session 状态的浅拷贝快照后立即释放 guard。
+
+    返回的 dict 与 session_store 里的对象是不同引用，后续读写不会相互影响。
+    """
+
+    with session_store_guard:
+        state = session_store.get(session_id)
+        if state is None:
+            state = create_initial_state(session_id)
+            session_store[session_id] = state
+        # 浅拷贝足够：后续 run_chat_turn 会基于这个 dict 构造新对象，
+        # 不会原地修改 messages / summary 等字段。
+        return dict(state)
+
+
+def _commit_session_state(session_id: str, result: dict[str, Any]) -> None:
+    """把 run_chat_turn 的结果写回 session_store（瞬时 guard）。"""
+
+    with session_store_guard:
+        session_store[session_id] = {
+            "session_id": session_id,
+            "messages": result.get("messages", []),
+            "summary": result.get("summary", ""),
+        }
+
+
 def get_or_create_session_state(session_id: str) -> AgentState:
+    """保留旧接口，供外部直接读取 session 状态（测试/脚本）。
+
+    注意：返回的是 session_store 内的引用，调用方不应修改。
+    业务路径请用 `_snapshot_session_state` 拿副本。
+    """
+
     normalized_session_id = session_id.strip()
     if not normalized_session_id:
         raise ValueError("session_id must not be empty")
@@ -106,12 +153,21 @@ def build_chat_result(
         message=request.message,
     )
 
+    if not normalized_session_id:
+        # 提前报错，避免进入锁流程
+        raise HTTPException(status_code=400, detail="session_id must not be empty")
+
     try:
+        # 1) 瞬时 guard：建/取 session_lock
         session_lock = get_session_lock(normalized_session_id)
+
+        # 2) 持有 session_lock 执行整个 turn，guard 不再持有
         with session_lock:
-            state = get_or_create_session_state(normalized_session_id)
+            # 2a) 瞬时 guard：快照 session 状态
+            state_snapshot = _snapshot_session_state(normalized_session_id)
+
             current_state = {
-                **state,
+                **state_snapshot,
                 "request_id": request_id,
                 "session_id": normalized_session_id,
                 "debug": request.debug,
@@ -119,13 +175,13 @@ def build_chat_result(
                 "stream_callback": stream_callback,
                 "streamed_answer": False,
             }
+
+            # 2b) 长时间操作：跑完整 graph，不持有任何全局锁
+            #     stream_callback 可能被回调，但不会再触发 guard，安全
             result = run_chat_turn(current_state, request.message)
-            with session_store_guard:
-                session_store[normalized_session_id] = {
-                    "session_id": normalized_session_id,
-                    "messages": result.get("messages", []),
-                    "summary": result.get("summary", ""),
-                }
+
+            # 2c) 瞬时 guard：写回 session 状态
+            _commit_session_state(normalized_session_id, result)
     except ValueError as exc:
         log_request(
             stage="failed",
@@ -136,6 +192,8 @@ def build_chat_result(
             error=str(exc),
         )
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except HTTPException:
+        raise
     except Exception as exc:
         log_request(
             stage="failed",
@@ -189,7 +247,9 @@ def sse_event(event: str, data: dict[str, Any]) -> str:
 def chunk_text(text: str, chunk_size: int = 24) -> list[str]:
     if not text:
         return []
-    return [text[index : index + chunk_size] for index in range(0, len(text), chunk_size)]
+    return [
+        text[index : index + chunk_size] for index in range(0, len(text), chunk_size)
+    ]
 
 
 @app.post("/chat", response_model=ChatResponse)
@@ -206,6 +266,7 @@ def chat_stream(request: ChatRequest) -> StreamingResponse:
 
     def worker() -> None:
         try:
+
             def stream_callback(event: str, data: dict[str, Any]) -> None:
                 event_queue.put({"event": event, "data": data})
 
