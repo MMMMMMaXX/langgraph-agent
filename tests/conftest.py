@@ -133,9 +133,18 @@ def llm_stub(monkeypatch: pytest.MonkeyPatch) -> Iterator[_LLMStub]:
     import app.llm as llm_pkg
 
     llm_chat_mod = sys.modules["app.llm.chat"]
+    original_chat = llm_chat_mod.chat
 
     monkeypatch.setattr(llm_chat_mod, "chat", stub)
     monkeypatch.setattr(llm_pkg, "chat", stub)
+    # 扫所有已加载模块：凡是通过 `from app.llm import chat` 绑到本模块 namespace
+    # 的 chat 引用（== 原函数对象），统一替换为 stub。否则业务模块在 import 时
+    # 就抓住了原函数，后续 patch 只改包属性对它们无效。
+    for mod_name, mod in list(sys.modules.items()):
+        if mod is None or mod_name.startswith("app.llm"):
+            continue
+        if getattr(mod, "chat", None) is original_chat:
+            monkeypatch.setattr(mod, "chat", stub)
     # 拦截底层入口：plan_routes / rewrite_query 这类直接用 SDK 响应的函数会走这里
     monkeypatch.setattr(llm_chat_mod, "_create_chat_completion", stub.create_completion)
     yield stub
