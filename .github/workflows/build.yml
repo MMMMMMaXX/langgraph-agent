@@ -21,7 +21,7 @@ permissions:
 
 concurrency:
   group: build-${{ github.ref }}
-  cancel-in-progress: false   # 推镜像别互相取消，避免 main / tag 并发时出现空洞
+  cancel-in-progress: false # 推镜像别互相取消，避免 main / tag 并发时出现空洞
 
 jobs:
   build-and-push:
@@ -32,6 +32,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        # 跨架构构建（linux/arm64）需要 QEMU 做指令翻译，
+        # amd64 runner 才能编译出 arm64 的镜像层。
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         # 启用 buildx 以便用 cache-from/to 和多平台构建
@@ -79,6 +84,9 @@ jobs:
         with:
           context: .
           push: true
+          # 同时出 amd64（生产服务器）+ arm64（Apple Silicon 本地验证）
+          # 构建时间会变长（arm64 需要 QEMU 模拟），但开发者不用再 --platform 绕。
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
