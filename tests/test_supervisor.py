@@ -29,9 +29,7 @@ from app.constants.routes import (
 )
 
 
-def _state_with_message(
-    message: str, history: list[dict] | None = None
-) -> dict:
+def _state_with_message(message: str, history: list[dict] | None = None) -> dict:
     """造一个最小 AgentState：只带 messages，其余字段走默认。"""
     messages = list(history or [])
     messages.append({"role": "user", "content": message})
@@ -135,3 +133,39 @@ def test_llm_fallback_not_called_when_rule_matches(
     # "天气" 命中规则，不应触发 fallback
     result = supervisor_node(_state_with_message("北京天气怎么样"))
     assert result["routes"] == [ROUTE_TOOL_AGENT]
+
+
+# --------------------- 端到端 LLM fallback（走真实调用链） ---------------------
+#
+# 上面两条 fallback 测试直接 patch 了 `supervisor.plan_routes`，只覆盖到
+# supervisor 这一层。这里换一种姿势：用顶层 `llm_stub` 拦截底层的
+# `_create_chat_completion`，让 supervisor → `plan_routes` → SDK 整条链路真实跑起来，
+# 顺带验证 llm_stub 在"多层薄包装"场景下也能稳定接管。
+
+
+def test_llm_fallback_via_llm_stub_end_to_end(llm_stub) -> None:
+    # plan_routes 期望 LLM 返回一个 JSON array 字符串，再解析出合法 agent 名字
+    llm_stub.set_response('["rag_agent"]')
+
+    # "hello" 不命中任何规则 → 真实 plan_routes() → 被桩拦截到的 _create_chat_completion
+    result = supervisor_node(_state_with_message("hello"))
+
+    assert result["routes"] == [ROUTE_RAG_AGENT]
+    assert result["intent"] == "retrieval"
+    assert result["debug_info"]["supervisor"]["route_reason"] == "llm fallback"
+
+    # 断言真的走到了 LLM 层：trace_stage 由 plan_routes 显式传入，容易对上号
+    assert any(
+        call.get("trace_stage") == "plan_routes" for call in llm_stub.calls
+    ), f"expected a plan_routes LLM call, got: {llm_stub.calls!r}"
+
+
+def test_llm_fallback_invalid_json_defaults_to_chat(llm_stub) -> None:
+    # LLM 返回无法解析的内容时，plan_routes 应降级到 [chat_agent]，
+    # 避免把异常冒泡到 supervisor 搞出 5xx。
+    llm_stub.set_response("not a json at all")
+
+    result = supervisor_node(_state_with_message("some truly unknown request"))
+
+    assert result["routes"] == [ROUTE_CHAT_AGENT]
+    assert result["intent"] == "chat"

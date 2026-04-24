@@ -22,9 +22,17 @@ os.environ.setdefault("DEEPSEEK_MODEL", "deepseek-chat")
 os.environ.setdefault("OPENAI_API_KEY", "test-key-not-real")
 
 from collections.abc import Callable, Iterator  # noqa: E402
+from types import SimpleNamespace  # noqa: E402
 from typing import Any  # noqa: E402
 
 import pytest  # noqa: E402
+
+
+def _fake_sdk_response(content: str) -> Any:
+    """造一个最小的 SDK-shape 返回：consumer 只读 `.choices[0].message.content`。"""
+    return SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content=content))]
+    )
 
 
 # LLM mock 配置：默认返回固定字符串；测试可覆盖 set_response() 改响应
@@ -33,6 +41,11 @@ class _LLMStub:
 
     - calls：记录所有调用参数，断言 LLM 被正确调用
     - set_response(str) / set_response_fn(callable)：自定义返回
+
+    同时拦截 `_create_chat_completion`：项目内像 `plan_routes` / `rewrite_query`
+    这类"薄包装"并不走 `chat()`，而是直接调底层 `_create_chat_completion` 拿 SDK
+    原生响应对象。为了让这些链路在测试里也能被 llm_stub 接管，这里伪造一个
+    最小 SDK-shape 响应（choices[0].message.content），内容仍由 set_response* 决定。
     """
 
     def __init__(self) -> None:
@@ -70,6 +83,34 @@ class _LLMStub:
     def set_response_fn(self, fn: Callable[..., str]) -> None:
         self._fn = fn
 
+    def create_completion(
+        self,
+        profile: str = "default_chat",
+        trace_stage: str = "",
+        **kwargs: Any,
+    ) -> Any:
+        """模拟 `_create_chat_completion` —— 返回 SDK-shape 对象。
+
+        `messages` 从 kwargs 取，便于记录；其余 kwargs（max_completion_tokens 等）
+        也会被原封不动地记下，方便断言。
+        """
+        messages = kwargs.get("messages") or []
+        self.calls.append(
+            {
+                "messages": messages,
+                "profile": profile,
+                "trace_stage": trace_stage,
+                "max_completion_tokens": kwargs.get("max_completion_tokens"),
+                "via": "_create_chat_completion",
+            }
+        )
+        content = self._fn(
+            messages=messages,
+            profile=profile,
+            trace_stage=trace_stage,
+        )
+        return _fake_sdk_response(content)
+
 
 @pytest.fixture
 def llm_stub(monkeypatch: pytest.MonkeyPatch) -> Iterator[_LLMStub]:
@@ -95,4 +136,6 @@ def llm_stub(monkeypatch: pytest.MonkeyPatch) -> Iterator[_LLMStub]:
 
     monkeypatch.setattr(llm_chat_mod, "chat", stub)
     monkeypatch.setattr(llm_pkg, "chat", stub)
+    # 拦截底层入口：plan_routes / rewrite_query 这类直接用 SDK 响应的函数会走这里
+    monkeypatch.setattr(llm_chat_mod, "_create_chat_completion", stub.create_completion)
     yield stub
