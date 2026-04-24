@@ -28,10 +28,47 @@ from typing import Any  # noqa: E402
 import pytest  # noqa: E402
 
 
-def _fake_sdk_response(content: str) -> Any:
-    """造一个最小的 SDK-shape 返回：consumer 只读 `.choices[0].message.content`。"""
+def _fake_sdk_response(
+    content: str = "",
+    tool_calls: list[Any] | None = None,
+) -> Any:
+    """造一个最小的 SDK-shape 返回。
+
+    - 默认只填 `choices[0].message.content`（普通问答 / plan_routes 路径够用）
+    - `tool_calls` 不为空时，还给 message 挂上 tool_calls 字段 + model_dump()，
+      供 `chat_with_tools` 里 `followup_messages.append(first_message.model_dump())`
+      使用。
+    """
+    msg_dict: dict[str, Any] = {"role": "assistant", "content": content}
+    if tool_calls:
+        msg_dict["tool_calls"] = [
+            {
+                "id": tc.id,
+                "type": "function",
+                "function": {
+                    "name": tc.function.name,
+                    "arguments": tc.function.arguments,
+                },
+            }
+            for tc in tool_calls
+        ]
+    message = SimpleNamespace(content=content, tool_calls=tool_calls)
+    message.model_dump = lambda: msg_dict
+    return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+
+def make_tool_call(
+    name: str, arguments: dict[str, Any], call_id: str = "call_1"
+) -> Any:
+    """测试辅助：造一个 SDK function-call 风格的 tool_call 对象。
+
+    arguments 会被 json.dumps 成字符串（OpenAI SDK 原生就是这样返回的）。
+    """
+    import json
+
     return SimpleNamespace(
-        choices=[SimpleNamespace(message=SimpleNamespace(content=content))]
+        id=call_id,
+        function=SimpleNamespace(name=name, arguments=json.dumps(arguments)),
     )
 
 
@@ -43,9 +80,14 @@ class _LLMStub:
     - set_response(str) / set_response_fn(callable)：自定义返回
 
     同时拦截 `_create_chat_completion`：项目内像 `plan_routes` / `rewrite_query`
-    这类"薄包装"并不走 `chat()`，而是直接调底层 `_create_chat_completion` 拿 SDK
-    原生响应对象。为了让这些链路在测试里也能被 llm_stub 接管，这里伪造一个
-    最小 SDK-shape 响应（choices[0].message.content），内容仍由 set_response* 决定。
+    / `chat_with_tools` 这类"薄包装"并不走 `chat()`，而是直接调底层
+    `_create_chat_completion` 拿 SDK 原生响应对象。为了让这些链路在测试里也能被
+    llm_stub 接管，这里伪造一个最小 SDK-shape 响应（choices[0].message.content），
+    内容仍由 set_response* 决定。
+
+    set_response_fn 的返回值既可以是纯 str（用作 content），也可以是 dict
+    `{"content": str, "tool_calls": [...]}`：后者专门用于 tool_agent 的
+    tool_select 阶段，测试通过 trace_stage 区分不同阶段给出不同响应。
     """
 
     def __init__(self) -> None:
@@ -66,6 +108,7 @@ class _LLMStub:
                 "profile": profile,
                 "trace_stage": trace_stage,
                 "max_completion_tokens": max_completion_tokens,
+                "via": "chat",
             }
         )
         result = self._fn(
@@ -73,6 +116,9 @@ class _LLMStub:
             profile=profile,
             trace_stage=trace_stage,
         )
+        # 兼容 tool_agent 场景：set_response_fn 可能按 trace_stage 分派返回 dict
+        if isinstance(result, dict):
+            result = result.get("content", "")
         if on_delta is not None:
             on_delta(result)
         return result
@@ -109,6 +155,12 @@ class _LLMStub:
             profile=profile,
             trace_stage=trace_stage,
         )
+        # dict 返回：tool_calls 路径；str 返回：普通文本
+        if isinstance(content, dict):
+            return _fake_sdk_response(
+                content=content.get("content", ""),
+                tool_calls=content.get("tool_calls"),
+            )
         return _fake_sdk_response(content)
 
 
