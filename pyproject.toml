@@ -1,0 +1,138 @@
+[project]
+name = "langgraph-agent"
+version = "0.3.1"
+description = "LangGraph 多 Agent 编排系统"
+requires-python = ">=3.11"
+
+# ------------------------------------------------------------
+# Ruff：代码风格 + 静态检查
+# ------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [
+    ".venv",
+    "build",
+    "dist",
+    "data",
+    "outputs",
+    "backups",
+]
+
+[tool.ruff.lint]
+# 起步只开最有价值的几类，避免一次性淹没。后续再逐步打开 ANN / RUF 等
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes（未使用变量、import 等）
+    "W",   # pycodestyle warnings
+    "I",   # isort
+    "B",   # flake8-bugbear（易错模式）
+    "UP",  # pyupgrade（建议新语法）
+]
+ignore = [
+    "E501",  # 行长度交给 formatter
+    "B008",  # FastAPI 路由依赖注入常用 Depends() 作默认值
+]
+# 面向 facade 文件：不要把 "导入后未使用" 自动删掉，纯 re-export 会被误伤。
+# 业务代码真的有无用导入时，还是会 warn，但需要手工修。
+unfixable = ["F401"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B011"]                # assert False 之类
+"scripts/**" = ["E402"]              # 脚本可能在 import 前做 path 处理
+# 门面 / re-export 模块：允许 "imported but unused"
+"app/**/__init__.py" = ["F401"]
+"app/rag.py" = ["F401"]
+"app/agents/novel_script/graph.py" = ["F401"]
+"app/agents/novel_script/prompts.py" = ["F401"]
+"app/prompts/core.py" = ["F401"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+# ------------------------------------------------------------
+# pytest
+# ------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-ra",          # 额外输出失败原因摘要
+    "--strict-markers",
+]
+filterwarnings = [
+    # 上游依赖的弃用告警太多，先静默
+    "ignore::DeprecationWarning",
+]
+
+# ------------------------------------------------------------
+# mypy（渐进 strict）
+# ------------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+# 项目 app/ 下很多子目录没有 __init__.py（PEP 420 namespace package），
+# 不开这两个选项 mypy 会把 app.constants 和 app.agents.novel_script.constants
+# 当成重名模块。
+namespace_packages = true
+explicit_package_bases = true
+mypy_path = "."
+# 全局基线：比默认严，但不至于被老代码淹没
+ignore_missing_imports = true       # 第三方库无 stub 时不报错（langchain/chromadb 等）
+warn_return_any = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+check_untyped_defs = true
+no_implicit_optional = true
+
+# 排除不必要进入类型检查的目录
+exclude = [
+    "build/",
+    "dist/",
+    "\\.venv/",
+    "data/",
+    "outputs/",
+    "backups/",
+]
+
+# --- 关键 / 新增模块：strict ---
+# 新代码必须带类型；现有代码等重构或补注解后再纳入
+[[tool.mypy.overrides]]
+module = [
+    "app.api.*",
+    "app.llm.providers",
+    "app.llm.retry",
+    "app.llm._helpers",
+]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+warn_return_any = true
+no_implicit_reexport = true
+
+# --- 老代码：先 permissive，允许逐步收紧 ---
+[[tool.mypy.overrides]]
+module = [
+    "app.agents.*",
+    "app.memory.*",
+    "app.retrieval.*",
+    "app.vector_store.*",
+    "app.prompts.*",
+    "app.tools.*",
+    "app.nodes.*",
+    "app.constants.*",
+    "app.utils.*",
+    "app.chunking.*",
+]
+disallow_untyped_defs = false
+check_untyped_defs = false
+
+# 第三方库显式忽略
+[[tool.mypy.overrides]]
+module = [
+    "chromadb.*",
+    "langchain.*",
+    "langgraph.*",
+    "langsmith.*",
+]
+ignore_missing_imports = true

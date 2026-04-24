@@ -131,7 +131,8 @@ uvicorn app.api:app --reload --port 8000
 
 - `POST /chat`：同步返回，body：`{ "session_id": "...", "message": "...", "debug": false }`
 - `POST /chat/stream`：SSE 流式，事件类型：`start / chunk / done / error / end`
-- `GET /health`：健康检查
+- `GET /health`：**liveness** 探针，进程活着就返回 `{"status":"ok", "version":..., "git_sha":..., "build_time":...}`。版本字段由 Dockerfile 构建参数注入（见 4.9）
+- `GET /health/ready`：**readiness** 探针，静态检查 LLM profile（provider + model + `*_API_KEY`）、会话历史目录、Chroma 目录；任一项失败返回 HTTP 503 并在 `checks` 字段指出原因。docker-compose healthcheck 默认使用该端点
 - `GET /debug-ui`：本地浏览器调试页
 
 ### 4.5 CLI 多轮对话
@@ -157,12 +158,14 @@ make docker-up
 make docker-health
 ```
 
+> **国内网络拉不到 `docker.io/library/python:3.11-slim`**：Docker Desktop → Settings → Docker Engine，给 JSON 加一条 `registry-mirrors`（如 `https://docker.m.daocloud.io`），Apply & restart 后重试 `make docker-up` 即可。
+
 `docker-compose.yml` 会把宿主机目录挂载进容器：
 
-| 宿主机路径 | 容器路径       | 用途                                                         |
-| ---------- | -------------- | ------------------------------------------------------------ |
-| `./data`   | `/app/data`    | Chroma、conversation history、LangGraph checkpoint 等持久化数据 |
-| `./outputs`| `/app/outputs` | eval 产物与本地调试输出                                      |
+| 宿主机路径  | 容器路径       | 用途                                                            |
+| ----------- | -------------- | --------------------------------------------------------------- |
+| `./data`    | `/app/data`    | Chroma、conversation history、LangGraph checkpoint 等持久化数据 |
+| `./outputs` | `/app/outputs` | eval 产物与本地调试输出                                         |
 
 停止并保留数据：
 
@@ -172,15 +175,15 @@ make docker-down
 
 常用命令：
 
-| 命令                  | 作用                                         |
-| --------------------- | -------------------------------------------- |
-| `make docker-up`      | 构建镜像并启动服务                           |
-| `make docker-down`    | 停止容器，保留 `data/` 和 `outputs/`          |
-| `make docker-restart` | 重启服务，验证持久化恢复时很常用             |
-| `make docker-logs`    | 跟随查看容器日志                             |
-| `make docker-health`  | 检查 `/health`                               |
-| `make docker-smoke`   | 自动执行健康检查、请求、重启、总结恢复校验   |
-| `make eval-baseline`  | 对运行中的服务执行 baseline eval             |
+| 命令                  | 作用                                       |
+| --------------------- | ------------------------------------------ |
+| `make docker-up`      | 构建镜像并启动服务                         |
+| `make docker-down`    | 停止容器，保留 `data/` 和 `outputs/`       |
+| `make docker-restart` | 重启服务，验证持久化恢复时很常用           |
+| `make docker-logs`    | 跟随查看容器日志                           |
+| `make docker-health`  | 检查 `/health`                             |
+| `make docker-smoke`   | 自动执行健康检查、请求、重启、总结恢复校验 |
+| `make eval-baseline`  | 对运行中的服务执行 baseline eval           |
 
 默认 `.env.example` 里 `LANGSMITH_TRACING=false`，避免 smoke/eval 测试请求污染 LangSmith 项目。需要观测 trace 时，再在 `.env` 里改成 `true`。
 
@@ -220,23 +223,23 @@ make prod-health
 
 生产模式使用 [docker-compose.prod.yml](./docker-compose.prod.yml)：
 
-| Volume 名称          | 容器路径       | 用途                                                         |
-| -------------------- | -------------- | ------------------------------------------------------------ |
-| `langgraph_data`     | `/app/data`    | Chroma、conversation history、LangGraph checkpoint 等持久化数据 |
-| `langgraph_outputs`  | `/app/outputs` | eval 产物与运行输出                                          |
+| Volume 名称         | 容器路径       | 用途                                                            |
+| ------------------- | -------------- | --------------------------------------------------------------- |
+| `langgraph_data`    | `/app/data`    | Chroma、conversation history、LangGraph checkpoint 等持久化数据 |
+| `langgraph_outputs` | `/app/outputs` | eval 产物与运行输出                                             |
 
 常用生产命令：
 
 | 命令                | 作用                                  |
 | ------------------- | ------------------------------------- |
-| `make prod-up`      | 构建镜像并后台启动生产 compose         |
-| `make prod-down`    | 停止生产容器，保留命名 volume          |
+| `make prod-up`      | 构建镜像并后台启动生产 compose        |
+| `make prod-down`    | 停止生产容器，保留命名 volume         |
 | `make prod-restart` | 重启生产容器                          |
 | `make prod-logs`    | 跟随查看生产容器日志                  |
 | `make prod-health`  | 检查 `/health`                        |
 | `make prod-smoke`   | 在生产 compose 上执行重启持久化 smoke |
-| `make prod-backup`  | 备份生产数据 volume 到 `backups/`      |
-| `make prod-restore` | 从备份恢复数据 volume，需显式确认      |
+| `make prod-backup`  | 备份生产数据 volume 到 `backups/`     |
+| `make prod-restore` | 从备份恢复数据 volume，需显式确认     |
 
 生产模式可通过环境变量覆盖镜像名、容器名和端口：
 
@@ -276,6 +279,120 @@ make prod-up
 ```
 
 恢复 `langgraph_outputs` 时同理传入 `VOLUME_NAME=langgraph_outputs`。恢复是破坏性操作，建议先对当前 volume 再做一次备份。
+
+### 4.8 本地开发模式备份 / 还原
+
+除了 `make prod-backup/prod-restore` 针对命名 volume 的通道，项目也提供**直接针对 `data/` 目录**的本地脚本，适合本地开发、手动挂载模式（`./data:/app/data`），以及用 cron/launchd 定时跑。
+
+```bash
+# 备份：默认落到 ./backups/<timestamp>/，保留 14 天
+./scripts/backup.sh
+
+# 自定义目录 / 保留天数
+BACKUP_DIR=/mnt/nas BACKUP_RETENTION_DAYS=30 ./scripts/backup.sh
+
+# 还原（交互确认，输入 y 才会真正覆盖）
+./scripts/restore.sh 20260423_031005
+```
+
+脚本做了这些事：
+
+- `conversation_history.sqlite3` / `langgraph_checkpoints.sqlite3` 用 `sqlite3 .backup` 做**在线安全快照**，运行中也能跑
+- `conversation_history.jsonl`（如果后端切到 JSONL）直接 `cp`
+- `data/chroma/` 打成 `chroma.tar.gz`
+- 每份快照带 `MANIFEST`（timestamp / git_sha / hostname）
+- 自动清理超过 `BACKUP_RETENTION_DAYS` 的旧快照
+
+cron 示例（每天 03:10）：
+
+```bash
+10 3 * * * cd /path/to/langgraph-agent && ./scripts/backup.sh >> backups/backup.log 2>&1
+```
+
+还原演练建议先做一次再进生产：
+
+```bash
+docker compose down
+rm -rf data/chroma data/*.sqlite3 data/*.jsonl   # 模拟数据丢失
+./scripts/restore.sh <timestamp>                 # 输入 y
+docker compose up -d --build
+curl -s http://localhost:8000/health/ready | python3 -m json.tool   # 应返回 ready
+```
+
+### 4.9 版本打标 / 回滚
+
+构建时会把三项版本元数据注入镜像，并通过 `/health` 暴露出来，方便排障和灰度：
+
+- `APP_VERSION`：语义版本（例如 `v0.3.1`），默认 `dev`
+- `APP_GIT_SHA`：`git rev-parse --short HEAD`，默认 `unknown`
+- `APP_BUILD_TIME`：构建时间（UTC ISO8601）
+- `IMAGE_TAG`：镜像 tag，默认 `$(APP_VERSION)-$(APP_GIT_SHA)`，例如 `v0.3.1-abc1234`
+
+查看当前 Make 将注入的版本：
+
+```bash
+make version
+# APP_VERSION=dev
+# APP_GIT_SHA=d1329ff
+# APP_BUILD_TIME=2026-04-23T17:07:14Z
+# IMAGE_TAG=dev-d1329ff
+```
+
+发版构建（显式打语义版本）：
+
+```bash
+make build APP_VERSION=v0.3.1
+# 产出镜像 langgraph-agent:v0.3.1-<sha>
+```
+
+也可以直接 `make docker-up` / `make prod-up`，同样会自动带上当前 git sha 和构建时间，镜像 tag 走默认规则。
+
+确认线上跑的版本：
+
+```bash
+curl -s http://localhost:8000/health | python3 -m json.tool
+# {
+#   "status": "ok",
+#   "version": "v0.3.1",
+#   "git_sha": "abc1234",
+#   "build_time": "2026-04-23T17:07:14Z"
+# }
+```
+
+回滚到旧版本：
+
+```bash
+IMAGE_TAG=v0.3.0-xxxxxxx docker compose up -d   # 复用已构建过的旧镜像
+```
+
+建议搭配 [4.8](#48-本地开发模式备份--还原) 的备份：**版本回滚只能回代码，回滚前务必确认数据兼容或先用 `scripts/restore.sh` 还原到兼容快照**。
+
+#### 常见陷阱：`docker compose up` 不带 `IMAGE_TAG` 会回退到 `:local`
+
+compose 文件里 `image: langgraph-agent:${IMAGE_TAG:-local}`，**tag 就是镜像身份**。所以：
+
+```bash
+# ❌ 踩坑：看起来在"发版"，实际跑的是默认 :local 镜像
+make build APP_VERSION=v0.3.1
+docker compose up -d                # 拉起 :local，不是刚构建的 v0.3.1
+
+# ❌ 更典型：--build 会重建 :local 且 args 全用默认值 → /health 返回 dev/unknown
+docker compose up -d --build
+
+# ✅ 正确：让 compose 知道要用哪个 tag
+make docker-up APP_VERSION=v0.3.1   # 推荐，make 自动透传 IMAGE_TAG
+
+# ✅ 或 build 和 run 分开时显式传 tag
+make build APP_VERSION=v0.3.1
+IMAGE_TAG=v0.3.1-<sha> docker compose up -d
+```
+
+快速自检：
+
+```bash
+docker compose ps --format '{{.Name}} {{.Image}}'
+# langgraph-agent langgraph-agent:v0.3.1-d1329ff   ← 看到具体版本 tag 才说明发版生效
+```
 
 ---
 
@@ -338,6 +455,36 @@ EVAL_CASE_IDS=case_01,case_05 python scripts/eval_chat.py
 
 ---
 
-## 8. License
+## 8. CI/CD
+
+GitHub Actions 分三条 pipeline，各司其职：
+
+- **`.github/workflows/ci.yml`（每次 push / PR 自动跑）**
+  - `ruff check` lint
+  - `mypy app`（渐进 strict，目前 `continue-on-error`，只暴露信号不拦合并）
+  - `pytest`（用 `tests/conftest.py` 里的 `llm_stub` monkey-patch `app.llm.chat`，不打真实 LLM）
+- **`.github/workflows/build.yml`（push main / 打 `v*` tag 触发）**
+  - 构建 Docker 镜像并推送到 `ghcr.io/<owner>/<repo>`
+  - 通过 `build-args` 把 `APP_VERSION` / `APP_GIT_SHA` / `APP_BUILD_TIME` 写进镜像，运行时由 `/health` 回显
+  - 利用 `docker/metadata-action` 自动生成 tag：`main` / `sha-xxxxxxx` / `v0.3.1` / `0.3` / `latest`
+- **`.github/workflows/eval.yml`（手动 `workflow_dispatch`）**
+  - 用真实 LLM key（repo secrets）启动应用并跑 `scripts/run_eval_profile.py`
+  - 结果 + 日志作为 artifacts 留档 14 天，方便下载后用 `scripts/compare_eval_runs.py` 对比
+
+**部署不在 CI 里做**：镜像推到 ghcr 之后，生产侧继续手动 `docker compose pull && docker compose up -d`。
+
+本地复刻 CI 做的事：
+
+```bash
+ruff check .
+mypy app           # 可能有遗留类型债，正常
+pytest -q
+```
+
+配置集中在 `pyproject.toml`（ruff / pytest / mypy）和 `tests/conftest.py`（LLM stub fixture）。
+
+---
+
+## 9. License
 
 仅用于个人学习与技术验证，未设定开源协议。若需二次使用请先联系作者。

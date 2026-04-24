@@ -1,0 +1,63 @@
+# CI: lint + mypy + test
+#
+# 触发：
+#   - 向任何分支 push
+#   - 对 main 发起 Pull Request
+# 目标：3 分钟内跑完，给出红绿灯，是合入 main 的前提。
+# 不做：构建镜像 / 推镜像 / 部署（那是 build.yml 的事）。
+
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  # 同一分支/PR 连续推送时，取消上一次还在排队/跑的 workflow，节省 Actions 额度
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    name: lint + mypy + pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff mypy pytest
+
+      - name: Ruff (lint)
+        # 暂不开 `ruff format --check`：老代码格式差异 56 个文件，留到后续单独一次
+        # "format 全仓" PR，避免和 CI 接入 PR 混在一起看不清。
+        run: ruff check .
+
+      - name: Mypy (gradual strict, non-blocking for week 1)
+        # strict 模块（app.api.* / app.llm.providers / retry / _helpers）目前还有
+        # 遗留类型债。先用 continue-on-error 把信号暴露出来，看得见但不拦合并；
+        # 等专门做一轮 "类型补注解" 后再改成阻塞 CI。
+        continue-on-error: true
+        run: mypy app
+
+      - name: Pytest
+        env:
+          # 测试里完全不应该打到真实 LLM；为了保险起见给个假 key，
+          # 让任何偶然漏过 monkeypatch 的代码早早报 auth 错，而不是偷偷花钱。
+          OPENAI_API_KEY: "test-key-not-real"
+          DEEPSEEK_API_KEY: "test-key-not-real"
+        run: pytest -ra

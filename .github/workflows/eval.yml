@@ -1,0 +1,90 @@
+# Eval：手动触发的评测工作流
+#
+# 为什么独立一个 workflow：
+#   1. 会调用真实 LLM（花钱、慢），不能跟 PR CI 一起跑
+#   2. 需要 OPENAI_API_KEY / DEEPSEEK_API_KEY 这类 secret，只给特定任务看
+#   3. 结果以 artifacts 留档，便于横向对比 profile 效果
+#
+# 触发：
+#   - workflow_dispatch：必须人手点按钮，输入 profile / case ids 等参数
+#
+# 一次典型用法：
+#   - 调整了 prompt 或 retrieval 阈值后，手动跑 baseline + concise 两个 profile
+#   - 下载 artifact，用 scripts/compare_eval_runs.py 对比
+
+name: Eval (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "eval profile name (见 scripts/eval_profiles.json)"
+        required: true
+        default: "baseline"
+      case_ids:
+        description: "逗号分隔的 case id，留空表示跑全量"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Start app in background
+        env:
+          # 真实 LLM key 从 repo secrets 注入；本地 .env 不会被 commit
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          # eval 只要 chat / retrieval，不需要写 langsmith
+          LANGSMITH_TRACING: "false"
+        run: |
+          # 后台起服务，把日志引流到文件；后面步骤失败时能 upload 出来排障
+          nohup uvicorn app.api:app --host 127.0.0.1 --port 8000 > uvicorn.log 2>&1 &
+          # 等到 /health 返回 200 为止，最多等 60 秒
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8000/health >/dev/null 2>&1; then
+              echo "app is up"; exit 0
+            fi
+            sleep 1
+          done
+          echo "app failed to start"; cat uvicorn.log; exit 1
+
+      - name: Run eval profile
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          EVAL_BASE_URL: "http://127.0.0.1:8000"
+          EVAL_CASE_IDS: ${{ inputs.case_ids }}
+        run: |
+          python scripts/run_eval_profile.py --profile "${{ inputs.profile }}"
+
+      - name: Upload eval results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-${{ inputs.profile }}-${{ github.run_id }}
+          path: |
+            outputs/eval_runs/**
+            uvicorn.log
+          if-no-files-found: warn
+          retention-days: 14
