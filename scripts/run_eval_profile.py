@@ -16,7 +16,6 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parent.parent
 PROFILES_PATH = Path(__file__).resolve().parent / "eval_profiles.json"
 DEFAULT_OUTPUT_DIR = ROOT / "outputs" / "eval_runs"

@@ -3,7 +3,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: ${LANGGRAPH_AGENT_IMAGE:-langgraph-agent:prod}
+      args:
+        APP_GIT_SHA: ${APP_GIT_SHA:-unknown}
+        APP_BUILD_TIME: ${APP_BUILD_TIME:-unknown}
+        APP_VERSION: ${APP_VERSION:-dev}
+    image: ${LANGGRAPH_AGENT_IMAGE:-langgraph-agent:${IMAGE_TAG:-prod}}
     container_name: ${LANGGRAPH_AGENT_CONTAINER:-langgraph-agent-prod}
     env_file:
       - .env
@@ -18,12 +22,12 @@ services:
           "CMD",
           "python",
           "-c",
-          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).read()",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3).read()",
         ]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 20s
+      start_period: 60s
     restart: unless-stopped
 
 volumes:

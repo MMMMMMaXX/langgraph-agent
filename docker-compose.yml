@@ -3,7 +3,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: langgraph-agent:local
+      args:
+        APP_GIT_SHA: ${APP_GIT_SHA:-unknown}
+        APP_BUILD_TIME: ${APP_BUILD_TIME:-unknown}
+        APP_VERSION: ${APP_VERSION:-dev}
+    image: langgraph-agent:${IMAGE_TAG:-local}
     container_name: langgraph-agent
     env_file:
       - .env
@@ -13,15 +17,16 @@ services:
       - ./data:/app/data
       - ./outputs:/app/outputs
     healthcheck:
+      # 使用 readiness 端点：LLM profile / 历史目录 / Chroma 目录 任一异常都会失败
       test:
         [
           "CMD",
           "python",
           "-c",
-          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).read()",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3).read()",
         ]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 20s
+      start_period: 60s
     restart: unless-stopped
