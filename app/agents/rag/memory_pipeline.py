@@ -1,12 +1,12 @@
 """RAG memory 兜底检索管线。"""
 
+from app.agents.rag.types import MemoryRetrievalResult
+from app.config import RAG_CONFIG, VECTOR_STORE_CONFIG
 from app.constants.keywords import (
     RECALL_QUERY_KEYWORDS,
     SUMMARY_QUERY_KEYWORDS,
     contains_any,
 )
-from app.agents.rag.types import MemoryRetrievalResult
-from app.config import RAG_CONFIG, VECTOR_STORE_CONFIG
 from app.constants.policies import SKIP_REASON_DOC_HIT
 from app.memory.vector_memory import search_memory
 from app.retrieval.reranker import rerank

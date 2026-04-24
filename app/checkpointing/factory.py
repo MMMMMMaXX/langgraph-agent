@@ -9,7 +9,6 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 
 from app.config import CHECKPOINT_CONFIG
 
-
 _CHECKPOINTER = None
 
 SQLITE_BUSY_TIMEOUT_MS = 5000

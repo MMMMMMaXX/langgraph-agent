@@ -1,15 +1,6 @@
 import json
 import re
 
-from app.llm import chat
-from app.prompts.story import (
-    EXTRACT_STORY_FACTS_SYSTEM_PROMPT,
-    REVIEW_SCRIPT_SYSTEM_PROMPT,
-)
-from app.prompts.creative import (
-    build_write_script_scene_system_prompt,
-    build_write_script_scene_user_prompt,
-)
 from app.agents.novel_script.constants import (
     REVIEW_FACT_CHARACTER_LIMIT,
     REVIEW_FACT_CONFLICT_LIMIT,
@@ -22,7 +13,15 @@ from app.agents.novel_script.constants import (
     WRITE_SCENE_MAX_COMPLETION_TOKENS,
 )
 from app.constants.model_profiles import PROFILE_CREATIVE_REVIEW, PROFILE_CREATIVE_WRITE
-
+from app.llm import chat
+from app.prompts.creative import (
+    build_write_script_scene_system_prompt,
+    build_write_script_scene_user_prompt,
+)
+from app.prompts.story import (
+    EXTRACT_STORY_FACTS_SYSTEM_PROMPT,
+    REVIEW_SCRIPT_SYSTEM_PROMPT,
+)
 
 CHAPTER_TITLE_RE = re.compile(
     r"^\s*第(?:\d+|[一二三四五六七八九十百千两零〇]+)[章节回篇卷部集幕]\b.*$"

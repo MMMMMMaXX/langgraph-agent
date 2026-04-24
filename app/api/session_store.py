@@ -29,8 +29,8 @@ from __future__ import annotations
 import threading
 from typing import Any
 
-from app.checkpointing.factory import clear_checkpoints
 from app.chat_service import create_initial_state
+from app.checkpointing.factory import clear_checkpoints
 from app.state import AgentState
 
 # 模块级共享状态（单机部署）；如果后续要做多进程/多机部署，整块需要换成外部存储。

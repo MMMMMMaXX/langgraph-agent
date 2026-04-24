@@ -59,7 +59,7 @@ def chunk_text(text: str, chunk_size: int = DEFAULT_STREAM_CHUNK_SIZE) -> list[s
 def run_chat_stream_worker(
     request: ChatRequest,
     request_id: str,
-    event_queue: "queue.Queue[dict[str, Any]]",
+    event_queue: queue.Queue[dict[str, Any]],
 ) -> None:
     """后台线程：真正跑 chat，把事件推给 event_queue。
 
@@ -129,7 +129,7 @@ def build_chat_stream_response(
     一帧一帧拉出来发给前端；队列空时发 `: ping\\n\\n` 注释帧维持连接。
     """
 
-    event_queue: "queue.Queue[dict[str, Any]]" = queue.Queue()
+    event_queue: queue.Queue[dict[str, Any]] = queue.Queue()
     thread = threading.Thread(
         target=run_chat_stream_worker,
         args=(request, request_id, event_queue),

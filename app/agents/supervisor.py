@@ -1,7 +1,8 @@
+from app.agents.novel_script_agent import looks_like_script_task
 from app.constants.keywords import (
+    FOLLOWUP_QUERY_MAX_CHARS,
     FOLLOWUP_QUERY_PREFIXES,
     FOLLOWUP_QUERY_SUFFIXES,
-    FOLLOWUP_QUERY_MAX_CHARS,
     KNOWLEDGE_QUERY_KEYWORDS,
     MATH_OPERATOR_KEYWORDS,
     MATH_QUERY_KEYWORDS,
@@ -18,9 +19,8 @@ from app.constants.routes import (
     ROUTE_RAG_AGENT,
     ROUTE_TOOL_AGENT,
 )
-from app.state import AgentState
 from app.llm import plan_routes
-from app.agents.novel_script_agent import looks_like_script_task
+from app.state import AgentState
 from app.utils.logger import log_node, preview
 
 

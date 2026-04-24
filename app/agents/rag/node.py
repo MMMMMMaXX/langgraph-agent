@@ -1,15 +1,3 @@
-from app.constants.routes import ROUTE_RAG_AGENT
-from app.constants.model_profiles import (
-    PROFILE_DOC_EMBEDDING,
-    PROFILE_MEMORY_EMBEDDING,
-    PROFILE_QUERY_EMBEDDING,
-)
-from app.state import AgentState
-from app.config import RAG_CONFIG
-from app.llm import get_profile_runtime_info
-from app.streaming import build_answer_streamer
-from app.tracing import add_current_run_metadata, build_rag_trace_metadata
-from app.utils.logger import log_node
 from app.agents.rag.answer import generate_answer_for_context
 from app.agents.rag.context import build_rag_context
 from app.agents.rag.debug import build_rag_debug_payload, build_rag_log_extra
@@ -17,6 +5,18 @@ from app.agents.rag.doc_pipeline import retrieve_docs_for_rag
 from app.agents.rag.memory_pipeline import retrieve_memory_for_rag
 from app.agents.rag.rewrite import rewrite_rag_query
 from app.agents.rag.strategy import build_doc_answer_strategy
+from app.config import RAG_CONFIG
+from app.constants.model_profiles import (
+    PROFILE_DOC_EMBEDDING,
+    PROFILE_MEMORY_EMBEDDING,
+    PROFILE_QUERY_EMBEDDING,
+)
+from app.constants.routes import ROUTE_RAG_AGENT
+from app.llm import get_profile_runtime_info
+from app.state import AgentState
+from app.streaming import build_answer_streamer
+from app.tracing import add_current_run_metadata, build_rag_trace_metadata
+from app.utils.logger import log_node
 
 
 def rag_agent_node(state: AgentState) -> AgentState:

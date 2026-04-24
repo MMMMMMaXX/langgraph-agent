@@ -1,11 +1,3 @@
-from app.constants.keywords import (
-    EXISTENCE_QUERY_KEYWORDS,
-    IMMEDIATE_SUMMARY_QUERY_KEYWORDS,
-    RECALL_QUERY_KEYWORDS,
-    SUMMARY_QUERY_KEYWORDS,
-    contains_any,
-)
-from app.constants.tags import CITY_TAGS
 from app.agents.chat.constants import (
     OPERATOR_AGGREGATE,
     OPERATOR_EXISTENCE,
@@ -14,6 +6,14 @@ from app.agents.chat.constants import (
     TASK_RECALL,
     TASK_SUMMARY,
 )
+from app.constants.keywords import (
+    EXISTENCE_QUERY_KEYWORDS,
+    IMMEDIATE_SUMMARY_QUERY_KEYWORDS,
+    RECALL_QUERY_KEYWORDS,
+    SUMMARY_QUERY_KEYWORDS,
+    contains_any,
+)
+from app.constants.tags import CITY_TAGS
 
 
 def classify_chat_task(message: str) -> str:

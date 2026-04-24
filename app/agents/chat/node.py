@@ -12,16 +12,13 @@ from app.agents.chat.memory_retrieval import (
     build_structured_facts_text,
     prepare_memory_hits,
 )
-from app.constants.policies import (
-    HISTORY_POLICY_NONE,
-)
 from app.constants.routes import ROUTE_CHAT_AGENT
-from app.state import AgentState
-from app.streaming import build_answer_streamer
-from app.utils.logger import log_node, now_ms
 from app.memory.conversation_history import (
     resolve_history_backend,
 )
+from app.state import AgentState
+from app.streaming import build_answer_streamer
+from app.utils.logger import log_node, now_ms
 
 
 def chat_agent_node(state: AgentState) -> AgentState:
@@ -36,8 +33,8 @@ def chat_agent_node(state: AgentState) -> AgentState:
     sub_timings_ms: dict[str, float] = {}
 
     memory_prepare_started_at_ms = now_ms()
-    memory_hits, task, memory_lookup_policy, memory_before_rerank, errors = prepare_memory_hits(
-        message, session_id
+    memory_hits, task, memory_lookup_policy, memory_before_rerank, errors = (
+        prepare_memory_hits(message, session_id)
     )
     sub_timings_ms["memoryPrepare"] = round(now_ms() - memory_prepare_started_at_ms, 2)
 

@@ -16,8 +16,8 @@ from app.constants.routes import (
     ROUTE_RAG_AGENT,
     ROUTE_TOOL_AGENT,
 )
-from app.state import AgentState
 from app.memory.vector_memory import DEFAULT_MEMORY_CONFIDENCE
+from app.state import AgentState
 from app.utils.memory_key import (
     MEMORY_TYPE_FACT,
     build_memory_key,

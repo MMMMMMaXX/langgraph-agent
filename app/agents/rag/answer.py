@@ -1,9 +1,9 @@
 """RAG 回答生成。"""
 
+from app.agents.rag.types import RagAnswerResult, RagContext
 from app.config import RAG_CONFIG
 from app.constants.model_profiles import PROFILE_DEFAULT_CHAT
 from app.llm import chat
-from app.agents.rag.types import RagAnswerResult, RagContext
 from app.prompts.rag import (
     RAG_MEMORY_ANSWER_SYSTEM_PROMPT,
     build_rag_doc_answer_system_prompt,

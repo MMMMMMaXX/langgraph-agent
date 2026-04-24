@@ -1,23 +1,24 @@
+from app.config import MEMORY_CONFIG
 from app.constants.keywords import META_HISTORY_QUERY_KEYWORDS, contains_any
+from app.constants.model_profiles import PROFILE_MEMORY_EMBEDDING
 from app.constants.policies import (
     SKIP_REASON_DUPLICATE,
     SKIP_REASON_EMPTY_MESSAGE,
     SKIP_REASON_META_QUERY,
 )
-from app.constants.model_profiles import PROFILE_MEMORY_EMBEDDING
 from app.constants.routes import NODE_MEMORY, ROUTE_CHAT_AGENT
-from app.state import AgentState
-from app.config import MEMORY_CONFIG
-from app.llm import summarize_messages, LLMCallError, get_profile_runtime_info
-from app.utils.errors import build_error_info
-from app.utils.logger import log_node, now_ms, preview
-from app.memory.vector_memory import MEMORY_SOURCE_CHAT_ROUND, add_memory_item
-from app.memory.write_policy import decide_memory_write
+from app.llm import LLMCallError, get_profile_runtime_info, summarize_messages
 from app.memory.conversation_history import (
     append_history_event,
     resolve_history_backend,
 )
+from app.memory.vector_memory import MEMORY_SOURCE_CHAT_ROUND, add_memory_item
+from app.memory.write_policy import decide_memory_write
+from app.state import AgentState
+from app.utils.errors import build_error_info
+from app.utils.logger import log_node, now_ms, preview
 from app.utils.tags import extract_tags
+
 
 def should_refresh_summary(messages: list[dict], rewritten_query: str) -> bool:
     if len(messages) < 2:

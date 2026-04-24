@@ -11,7 +11,6 @@ import time
 from app.llm._helpers import _env_float, _env_int
 from app.utils.errors import classify_exception, format_exception_message
 
-
 # --- Retry / timeout 默认值 -------------------------------------------------
 # 这些默认值经过简单压测选取，生产场景建议通过环境变量覆盖。
 DEFAULT_CHAT_TIMEOUT_SECONDS = 45.0

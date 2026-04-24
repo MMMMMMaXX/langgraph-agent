@@ -5,9 +5,8 @@ import logging
 import os
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
-
 
 LOGGER_NAME = "langgraph_agent"
 DEFAULT_LOG_LEVEL = "INFO"
@@ -26,7 +25,7 @@ class JsonLineFormatter(logging.Formatter):
             payload = {"message": record.getMessage()}
 
         event = {
-            "ts": datetime.fromtimestamp(record.created, timezone.utc)
+            "ts": datetime.fromtimestamp(record.created, UTC)
             .isoformat()
             .replace("+00:00", LOG_TIME_SUFFIX_UTC),
             "level": record.levelname,

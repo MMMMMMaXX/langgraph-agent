@@ -1,20 +1,17 @@
-from typing import List, Dict
-
-from app.utils.logger import now_timestamp_s
-
-from app.constants.tags import CITY_TAGS, LITERAL_MATCH_WEIGHT, TAG_WEIGHTS, TOPIC_TAGS
 from app.config import VECTOR_STORE_CONFIG
 from app.constants.model_profiles import (
     PROFILE_MEMORY_EMBEDDING,
     PROFILE_QUERY_EMBEDDING,
 )
+from app.constants.tags import CITY_TAGS, LITERAL_MATCH_WEIGHT, TAG_WEIGHTS, TOPIC_TAGS
 from app.retrieval.embedder import get_embedding
-from app.utils.tags import extract_tags
+from app.utils.logger import now_timestamp_s
 from app.utils.memory_key import (
     MEMORY_TYPE_FACT,
     build_memory_key,
     classify_memory_type,
 )
+from app.utils.tags import extract_tags
 from app.vector_store import ChromaVectorStore
 
 MEMORY_SCHEMA_VERSION = 1
@@ -60,7 +57,7 @@ def _build_memory_record(
     document_id: str,
     content: str,
     metadata: dict,
-) -> Dict:
+) -> dict:
     """把 Chroma 的 document + metadata 还原成项目内部 memory 记录结构。"""
 
     return {
@@ -80,11 +77,11 @@ def _build_memory_record(
     }
 
 
-def _flatten_get_result(result: dict) -> List[Dict]:
+def _flatten_get_result(result: dict) -> list[dict]:
     ids = result.get("ids") or []
     documents = result.get("documents") or []
     metadatas = result.get("metadatas") or []
-    records: List[Dict] = []
+    records: list[dict] = []
 
     for index, document_id in enumerate(ids):
         content = documents[index] if index < len(documents) else ""
@@ -100,12 +97,12 @@ def _flatten_get_result(result: dict) -> List[Dict]:
     return records
 
 
-def _flatten_query_result(result: dict) -> List[Dict]:
+def _flatten_query_result(result: dict) -> list[dict]:
     ids = (result.get("ids") or [[]])[0]
     documents = (result.get("documents") or [[]])[0]
     metadatas = (result.get("metadatas") or [[]])[0]
     distances = (result.get("distances") or [[]])[0]
-    hits: List[Dict] = []
+    hits: list[dict] = []
 
     for index, document_id in enumerate(ids):
         content = documents[index] if index < len(documents) else ""
@@ -257,7 +254,7 @@ def search_memory(
     alpha: float = 0.7,
     beta: float = 0.3,
     session_id: str | None = None,
-) -> List[Dict]:
+) -> list[dict]:
     if not query or not query.strip():
         return []
 
@@ -293,7 +290,7 @@ def search_memory(
 def get_recent_memory(
     session_id: str,
     limit: int = 5,
-) -> List[Dict]:
+) -> list[dict]:
     """读取当前 session 最近写入的 memory。
 
     这个接口专门服务“总结刚刚/刚才的问题”：
@@ -315,7 +312,7 @@ def get_recent_memory(
         RECENT_MEMORY_MAX_SCAN_LIMIT,
     )
     start_offset = max(total_count - scan_limit, 0)
-    records: List[Dict] = []
+    records: list[dict] = []
 
     for offset in range(start_offset, total_count, MEMORY_GET_PAGE_SIZE):
         result = store.get(
@@ -337,7 +334,7 @@ def build_global_memory_index(session_id: str | None = None):
     store = _get_store()
     where = {"session_id": session_id} if session_id is not None else None
     collection_name = VECTOR_STORE_CONFIG.memory_collection_name
-    data: List[Dict] = []
+    data: list[dict] = []
     offset = 0
 
     while True:

@@ -16,7 +16,7 @@
 from __future__ import annotations
 
 import inspect
-from typing import Callable
+from collections.abc import Callable
 
 from app.agents.novel_script.constants import DEFAULT_TARGET_SCENE_COUNT
 from app.agents.novel_script.state import NovelScriptState

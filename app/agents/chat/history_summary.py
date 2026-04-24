@@ -1,5 +1,4 @@
-from app.agents.chat.intent import TASK_SUMMARY, classify_chat_task
-from app.agents.chat.intent import is_immediate_summary_query
+from app.agents.chat.intent import TASK_SUMMARY, classify_chat_task, is_immediate_summary_query
 from app.config import CONVERSATION_HISTORY_CONFIG
 from app.constants.policies import HISTORY_POLICY_ALL, HISTORY_POLICY_RECENT
 from app.memory.conversation_history import get_all_history, get_recent_history

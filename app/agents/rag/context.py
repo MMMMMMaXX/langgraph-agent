@@ -1,7 +1,7 @@
 """RAG 生成上下文压缩。"""
 
-from app.config import RAG_CONFIG
 from app.agents.rag.types import RagContext
+from app.config import RAG_CONFIG
 
 
 def compress_doc_context(doc_hits: list[dict]) -> str:

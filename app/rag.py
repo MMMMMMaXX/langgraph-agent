@@ -6,8 +6,8 @@
 """
 
 from app.constants.tags import (
-    CONCEPT_TAG_WEIGHTS,
     CITY_TAG_WEIGHTS,
+    CONCEPT_TAG_WEIGHTS,
     LITERAL_MATCH_WEIGHT,
     TAG_MATCH_TERMS,
     TAG_WEIGHTS,
@@ -24,8 +24,8 @@ from app.retrieval.doc_retrieval import (
     distance_to_semantic_score,
     flatten_chroma_get_result,
     flatten_chroma_query_result,
-    keyword_score,
     keyword_retrieve_docs,
+    keyword_score,
     merge_doc_hits,
     normalize_keyword_scores,
     normalize_keyword_text,

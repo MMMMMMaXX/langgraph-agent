@@ -1,4 +1,5 @@
-from typing import Annotated, Any, Literal, List
+from typing import Annotated, Any, Literal
+
 from typing_extensions import TypedDict
 
 
@@ -20,13 +21,11 @@ class AgentState(TypedDict, total=False):
     conversation_history_path: str
     stream_callback: Any
     streamed_answer: bool
-    messages: List[dict]
+    messages: list[dict]
     summary: str
 
     # supervisor 决策
-    routes: List[
-        Literal["rag_agent", "tool_agent", "chat_agent", "novel_script_agent"]
-    ]
+    routes: list[Literal["rag_agent", "tool_agent", "chat_agent", "novel_script_agent"]]
 
     # 中间结果
     rewritten_query: str
@@ -35,7 +34,7 @@ class AgentState(TypedDict, total=False):
     agent_outputs: Annotated[dict, merge_dict]
 
     # 新增：vector memory 检索结果
-    memory_hits: List[dict]
+    memory_hits: list[dict]
     node_timings: Annotated[dict, merge_dict]
     debug_info: Annotated[dict, merge_dict]
 

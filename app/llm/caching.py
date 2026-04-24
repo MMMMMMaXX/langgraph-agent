@@ -20,7 +20,6 @@ from app.llm.providers import (
     _resolve_provider,
 )
 
-
 # --- Embedding 缓存（ContextVar：按请求/协程隔离，天生无竞态） ----------------
 
 # 单次请求内最多缓存多少条 embedding，避免异常长请求导致内存无限增长。

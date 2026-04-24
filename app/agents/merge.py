@@ -1,8 +1,8 @@
-from app.constants.routes import NODE_MERGE
 from app.constants.model_profiles import PROFILE_DEFAULT_CHAT
-from app.state import AgentState
-from app.llm import chat, LLMCallError, get_profile_runtime_info
+from app.constants.routes import NODE_MERGE
+from app.llm import LLMCallError, chat, get_profile_runtime_info
 from app.prompts.merge import MERGE_SYSTEM_PROMPT, build_merge_user_prompt
+from app.state import AgentState
 from app.streaming import build_answer_streamer
 from app.utils.logger import log_node, preview
 

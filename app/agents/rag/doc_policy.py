@@ -35,7 +35,7 @@ def are_same_doc_adjacent_hits(hits: list[dict]) -> bool:
     chunk_indexes = sorted(hit.get("chunk_index", 0) for hit in hits)
     return all(
         current + 1 == next_index
-        for current, next_index in zip(chunk_indexes, chunk_indexes[1:])
+        for current, next_index in zip(chunk_indexes, chunk_indexes[1:], strict=False)
     )
 
 
@@ -65,4 +65,3 @@ def should_skip_doc_rerank(hits: list[dict]) -> tuple[bool, str]:
         return False, ""
 
     return True, DOC_RERANK_SKIP_REASON_ADJACENT_HIGH_CONFIDENCE
-

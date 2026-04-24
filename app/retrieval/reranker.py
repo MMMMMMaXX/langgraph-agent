@@ -1,6 +1,6 @@
 # app/retrieval/reranker.py
 
-from app.llm import chat, LLMCallError
+from app.llm import LLMCallError, chat
 from app.prompts.tooling import build_rerank_prompt
 from app.utils.logger import log_warning
 

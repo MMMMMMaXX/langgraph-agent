@@ -14,10 +14,10 @@ from app.constants.model_profiles import (
     ENV_CREATIVE_PLANNER_PROVIDER,
     ENV_CREATIVE_REVIEW_PROVIDER,
     ENV_CREATIVE_WRITE_PROVIDER,
-    ENV_DEFAULT_CHAT_PROVIDER,
     ENV_DEEPSEEK_API_KEY,
     ENV_DEEPSEEK_BASE_URL,
     ENV_DEEPSEEK_MODEL,
+    ENV_DEFAULT_CHAT_PROVIDER,
     ENV_DOC_EMBEDDING_MODEL,
     ENV_DOC_EMBEDDING_PROVIDER,
     ENV_EMBEDDING_API_KEY,
@@ -54,7 +54,6 @@ from app.constants.model_profiles import (
     PROVIDER_GLM,
     PROVIDER_OPENAI,
 )
-
 from app.llm._helpers import _env
 from app.llm.retry import LLMCallError
 

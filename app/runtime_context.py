@@ -4,7 +4,6 @@ from collections.abc import Callable
 from contextvars import ContextVar
 from typing import Any
 
-
 StreamCallback = Callable[[str, dict[str, Any]], None]
 
 

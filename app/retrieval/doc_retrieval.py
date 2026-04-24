@@ -1,6 +1,6 @@
-from app.constants.tags import LITERAL_MATCH_WEIGHT, TAG_MATCH_TERMS, TAG_WEIGHTS
 from app.config import RAG_CONFIG, VECTOR_STORE_CONFIG
 from app.constants.model_profiles import PROFILE_QUERY_EMBEDDING
+from app.constants.tags import LITERAL_MATCH_WEIGHT, TAG_MATCH_TERMS, TAG_WEIGHTS
 from app.retrieval.embedder import get_embedding
 from app.utils.tags import extract_tags
 from app.vector_store import ChromaVectorStore
