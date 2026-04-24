@@ -60,4 +60,6 @@ jobs:
           # 让任何偶然漏过 monkeypatch 的代码早早报 auth 错，而不是偷偷花钱。
           OPENAI_API_KEY: "test-key-not-real"
           DEEPSEEK_API_KEY: "test-key-not-real"
-        run: pytest -ra
+        # -v 显示每个 case；--tb=short 失败时打出简短 traceback；
+        # -W error 把警告升为错误（暂时不开，老依赖警告太多）
+        run: pytest -v --tb=short

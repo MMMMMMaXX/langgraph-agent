@@ -41,13 +41,16 @@ def test_health_reflects_injected_version(
 
 
 def test_health_ready_ok(client: TestClient) -> None:
+    # conftest 已经在 import app 之前把最小 env 塞进去了，
+    # 所以这里不需要再 monkeypatch；直接打接口即可。
     resp = client.get("/health/ready")
-    # 本地 / CI 默认配置都应 ready
-    assert resp.status_code == 200
+    # 失败时连带把 body 带出来，下次能直接看到是哪一项 check 挂了，
+    # 而不是只知道 "503"。
+    assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["status"] == "ready"
     for name in ("llm_profile", "history_path", "chroma_dir"):
-        assert body["checks"][name]["ok"] is True
+        assert body["checks"][name]["ok"] is True, body["checks"][name]
 
 
 def test_health_ready_fails_when_api_key_missing(

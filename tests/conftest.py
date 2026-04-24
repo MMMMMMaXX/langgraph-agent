@@ -8,10 +8,23 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
-from typing import Any
+import os
 
-import pytest
+# ---------------------------------------------------------------------------
+# 必须在 import app.* 之前设置：
+# app.llm.providers 在模块加载时就会把 PROVIDER_CONFIGS 冻住（读 env 的快照）。
+# 之后再用 monkeypatch.setenv 不会影响已经构建好的 registry，readiness 检查就会
+# 报 "model empty" / "API_KEY not set"。
+# 这里给出 CI 里也一定成立的最小可用环境，本地有 .env 不受影响（setdefault 不覆盖）。
+# ---------------------------------------------------------------------------
+os.environ.setdefault("DEEPSEEK_API_KEY", "test-key-not-real")
+os.environ.setdefault("DEEPSEEK_MODEL", "deepseek-chat")
+os.environ.setdefault("OPENAI_API_KEY", "test-key-not-real")
+
+from collections.abc import Callable, Iterator  # noqa: E402
+from typing import Any  # noqa: E402
+
+import pytest  # noqa: E402
 
 
 # LLM mock 配置：默认返回固定字符串；测试可覆盖 set_response() 改响应
