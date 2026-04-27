@@ -12,6 +12,14 @@ from app.memory.conversation_history import (
     append_history_event,
     resolve_history_backend,
 )
+from app.memory.services import (
+    build_memory_debug_payload,
+    build_memory_log_extra,
+    prune_working_messages,
+    refresh_summary_if_needed,
+    write_history_if_needed,
+    write_vector_memory_if_needed,
+)
 from app.memory.vector_memory import MEMORY_SOURCE_CHAT_ROUND, add_memory_item
 from app.memory.write_policy import decide_memory_write
 from app.state import AgentState
@@ -83,28 +91,24 @@ def memory_node(state: AgentState) -> AgentState:
     }
 
     # 1. 只在“需要压缩上下文”或“用户明确依赖历史摘要”时更新 summary
-    new_summary = old_summary
-    refreshed_summary = False
-    skipped_summary_refresh = False
-    summary_refresh_started_at_ms = now_ms()
-    if should_skip_summary_refresh(state, rewritten_query):
-        skipped_summary_refresh = True
-    elif should_refresh_summary(messages, rewritten_query):
-        try:
-            recent_chunk = messages[-MEMORY_CONFIG.max_recent_messages :]
-            new_summary = summarize_messages(old_summary, recent_chunk)
-            refreshed_summary = True
-        except LLMCallError as exc:
-            errors.append(
-                build_error_info(exc, stage="summarize_messages", source="llm")
-            )
-    sub_timings_ms["summaryRefresh"] = round(
-        now_ms() - summary_refresh_started_at_ms, 2
+    summary_result = refresh_summary_if_needed(
+        state=state,
+        messages=messages,
+        old_summary=old_summary,
+        rewritten_query=rewritten_query,
+        should_skip_summary_refresh=should_skip_summary_refresh,
+        should_refresh_summary=should_refresh_summary,
+        summarize_messages=summarize_messages,
+        build_error_info=build_error_info,
+        llm_error_type=LLMCallError,
+        now_ms=now_ms,
     )
+    new_summary = summary_result.summary
+    refreshed_summary = summary_result.refreshed_summary
+    skipped_summary_refresh = summary_result.skipped_summary_refresh
+    errors.extend(summary_result.errors)
+    sub_timings_ms["summaryRefresh"] = summary_result.duration_ms
 
-    stored_to_vector = False
-    stored_tags: list[str] = []
-    stored_preview = ""
     user_message = messages[-1]["content"] if len(messages) >= 1 else ""
     memory_write_decision = decide_memory_write(
         state=state,
@@ -112,143 +116,108 @@ def memory_node(state: AgentState) -> AgentState:
         rewritten_query=rewritten_query,
         answer=answer,
     )
-    skipped_vector_store = not memory_write_decision.should_write
-    vector_store_skip_reason = memory_write_decision.skip_reason
 
     # 2. 写入 Vector Memory（只写有价值的结论）
-    vector_store_started_at_ms = now_ms()
-    if memory_write_decision.should_write and len(messages) >= 1:
-        stored_tags = list(memory_write_decision.tags)
-        memory_text = f"""
-问题：{user_message}
-重写问题：{rewritten_query}
-回答：{answer}
-标签：{",".join(stored_tags)}
-"""
-        try:
-            add_memory_item(
-                memory_text,
-                source=MEMORY_SOURCE_CHAT_ROUND,
-                rewritten_query=rewritten_query,
-                session_id=session_id,
-                source_route=memory_write_decision.source_route,
-                confidence=memory_write_decision.confidence,
-                tags=stored_tags,
-                memory_key=memory_write_decision.memory_key,
-                memory_type=memory_write_decision.memory_type,
-            )
-            stored_to_vector = True
-            stored_preview = memory_text
-        except Exception as exc:
-            errors.append(
-                build_error_info(
-                    exc,
-                    stage="add_memory_item",
-                    source="memory",
-                    preferred_code="storage_error",
-                )
-            )
-    sub_timings_ms["vectorStore"] = round(now_ms() - vector_store_started_at_ms, 2)
+    vector_store_result = write_vector_memory_if_needed(
+        session_id=session_id,
+        user_message=user_message,
+        rewritten_query=rewritten_query,
+        answer=answer,
+        memory_write_decision=memory_write_decision,
+        memory_source=MEMORY_SOURCE_CHAT_ROUND,
+        add_memory_item=add_memory_item,
+        build_error_info=build_error_info,
+        now_ms=now_ms,
+    )
+    stored_to_vector = vector_store_result.stored_to_vector
+    skipped_vector_store = vector_store_result.skipped_vector_store
+    vector_store_skip_reason = vector_store_result.vector_store_skip_reason
+    stored_tags = vector_store_result.stored_tags
+    stored_preview = vector_store_result.stored_preview
+    errors.extend(vector_store_result.errors)
+    sub_timings_ms["vectorStore"] = vector_store_result.duration_ms
 
     # 3. 写入非向量化会话流水。
     # 这条流水只服务“总结/回放”，即使当前轮跳过 vector memory，也可以保留问题顺序。
-    stored_to_history = False
-    skipped_history_store = False
-    history_store_skip_reason = ""
-    history_preview = ""
-    history_store_started_at_ms = now_ms()
-    skipped_history_store, history_store_skip_reason = should_skip_history_store(
-        user_message,
-        rewritten_query,
+    history_store_result = write_history_if_needed(
+        session_id=session_id,
+        user_message=user_message,
+        rewritten_query=rewritten_query,
+        answer=answer,
+        routes=state.get("routes", []),
+        tags=stored_tags or list(memory_write_decision.tags) or extract_tags(rewritten_query),
+        stored_to_vector=stored_to_vector,
+        skipped_vector_store=skipped_vector_store,
+        vector_store_skip_reason=vector_store_skip_reason,
+        history_path=conversation_history_path,
+        should_skip_history_store=should_skip_history_store,
+        append_history_event=append_history_event,
+        duplicate_skip_reason=SKIP_REASON_DUPLICATE,
+        build_error_info=build_error_info,
+        now_ms=now_ms,
     )
-    if not skipped_history_store:
-        try:
-            history_event = append_history_event(
-                session_id=session_id,
-                user_message=user_message,
-                rewritten_query=rewritten_query,
-                answer=answer,
-                routes=state.get("routes", []),
-                tags=stored_tags or list(memory_write_decision.tags) or extract_tags(rewritten_query),
-                stored_to_vector=stored_to_vector,
-                skipped_vector_store=skipped_vector_store,
-                vector_store_skip_reason=vector_store_skip_reason,
-                history_path=conversation_history_path,
-            )
-            if history_event.get("skipped_duplicate"):
-                skipped_history_store = True
-                history_store_skip_reason = SKIP_REASON_DUPLICATE
-            else:
-                stored_to_history = True
-                history_preview = history_event.get(
-                    "rewritten_query"
-                ) or history_event.get("user_message", "")
-        except Exception as exc:
-            errors.append(
-                build_error_info(
-                    exc,
-                    stage="append_history_event",
-                    source="memory",
-                    preferred_code="storage_error",
-                )
-            )
-    sub_timings_ms["historyStore"] = round(now_ms() - history_store_started_at_ms, 2)
+    stored_to_history = history_store_result.stored_to_history
+    skipped_history_store = history_store_result.skipped_history_store
+    history_store_skip_reason = history_store_result.history_store_skip_reason
+    history_preview = history_store_result.history_preview
+    errors.extend(history_store_result.errors)
+    sub_timings_ms["historyStore"] = history_store_result.duration_ms
 
     # 4. 如果 messages 太长，再裁剪  Working Memory
-    message_prune_started_at_ms = now_ms()
-    new_messages = messages
-    if len(messages) > MEMORY_CONFIG.summary_trigger:
-        new_messages = messages[-MEMORY_CONFIG.max_recent_messages :]
-    sub_timings_ms["messagePrune"] = round(now_ms() - message_prune_started_at_ms, 2)
+    prune_result = prune_working_messages(messages, now_ms=now_ms)
+    new_messages = prune_result.messages
+    sub_timings_ms["messagePrune"] = prune_result.duration_ms
 
     new_state = {
         "summary": new_summary,
         "messages": new_messages,
     }
     new_state["debug_info"] = {
-        NODE_MEMORY: {
-            "refreshed_summary": refreshed_summary,
-            "skipped_summary_refresh": skipped_summary_refresh,
-            "stored_to_vector": stored_to_vector,
-            "skipped_vector_store": skipped_vector_store,
-            "vector_store_skip_reason": vector_store_skip_reason,
-            "stored_to_history": stored_to_history,
-            "skipped_history_store": skipped_history_store,
-            "history_store_skip_reason": history_store_skip_reason,
-            "conversation_history_path": conversation_history_path,
-            "conversation_history_backend": conversation_history_backend,
-            "memory_write_decision": memory_write_decision.to_debug_dict(),
-            "stored_tags": stored_tags,
-            "summary_preview": preview(new_summary, 160),
-            "sub_timings_ms": sub_timings_ms,
-            "embedding_profiles": embedding_profiles,
-            "errors": errors,
-        }
+        NODE_MEMORY: build_memory_debug_payload(
+            refreshed_summary=refreshed_summary,
+            skipped_summary_refresh=skipped_summary_refresh,
+            stored_to_vector=stored_to_vector,
+            skipped_vector_store=skipped_vector_store,
+            vector_store_skip_reason=vector_store_skip_reason,
+            stored_to_history=stored_to_history,
+            skipped_history_store=skipped_history_store,
+            history_store_skip_reason=history_store_skip_reason,
+            conversation_history_path=conversation_history_path,
+            conversation_history_backend=conversation_history_backend,
+            memory_write_decision=memory_write_decision,
+            stored_tags=stored_tags,
+            summary=new_summary,
+            sub_timings_ms=sub_timings_ms,
+            embedding_profiles=embedding_profiles,
+            errors=errors,
+            preview=preview,
+        )
     }
     log_state = {**state, **new_state}
 
     log_node(
         NODE_MEMORY,
         log_state,
-        extra={
-            "refreshedSummary": refreshed_summary,
-            "skippedSummaryRefresh": skipped_summary_refresh,
-            "storedToVector": stored_to_vector,
-            "skippedVectorStore": skipped_vector_store,
-            "vectorStoreSkipReason": vector_store_skip_reason,
-            "storedToHistory": stored_to_history,
-            "skippedHistoryStore": skipped_history_store,
-            "historyStoreSkipReason": history_store_skip_reason,
-            "conversationHistoryPath": conversation_history_path,
-            "conversationHistoryBackend": conversation_history_backend,
-            "memoryWriteDecision": memory_write_decision.to_debug_dict(),
-            "storedTags": stored_tags,
-            "storedPreview": preview(stored_preview, 120),
-            "historyPreview": preview(history_preview, 120),
-            "summaryPreview": preview(new_summary, 160),
-            "subTimingsMs": sub_timings_ms,
-            "embeddingProfiles": embedding_profiles,
-            "errors": errors,
-        },
+        extra=build_memory_log_extra(
+            refreshed_summary=refreshed_summary,
+            skipped_summary_refresh=skipped_summary_refresh,
+            stored_to_vector=stored_to_vector,
+            skipped_vector_store=skipped_vector_store,
+            vector_store_skip_reason=vector_store_skip_reason,
+            stored_to_history=stored_to_history,
+            skipped_history_store=skipped_history_store,
+            history_store_skip_reason=history_store_skip_reason,
+            conversation_history_path=conversation_history_path,
+            conversation_history_backend=conversation_history_backend,
+            memory_write_decision=memory_write_decision,
+            stored_tags=stored_tags,
+            stored_preview=stored_preview,
+            history_preview=history_preview,
+            summary=new_summary,
+            sub_timings_ms=sub_timings_ms,
+            embedding_profiles=embedding_profiles,
+            errors=errors,
+            preview=preview,
+        ),
     )
     return new_state

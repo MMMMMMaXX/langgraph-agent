@@ -1,12 +1,18 @@
 from app.graph import graph
 from app.llm import get_embedding_cache_stats, reset_embedding_cache
 from app.runtime import SessionRuntime
-from app.runtime.initial_state import create_initial_state
+from app.runtime.initial_state import create_initial_state as build_initial_state
 from app.runtime_context import reset_stream_callback, set_stream_callback
 from app.state import AgentState
 from app.tracing import build_graph_trace_config, reset_model_call_index
 
 _SESSION_RUNTIME = SessionRuntime()
+
+
+def create_initial_state(session_id: str = "default") -> AgentState:
+    """兼容旧入口：对外继续暴露 create_initial_state。"""
+
+    return build_initial_state(session_id=session_id)
 
 
 def run_chat_turn(state: AgentState, message: str) -> AgentState:
