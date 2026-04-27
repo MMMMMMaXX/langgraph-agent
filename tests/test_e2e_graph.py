@@ -79,9 +79,7 @@ def isolate_rag_pipelines(monkeypatch: pytest.MonkeyPatch) -> Iterator[dict]:
             docs=[{"id": "d1", "content": "doc", "score": 0.9}],
             filtered_docs=[{"id": "d1", "content": "doc", "score": 0.9}],
             doc_hits=[{"id": "d1", "content": "doc", "score": 0.9}],
-            merged_doc_hits=[
-                {"id": "d1", "content": "doc hit content", "score": 0.9}
-            ],
+            merged_doc_hits=[{"id": "d1", "content": "doc hit content", "score": 0.9}],
             retrieval_debug={},
             errors=[],
             timings_ms={},
@@ -197,8 +195,13 @@ def test_e2e_rag_no_hits_falls_back_to_insufficient(
 
     # 清空 doc_result → 触发空文档分支
     isolate_rag_pipelines["doc_result"] = DocRetrievalResult(
-        docs=[], filtered_docs=[], doc_hits=[], merged_doc_hits=[],
-        retrieval_debug={}, errors=[], timings_ms={},
+        docs=[],
+        filtered_docs=[],
+        doc_hits=[],
+        merged_doc_hits=[],
+        retrieval_debug={},
+        errors=[],
+        timings_ms={},
     )
 
     state = create_initial_state("sess-rag-empty")
@@ -213,9 +216,7 @@ def test_e2e_rag_no_hits_falls_back_to_insufficient(
 # ------------------------------ 多轮状态 E2E ------------------------------
 
 
-def test_e2e_multi_turn_preserves_messages(
-    llm_stub, isolate_memory_io
-) -> None:
+def test_e2e_multi_turn_preserves_messages(llm_stub, isolate_memory_io) -> None:
     """连续两轮：第二轮的入参 state.messages 应该带上第一轮的 user + assistant。"""
 
     def stub(trace_stage: str = "", **_):
