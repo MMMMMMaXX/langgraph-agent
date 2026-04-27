@@ -12,6 +12,7 @@ class DocumentChunk:
     - text: 当前 chunk 文本
     - start_char / end_char: 对应原文字符区间，方便调试召回来源
     - char_len: chunk 文本长度，方便评估切块粒度是否合理
+    - section_title: 当前 chunk 所属标题，方便后续引用和调试
     """
 
     chunk_id: str
@@ -21,3 +22,4 @@ class DocumentChunk:
     start_char: int
     end_char: int
     char_len: int
+    section_title: str = ""

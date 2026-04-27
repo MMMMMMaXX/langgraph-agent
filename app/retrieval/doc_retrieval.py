@@ -2,6 +2,8 @@ from app.config import RAG_CONFIG, VECTOR_STORE_CONFIG
 from app.constants.model_profiles import PROFILE_QUERY_EMBEDDING
 from app.constants.tags import LITERAL_MATCH_WEIGHT, TAG_MATCH_TERMS, TAG_WEIGHTS
 from app.retrieval.embedder import get_embedding
+from app.retrieval.lexical.factory import get_lexical_retriever
+from app.utils.logger import logger
 from app.utils.tags import extract_tags
 from app.vector_store import ChromaVectorStore
 
@@ -98,6 +100,7 @@ def flatten_chroma_query_result(result: dict) -> list[dict]:
                 "doc_id": str(metadata.get("doc_id", "")),
                 "doc_title": str(metadata.get("doc_title", "")),
                 "source": str(metadata.get("source", "")),
+                "section_title": str(metadata.get("section_title", "")),
                 "chunk_index": metadata.get("chunk_index", DEFAULT_CHUNK_INDEX),
                 "start_char": metadata.get("start_char", 0),
                 "end_char": metadata.get("end_char", 0),
@@ -126,6 +129,7 @@ def build_doc_hit(
         "doc_id": str(metadata.get("doc_id", "")),
         "doc_title": str(metadata.get("doc_title", "")),
         "source": str(metadata.get("source", "")),
+        "section_title": str(metadata.get("section_title", "")),
         "chunk_index": metadata.get("chunk_index", DEFAULT_CHUNK_INDEX),
         "start_char": metadata.get("start_char", 0),
         "end_char": metadata.get("end_char", 0),
@@ -213,12 +217,29 @@ def dense_retrieve_docs(query: str, top_k: int) -> list[dict]:
 
 
 def keyword_retrieve_docs(query: str, top_k: int) -> list[dict]:
-    """从 Chroma docs collection 做轻量关键词召回。
+    """从 SQLite FTS5 做 lexical 召回，失败时退回旧版小规模扫描。
 
-    当前实现直接扫描 collection 中的 chunk，适合我们现阶段的小规模学习项目。
-    后续如果文档量变大，可以把这个函数替换成 BM25/倒排索引，而不影响
-    search_docs 的主流程。
+    FTS5 是现在的主路径：它避免了每次从 Chroma 拉全量 chunk 再 Python 打分。
+    兜底保留旧逻辑，是为了兼容还没重建 knowledge index 的本地环境。
     """
+
+    try:
+        lexical_hits = get_lexical_retriever().search(query, top_k=top_k)
+        if lexical_hits:
+            for hit in lexical_hits:
+                hit["retrieval_source"] = RETRIEVAL_SOURCE_KEYWORD
+            return lexical_hits
+    except Exception as exc:
+        # 检索链路不能因为 FTS5 尚未初始化而中断；debug/errors 会在上层继续体现。
+        # 这里保留本地小数据集兜底，方便渐进迁移。
+        logger.warning(
+            {
+                "event": "retrieval_fallback",
+                "stage": "lexical_fts",
+                "message": "SQLite FTS lexical retrieval failed; falling back to Chroma scan",
+                "error": str(exc),
+            }
+        )
 
     store = ChromaVectorStore()
     raw_result = store.get(collection_name=VECTOR_STORE_CONFIG.doc_collection_name)
@@ -247,7 +268,8 @@ def apply_keyword_scores(query: str, hits: list[dict]) -> list[dict]:
     """为候选 chunk 补充 keyword_score 和 keyword_score_norm。"""
 
     for hit in hits:
-        hit["keyword_score"] = keyword_score(query, hit["content"])
+        existing_score = float(hit.get("keyword_score", 0.0) or 0.0)
+        hit["keyword_score"] = max(existing_score, keyword_score(query, hit["content"]))
 
     return normalize_keyword_scores(hits)
 

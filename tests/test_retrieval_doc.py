@@ -84,6 +84,23 @@ def test_normalize_keyword_scores_all_zero_sets_norm_zero() -> None:
     assert all(h["keyword_score_norm"] == 0.0 for h in out)
 
 
+def test_apply_keyword_scores_preserves_existing_lexical_score() -> None:
+    from app.retrieval.doc_retrieval import apply_keyword_scores
+
+    hits = [
+        {
+            "id": "fts-hit",
+            "content": "完全不触发项目标签的内容",
+            "keyword_score": 0.8,
+        }
+    ]
+
+    out = apply_keyword_scores("unmatched-query", hits)
+
+    assert out[0]["keyword_score"] == 0.8
+    assert out[0]["keyword_score_norm"] == 1.0
+
+
 # ----------------------------- merge_doc_hits -----------------------------
 
 def test_merge_doc_hits_dedupes_and_merges_sources() -> None:

@@ -94,6 +94,28 @@ class VectorStoreConfig:
 
 
 @dataclass(frozen=True)
+class KnowledgeBaseConfig:
+    """知识库结构化存储配置。
+
+    SQLite 作为文档和 chunk 的真相源，同时承载 FTS5 lexical index；
+    Chroma 只负责 dense 向量召回，必要时可以从 SQLite 重建。
+    """
+
+    sqlite_path: str = "data/knowledge_base.sqlite3"
+
+
+@dataclass(frozen=True)
+class LexicalRetrievalConfig:
+    """Lexical retriever 配置。
+
+    先默认使用 SQLite FTS5；后续接 OpenSearch/Elasticsearch 时，只需要新增
+    retriever 实现并切换该配置，不必改 RAG 主链路。
+    """
+
+    backend: str = "sqlite_fts"
+
+
+@dataclass(frozen=True)
 class ChunkingConfig:
     """文档切块配置。
 
@@ -185,6 +207,20 @@ def load_vector_store_config() -> VectorStoreConfig:
     )
 
 
+def load_knowledge_base_config() -> KnowledgeBaseConfig:
+    return KnowledgeBaseConfig(
+        sqlite_path=get_env_str(
+            "KNOWLEDGE_BASE_SQLITE_PATH", "data/knowledge_base.sqlite3"
+        ),
+    )
+
+
+def load_lexical_retrieval_config() -> LexicalRetrievalConfig:
+    return LexicalRetrievalConfig(
+        backend=get_env_str("LEXICAL_RETRIEVER", "sqlite_fts"),
+    )
+
+
 def load_chunking_config() -> ChunkingConfig:
     return ChunkingConfig(
         enabled=get_env_bool("DOC_CHUNKING_ENABLED", True),
@@ -209,5 +245,7 @@ RAG_CONFIG = load_rag_config()
 MEMORY_CONFIG = load_memory_config()
 CONVERSATION_HISTORY_CONFIG = load_conversation_history_config()
 VECTOR_STORE_CONFIG = load_vector_store_config()
+KNOWLEDGE_BASE_CONFIG = load_knowledge_base_config()
+LEXICAL_RETRIEVAL_CONFIG = load_lexical_retrieval_config()
 CHUNKING_CONFIG = load_chunking_config()
 CHECKPOINT_CONFIG = load_checkpoint_config()

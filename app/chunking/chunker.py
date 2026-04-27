@@ -1,9 +1,64 @@
 from app.chunking.models import DocumentChunk
 from app.config import CHUNKING_CONFIG
 
+MARKDOWN_HEADING_PREFIXES = ("#", "##", "###", "####", "#####", "######")
 SENTENCE_BOUNDARY_CHARS = "。！？!?；;\n"
 OVERLAP_START_BOUNDARY_CHARS = "。！？!?；;，,、：: \n\t"
 OVERLAP_START_ALIGN_SCAN_CHARS = 40
+
+
+def _is_heading_line(line: str) -> bool:
+    stripped = line.strip()
+    return any(
+        stripped.startswith(f"{prefix} ") for prefix in MARKDOWN_HEADING_PREFIXES
+    )
+
+
+def _heading_title(line: str) -> str:
+    return line.strip().lstrip("#").strip()
+
+
+def _split_paragraph_ranges(text: str) -> list[tuple[int, int, str]]:
+    """按非空段落切分，并保留段落在规范化文本里的字符区间。"""
+
+    ranges: list[tuple[int, int, str]] = []
+    cursor = 0
+    for paragraph in text.split("\n\n"):
+        start = text.find(paragraph, cursor)
+        if start < 0:
+            start = cursor
+        end = start + len(paragraph)
+        content = paragraph.strip()
+        if content:
+            ranges.append((start, end, content))
+        cursor = end + 2
+    return ranges
+
+
+def _split_section_ranges(text: str) -> list[tuple[int, int, str]]:
+    """按 Markdown 标题拆 section；没有标题时退化为整篇文档。
+
+    工业 RAG 里 chunk 最怕把标题和正文关系切散。这里先做轻量 section 感知：
+    看到 Markdown 标题就开启新 section，后续 chunk 会尽量在 section 内打包。
+    """
+
+    lines = text.splitlines(keepends=True)
+    sections: list[tuple[int, int, str]] = []
+    section_start = 0
+    section_title = ""
+    offset = 0
+
+    for line in lines:
+        if _is_heading_line(line):
+            if offset > section_start:
+                sections.append((section_start, offset, section_title))
+            section_start = offset
+            section_title = _heading_title(line)
+        offset += len(line)
+
+    if text:
+        sections.append((section_start, len(text), section_title))
+    return sections or [(0, len(text), "")]
 
 
 def _normalize_text(text: str) -> str:
@@ -37,6 +92,7 @@ def _build_chunk(
     text: str,
     start_char: int,
     end_char: int,
+    section_title: str = "",
 ) -> DocumentChunk:
     chunk_text = text.strip()
     return DocumentChunk(
@@ -47,6 +103,7 @@ def _build_chunk(
         start_char=start_char,
         end_char=end_char,
         char_len=len(chunk_text),
+        section_title=section_title,
     )
 
 
@@ -119,13 +176,16 @@ def _align_overlap_start(text: str, raw_start: int, max_start: int) -> int:
     return raw_start
 
 
-def chunk_document_text(
+def _chunk_text_window(
     doc_id: str,
     text: str,
     *,
     chunk_size_chars: int | None = None,
     chunk_overlap_chars: int | None = None,
     min_chunk_chars: int | None = None,
+    chunk_index_start: int = 0,
+    offset_base: int = 0,
+    section_title: str = "",
 ) -> list[DocumentChunk]:
     """按“句子边界优先 + 字符窗口兜底”把单篇文档切成多个 chunk。
 
@@ -137,8 +197,7 @@ def chunk_document_text(
     这比纯固定窗口更不容易切断语义，同时仍保留简单可控的字符长度上限。
     """
 
-    normalized = _normalize_text(text)
-    if not normalized:
+    if not text:
         return []
 
     size = chunk_size_chars or CHUNKING_CONFIG.chunk_size_chars
@@ -151,13 +210,13 @@ def chunk_document_text(
 
     chunks: list[DocumentChunk] = []
     start = 0
-    chunk_index = 0
-    text_len = len(normalized)
+    chunk_index = chunk_index_start
+    text_len = len(text)
 
     while start < text_len:
         max_end = min(start + size, text_len)
-        end = _find_boundary(normalized, start, max_end, minimum)
-        chunk_text = normalized[start:end].strip()
+        end = _find_boundary(text, start, max_end, minimum)
+        chunk_text = text[start:end].strip()
 
         if chunk_text and len(chunk_text) >= minimum:
             chunks.append(
@@ -165,8 +224,9 @@ def chunk_document_text(
                     doc_id=doc_id,
                     chunk_index=chunk_index,
                     text=chunk_text,
-                    start_char=start,
-                    end_char=end,
+                    start_char=offset_base + start,
+                    end_char=offset_base + end,
+                    section_title=section_title,
                 )
             )
             chunk_index += 1
@@ -176,8 +236,121 @@ def chunk_document_text(
 
         # 下一块从当前边界前回退 overlap，既保留上下文，又保证窗口继续前进。
         raw_next_start = max(end - overlap, start + 1)
-        next_start = _align_overlap_start(normalized, raw_next_start, end)
+        next_start = _align_overlap_start(text, raw_next_start, end)
         start = min(next_start, start + step)
+
+    return chunks
+
+
+def _pack_section_paragraphs(
+    *,
+    doc_id: str,
+    section_text: str,
+    section_offset: int,
+    section_title: str,
+    chunk_index_start: int,
+    chunk_size_chars: int,
+    chunk_overlap_chars: int,
+    min_chunk_chars: int,
+) -> list[DocumentChunk]:
+    """在 section 内按段落打包，段落过长时再退化到窗口切分。"""
+
+    chunks: list[DocumentChunk] = []
+    pending_parts: list[str] = []
+    pending_start: int | None = None
+    pending_end = 0
+    chunk_index = chunk_index_start
+
+    def flush_pending() -> None:
+        nonlocal pending_parts, pending_start, pending_end, chunk_index
+        if pending_start is None:
+            return
+        content = "\n\n".join(part.strip() for part in pending_parts if part.strip())
+        if len(content) >= min_chunk_chars:
+            chunks.append(
+                _build_chunk(
+                    doc_id=doc_id,
+                    chunk_index=chunk_index,
+                    text=content,
+                    start_char=section_offset + pending_start,
+                    end_char=section_offset + pending_end,
+                    section_title=section_title,
+                )
+            )
+            chunk_index += 1
+        pending_parts = []
+        pending_start = None
+        pending_end = 0
+
+    for start, end, paragraph in _split_paragraph_ranges(section_text):
+        if len(paragraph) > chunk_size_chars:
+            flush_pending()
+            long_chunks = _chunk_text_window(
+                doc_id,
+                paragraph,
+                chunk_size_chars=chunk_size_chars,
+                chunk_overlap_chars=chunk_overlap_chars,
+                min_chunk_chars=min_chunk_chars,
+                chunk_index_start=chunk_index,
+                offset_base=section_offset + start,
+                section_title=section_title,
+            )
+            chunks.extend(long_chunks)
+            chunk_index += len(long_chunks)
+            continue
+
+        pending_len = len("\n\n".join(pending_parts + [paragraph]))
+        if pending_parts and pending_len > chunk_size_chars:
+            flush_pending()
+
+        if pending_start is None:
+            pending_start = start
+        pending_parts.append(paragraph)
+        pending_end = end
+
+    flush_pending()
+    return chunks
+
+
+def chunk_document_text(
+    doc_id: str,
+    text: str,
+    *,
+    chunk_size_chars: int | None = None,
+    chunk_overlap_chars: int | None = None,
+    min_chunk_chars: int | None = None,
+) -> list[DocumentChunk]:
+    """按“标题/段落优先 + 字符窗口兜底”把单篇文档切成多个 chunk。
+
+    新版切片先保留文档自然结构：Markdown 标题形成 section，段落在 section
+    内打包；只有单段过长时才用字符窗口切分。这样更适合后续引用展示和
+    FTS/BM25 检索，也减少标题、定义、解释被切散的概率。
+    """
+
+    normalized = _normalize_text(text)
+    if not normalized:
+        return []
+
+    size = chunk_size_chars or CHUNKING_CONFIG.chunk_size_chars
+    overlap = chunk_overlap_chars or CHUNKING_CONFIG.chunk_overlap_chars
+    minimum = min_chunk_chars or CHUNKING_CONFIG.min_chunk_chars
+
+    chunks: list[DocumentChunk] = []
+    for section_start, section_end, section_title in _split_section_ranges(normalized):
+        section_text = normalized[section_start:section_end].strip()
+        if not section_text:
+            continue
+        section_chunks = _pack_section_paragraphs(
+            doc_id=doc_id,
+            section_text=section_text,
+            section_offset=section_start,
+            section_title=section_title,
+            chunk_index_start=len(chunks),
+            chunk_size_chars=size,
+            chunk_overlap_chars=overlap,
+            min_chunk_chars=minimum,
+        )
+        chunks.extend(section_chunks)
 
     # 极短文本会因为 minimum 被过滤掉；这种情况下退化成单块，避免文档丢失。
     if not chunks:
@@ -187,7 +360,7 @@ def chunk_document_text(
                 chunk_index=0,
                 text=normalized,
                 start_char=0,
-                end_char=text_len,
+                end_char=len(normalized),
             )
         )
 

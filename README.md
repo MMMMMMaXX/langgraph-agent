@@ -424,7 +424,8 @@ EVAL_CASE_IDS=case_01,case_05 python scripts/eval_chat.py
 
 - `scripts/run_eval_profile.py`：跨 profile A/B 对比
 - `scripts/compare_eval_runs.py`：两次 run 的 diff
-- `scripts/build_doc_embeddings.py` + `scripts/build_doc_chroma_index.py`：文档向量化 & 建索引
+- `scripts/build_knowledge_index.py`：构建知识库索引，同时写 SQLite FTS5 与 Chroma
+- `scripts/build_doc_chroma_index.py`：旧入口兼容，内部转发到 `build_knowledge_index.py`
 - `scripts/clear_conversation_history.py`：清理历史
 - `scripts/migrate_*.py` / `scripts/inspect_*.py`：数据迁移与巡检
 
@@ -444,7 +445,9 @@ EVAL_CASE_IDS=case_01,case_05 python scripts/eval_chat.py
   - `sqlite_backend.py`：WAL 模式 + busy_timeout，适合并发读写
   - `jsonl_backend.py`：纯文件、易检查、适合小规模 / 调试
 - **向量记忆**：Chroma，持久化目录由 `CHROMA_PERSIST_DIR` 控制
-- **文档索引**：同一 Chroma 实例下的独立 collection（`CHROMA_DOC_COLLECTION`）
+- **知识库真相源**：SQLite catalog，由 `KNOWLEDGE_BASE_SQLITE_PATH` 控制，保存 documents/chunks 并维护 FTS5 lexical index
+- **文档向量索引**：同一 Chroma 实例下的独立 collection（`CHROMA_DOC_COLLECTION`）
+- **文档切片**：`app/chunking/` 采用标题/段落优先，长段落再字符窗口兜底；chunk 元数据会同时写入 SQLite 和 Chroma
 
 ---
 
