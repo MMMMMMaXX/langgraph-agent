@@ -46,6 +46,7 @@
 会话状态流、checkpoint/history/vector memory 分工、当前并发模型的详细说明见：
 
 - [docs/runtime-state.md](./docs/runtime-state.md)
+- [docs/memory-architecture.md](./docs/memory-architecture.md)
 
 ---
 

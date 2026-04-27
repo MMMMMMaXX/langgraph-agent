@@ -7,6 +7,10 @@
 3. 当前锁模型如何避免同 session 并发污染
 4. 后续如果继续演进，应该沿哪个方向收敛
 
+如果你更关注 `app/runtime/` 目录内各文件的职责边界，而不是全局状态模型，请先看：
+
+- [app/runtime/README.md](/Users/manxin/baidu/ai-max/langgraph-agent/app/runtime/README.md)
+
 ---
 
 ## 1. 设计目标
