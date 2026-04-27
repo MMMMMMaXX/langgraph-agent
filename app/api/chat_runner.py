@@ -13,17 +13,14 @@ from typing import Any
 from fastapi import HTTPException
 
 from app.chat_service import run_chat_turn
+from app.runtime import SessionRuntime
 from app.tracing import get_langsmith_runtime_info
 from app.utils.logger import log_request, now_ms
 
 from .schemas import ChatRequest, DebugPayload
-from .session_store import (
-    commit_session_state,
-    get_session_lock,
-    snapshot_session_state,
-)
 
 StreamCallback = Callable[[str, dict[str, Any]], None]
+_SESSION_RUNTIME = SessionRuntime()
 
 
 def _log_failure(
@@ -83,22 +80,19 @@ def _invoke_with_session_lock(
     模块级 docstring。
     """
 
-    session_lock = get_session_lock(session_id)
+    session_lock = _SESSION_RUNTIME.get_lock(session_id)
     with session_lock:
-        state_snapshot = snapshot_session_state(session_id)
-        current_state = {
-            **state_snapshot,
-            "request_id": request_id,
-            "session_id": session_id,
-            "debug": request.debug,
-            "conversation_history_path": request.conversation_history_path.strip(),
-            "stream_callback": stream_callback,
-            "streamed_answer": False,
-        }
+        current_state = _SESSION_RUNTIME.build_request_state(
+            session_id=session_id,
+            request_id=request_id,
+            debug=request.debug,
+            conversation_history_path=request.conversation_history_path.strip(),
+            stream_callback=stream_callback,
+        )
         # 长时间操作：跑完整 graph，不持有任何全局锁。
         # stream_callback 可能被回调，但不会再触发 guard，安全。
         result = run_chat_turn(current_state, request.message)
-        commit_session_state(session_id, result)
+        _SESSION_RUNTIME.cache_turn_result(session_id, result)
     return result
 
 

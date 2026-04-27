@@ -1,18 +1,12 @@
-from app.constants.routes import NODE_MEMORY
 from app.graph import graph
 from app.llm import get_embedding_cache_stats, reset_embedding_cache
+from app.runtime import SessionRuntime
+from app.runtime.initial_state import create_initial_state
 from app.runtime_context import reset_stream_callback, set_stream_callback
 from app.state import AgentState
 from app.tracing import build_graph_trace_config, reset_model_call_index
 
-
-def create_initial_state(session_id: str = "default") -> AgentState:
-    return {
-        "session_id": session_id,
-        "debug": False,
-        "messages": [],
-        "summary": "",
-    }
+_SESSION_RUNTIME = SessionRuntime()
 
 
 def run_chat_turn(state: AgentState, message: str) -> AgentState:
@@ -30,18 +24,18 @@ def run_chat_turn(state: AgentState, message: str) -> AgentState:
         "summary": state.get("summary", ""),
         "debug_info": dict(state.get("debug_info", {})),
     }
-    graph_config = build_graph_trace_config(next_state, user_message)
-    checkpoint_snapshot = graph.get_state(graph_config)
-    checkpoint_values = checkpoint_snapshot.values if checkpoint_snapshot else {}
-
-    # 进程重启后 session_store 会变空，但 SQLite checkpoint 仍保存着上一轮
-    # messages/summary。这里在追加当前用户消息前先恢复它们，保证多轮上下文连续。
-    if not next_state["messages"] and checkpoint_values.get("messages"):
-        next_state["messages"] = list(checkpoint_values.get("messages", []))
-    if not next_state["summary"] and checkpoint_values.get("summary"):
-        next_state["summary"] = checkpoint_values.get("summary", "")
+    # 只有当前 state 里真的没有上下文时，才回退到 SessionRuntime 恢复。
+    # 这样可以保持现有单进程热路径：同进程多轮对话仍优先复用 session cache，
+    # 而进程重启后的冷恢复则自动落到 checkpoint。
+    if not next_state["messages"] and not next_state["summary"]:
+        snapshot = _SESSION_RUNTIME.load(next_state["session_id"], graph)
+        if snapshot.messages:
+            next_state["messages"] = list(snapshot.messages)
+        if snapshot.summary:
+            next_state["summary"] = snapshot.summary
 
     next_state["messages"].append({"role": "user", "content": user_message})
+    graph_config = build_graph_trace_config(next_state, user_message)
 
     reset_model_call_index()
     reset_embedding_cache()
@@ -51,16 +45,11 @@ def run_chat_turn(state: AgentState, message: str) -> AgentState:
     finally:
         reset_stream_callback(callback_token)
     answer = result.get("answer", "").strip()
-
-    updated_messages = list(result.get("messages", []))
-    updated_messages.append({"role": "assistant", "content": answer})
-    graph.update_state(
-        graph_config,
-        {
-            "messages": updated_messages,
-            "summary": result.get("summary", ""),
-        },
-        as_node=NODE_MEMORY,
+    updated_messages = _SESSION_RUNTIME.commit(
+        session_id=next_state["session_id"],
+        graph=graph,
+        state=result,
+        answer=answer,
     )
 
     debug_info = dict(result.get("debug_info", {}))

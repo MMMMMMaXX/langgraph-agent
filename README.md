@@ -43,6 +43,10 @@
 
 图定义集中在 `app/graph.py`，状态 schema 在 `app/state.py`。
 
+会话状态流、checkpoint/history/vector memory 分工、当前并发模型的详细说明见：
+
+- [docs/runtime-state.md](./docs/runtime-state.md)
+
 ---
 
 ## 3. 目录结构
@@ -63,6 +67,7 @@ app/
 │   ├── vector_memory.py # Chroma 语义记忆
 │   └── write_policy.py
 ├── retrieval/           # 文档召回、embedding、reranker
+├── runtime/             # session runtime、checkpoint/cache 门面、会话快照
 ├── vector_store/        # Chroma 封装
 ├── nodes/memory.py      # 后处理：写历史 / 写记忆 / 刷新摘要
 ├── prompts/             # 提示词模板
@@ -76,6 +81,7 @@ app/
 ├── tracing.py           # LangSmith 元数据
 └── debug_ui.html
 
+docs/                    # 设计说明与运维文档
 scripts/                 # eval、数据迁移、索引构建等 CLI
 data/                    # Chroma 持久化、会话历史 DB/JSONL
 outputs/                 # eval 产物（已被 .gitignore 忽略）
