@@ -20,6 +20,9 @@ import os
 os.environ.setdefault("DEEPSEEK_API_KEY", "test-key-not-real")
 os.environ.setdefault("DEEPSEEK_MODEL", "deepseek-chat")
 os.environ.setdefault("OPENAI_API_KEY", "test-key-not-real")
+# E2E 测试会触发 graph.compile()，如果用 SQLite checkpointer 就会真写
+# data/langgraph_checkpoints.sqlite3。这里强制走 InMemorySaver，保持测试 hermetic。
+os.environ.setdefault("LANGGRAPH_CHECKPOINT_ENABLED", "false")
 
 from collections.abc import Callable, Iterator  # noqa: E402
 from types import SimpleNamespace  # noqa: E402
