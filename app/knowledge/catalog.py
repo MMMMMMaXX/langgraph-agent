@@ -126,6 +126,98 @@ class KnowledgeCatalog:
             conn.execute("DELETE FROM document_chunks")
             conn.execute("DELETE FROM documents")
 
+    def list_documents(self, limit: int = 50, offset: int = 0) -> list[dict]:
+        """分页读取已导入文档列表，供 API 和调试脚本使用。"""
+
+        self.init_schema()
+        with _connect(self.path) as conn:
+            rows = conn.execute(
+                """
+                SELECT
+                    d.doc_id,
+                    d.title,
+                    d.source,
+                    d.source_type,
+                    d.content_hash,
+                    d.created_at,
+                    d.updated_at,
+                    COUNT(c.chunk_id) AS chunk_count
+                FROM documents d
+                LEFT JOIN document_chunks c ON c.doc_id = d.doc_id
+                GROUP BY d.doc_id
+                ORDER BY d.updated_at DESC
+                LIMIT ? OFFSET ?
+                """,
+                (max(limit, 0), max(offset, 0)),
+            ).fetchall()
+
+        return [
+            {
+                "doc_id": row["doc_id"],
+                "title": row["title"],
+                "source": row["source"],
+                "source_type": row["source_type"],
+                "content_hash": row["content_hash"],
+                "created_at": float(row["created_at"]),
+                "updated_at": float(row["updated_at"]),
+                "chunk_count": int(row["chunk_count"]),
+            }
+            for row in rows
+        ]
+
+    def get_document(self, doc_id: str) -> dict | None:
+        """读取单个文档及其 chunk 摘要。"""
+
+        self.init_schema()
+        with _connect(self.path) as conn:
+            row = conn.execute(
+                """
+                SELECT
+                    doc_id, title, source, source_type, content_hash,
+                    metadata_json, created_at, updated_at
+                FROM documents
+                WHERE doc_id = ?
+                """,
+                (doc_id,),
+            ).fetchone()
+            if row is None:
+                return None
+
+            chunk_rows = conn.execute(
+                """
+                SELECT
+                    chunk_id, section_title, chunk_index, start_char,
+                    end_char, chunk_char_len, content
+                FROM document_chunks
+                WHERE doc_id = ?
+                ORDER BY chunk_index ASC
+                """,
+                (doc_id,),
+            ).fetchall()
+
+        return {
+            "doc_id": row["doc_id"],
+            "title": row["title"],
+            "source": row["source"],
+            "source_type": row["source_type"],
+            "content_hash": row["content_hash"],
+            "metadata": json.loads(row["metadata_json"] or "{}"),
+            "created_at": float(row["created_at"]),
+            "updated_at": float(row["updated_at"]),
+            "chunks": [
+                {
+                    "chunk_id": chunk["chunk_id"],
+                    "section_title": chunk["section_title"],
+                    "chunk_index": int(chunk["chunk_index"]),
+                    "start_char": int(chunk["start_char"]),
+                    "end_char": int(chunk["end_char"]),
+                    "chunk_char_len": int(chunk["chunk_char_len"]),
+                    "preview": chunk["content"][:120],
+                }
+                for chunk in chunk_rows
+            ],
+        }
+
     def upsert_document(
         self,
         *,

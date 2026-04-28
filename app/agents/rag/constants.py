@@ -77,3 +77,20 @@ DOC_HIT_SCORE_FIELDS = {
     "semantic_score",
     "keyword_score_norm",
 }
+
+# Context compression：句子切分后最多保留的候选句数量，控制规则压缩复杂度。
+CONTEXT_COMPRESSION_MAX_SENTENCES_PER_BLOCK = 4
+
+# Context compression：每个引用块至少保留的正文字符数，避免压缩后证据过短。
+CONTEXT_COMPRESSION_MIN_BLOCK_CHARS = 80
+
+# Context compression：定义类问题中可加权的定义/作用信号词。
+CONTEXT_COMPRESSION_DEFINITION_SIGNALS = (
+    "是",
+    "指",
+    "称为",
+    "定义",
+    "用于",
+    "作用",
+    "提供",
+)

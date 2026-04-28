@@ -112,6 +112,8 @@ def rag_agent_node(state: AgentState) -> AgentState:
         doc_hits=merged_doc_hits,
         memory_hits=memory_hits,
         doc_context_chars=doc_answer_strategy["context_chars"],
+        query=rewritten,
+        query_type=query_classification.query_type,
     )
 
     # ===== 5. 生成答案 =====
@@ -149,6 +151,7 @@ def rag_agent_node(state: AgentState) -> AgentState:
         threshold=threshold,
         doc_context=rag_context.doc_context,
         citations=rag_context.citations,
+        context_compression=rag_context.context_compression,
         query_classification=query_classification,
         answer_strategy=doc_answer_strategy,
         sub_timings_ms=sub_timings_ms,
@@ -197,6 +200,7 @@ def rag_agent_node(state: AgentState) -> AgentState:
             context=rag_context.context,
             doc_context=rag_context.doc_context,
             citations=rag_context.citations,
+            context_compression=rag_context.context_compression,
             query_classification=query_classification,
             answer_strategy=doc_answer_strategy,
             sub_timings_ms=sub_timings_ms,

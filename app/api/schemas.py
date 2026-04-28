@@ -39,3 +39,43 @@ class ChatResponse(BaseModel):
     routes: list[str] = []
     summary: str = ""
     debug: DebugPayload | None = None
+
+
+class KnowledgeImportRequest(BaseModel):
+    """POST /knowledge/import 的请求体。
+
+    这个入口适合脚本或调试直接传 content；前端文件上传走
+    POST /knowledge/import/file。
+    """
+
+    content: str
+    doc_id: str = ""
+    title: str = ""
+    source: str = ""
+    source_type: str = "txt"
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class KnowledgeImportResponse(BaseModel):
+    """文档导入后的索引结果摘要。"""
+
+    doc_id: str
+    title: str
+    source: str
+    source_type: str
+    content_hash: str
+    chunk_count: int
+    indexed_to_sqlite: bool
+    indexed_to_chroma: bool
+
+
+class KnowledgeDocumentListResponse(BaseModel):
+    """GET /knowledge/docs 的响应。"""
+
+    documents: list[dict[str, Any]]
+
+
+class KnowledgeDocumentDetailResponse(BaseModel):
+    """GET /knowledge/docs/{doc_id} 的响应。"""
+
+    document: dict[str, Any]

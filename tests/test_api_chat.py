@@ -19,6 +19,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api import app, clear_session_store, session_store
+from app.knowledge.ingestion import KnowledgeImportResult
 
 
 # ---------------------------------------------------------------------------
@@ -192,6 +193,92 @@ def test_chat_missing_required_field_returns_422(client: TestClient) -> None:
     """Pydantic 校验层：缺字段直接 422，根本走不到 chat_runner。"""
     resp = client.post("/chat", json={"session_id": "u1"})  # 缺 message
     assert resp.status_code == 422
+
+
+def test_import_knowledge_endpoint_returns_index_summary(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.api.routes as routes_mod
+
+    def fake_import(payload):
+        assert payload.content == "WAI-ARIA 是无障碍技术规范。"
+        return KnowledgeImportResult(
+            doc_id="doc-api",
+            title="API 导入文档",
+            source="api.md",
+            source_type="md",
+            content_hash="hash",
+            chunk_count=1,
+            indexed_to_sqlite=True,
+            indexed_to_chroma=True,
+        )
+
+    monkeypatch.setattr(routes_mod, "import_knowledge_document", fake_import)
+
+    resp = client.post(
+        "/knowledge/import",
+        json={
+            "title": "API 导入文档",
+            "source": "api.md",
+            "source_type": "md",
+            "content": "WAI-ARIA 是无障碍技术规范。",
+        },
+    )
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["doc_id"] == "doc-api"
+    assert body["chunk_count"] == 1
+    assert body["indexed_to_sqlite"] is True
+    assert body["indexed_to_chroma"] is True
+
+
+def test_import_knowledge_file_endpoint_returns_index_summary(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.api.routes as routes_mod
+
+    def fake_import(payload):
+        assert payload.content == "# WAI-ARIA\n\nWAI-ARIA 是无障碍技术规范。"
+        assert payload.title == "上传文档"
+        assert payload.source == "upload.md"
+        assert payload.source_type == "md"
+        assert payload.metadata == {"topic": "a11y"}
+        return KnowledgeImportResult(
+            doc_id="doc-upload",
+            title="上传文档",
+            source="upload.md",
+            source_type="md",
+            content_hash="hash",
+            chunk_count=1,
+            indexed_to_sqlite=True,
+            indexed_to_chroma=True,
+        )
+
+    monkeypatch.setattr(routes_mod, "import_knowledge_document", fake_import)
+
+    resp = client.post(
+        "/knowledge/import/file",
+        data={
+            "title": "上传文档",
+            "metadata_json": '{"topic":"a11y"}',
+        },
+        files={
+            "file": (
+                "upload.md",
+                b"# WAI-ARIA\n\nWAI-ARIA \xe6\x98\xaf\xe6\x97\xa0\xe9\x9a\x9c\xe7\xa2\x8d\xe6\x8a\x80\xe6\x9c\xaf\xe8\xa7\x84\xe8\x8c\x83\xe3\x80\x82",
+                "text/markdown",
+            )
+        },
+    )
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["doc_id"] == "doc-upload"
+    assert body["source_type"] == "md"
+    assert body["indexed_to_chroma"] is True
 
 
 def test_chat_persists_session_state_across_turns(

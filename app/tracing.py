@@ -119,6 +119,7 @@ def build_rag_trace_metadata(rag_debug: dict[str, Any]) -> dict:
     filtered_docs = rag_debug.get("filtered_docs", [])
     merged_docs = rag_debug.get("merged_docs", [])
     citations = rag_debug.get("citations", [])
+    context_compression = rag_debug.get("context_compression", {})
     retrieval_debug = rag_debug.get("retrieval_debug", {})
     doc_retrieval = retrieval_debug.get("doc", {})
     memory_retrieval = retrieval_debug.get("memory", {})
@@ -131,6 +132,12 @@ def build_rag_trace_metadata(rag_debug: dict[str, Any]) -> dict:
         "rag.answer_strategy": rag_debug.get("answer_strategy", ""),
         "rag.threshold": rag_debug.get("threshold"),
         "rag.doc_context_chars": rag_debug.get("doc_context_chars", 0),
+        "rag.context_before_chars": context_compression.get("before_chars", 0),
+        "rag.context_after_chars": context_compression.get("after_chars", 0),
+        "rag.context_compression_ratio": context_compression.get(
+            "compression_ratio",
+            0,
+        ),
         "rag.answer_context_chars": rag_debug.get("answer_context_chars", 0),
         "rag.answer_max_tokens": rag_debug.get("answer_max_tokens", 0),
         "rag.top_doc_score": top_docs[0].get("score") if top_docs else None,

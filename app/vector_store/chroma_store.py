@@ -113,3 +113,28 @@ class ChromaVectorStore:
             metadata={"hnsw:space": "cosine"},
         )
         return int(collection.count())
+
+    def delete(
+        self,
+        *,
+        collection_name: str,
+        ids: list[str] | None = None,
+        where: dict | None = None,
+    ) -> None:
+        """删除 collection 中的记录。
+
+        文档重新导入时，SQLite catalog 会先替换 chunk；Chroma 也需要按 doc_id
+        删除旧 chunk，避免新文档 chunk 数变少时残留旧向量被召回。
+        """
+
+        collection = self.get_or_create_collection(
+            collection_name,
+            metadata={"hnsw:space": "cosine"},
+        )
+        kwargs = {}
+        if ids:
+            kwargs["ids"] = ids
+        if where:
+            kwargs["where"] = where
+        if kwargs:
+            collection.delete(**kwargs)

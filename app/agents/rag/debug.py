@@ -102,6 +102,7 @@ def build_rag_debug_payload(
     threshold: float,
     doc_context: str,
     citations: list[dict],
+    context_compression: dict,
     query_classification: QueryClassification,
     answer_strategy: dict,
     sub_timings_ms: dict[str, float],
@@ -128,6 +129,7 @@ def build_rag_debug_payload(
         },
         "threshold": threshold,
         "doc_context_chars": len(doc_context),
+        "context_compression": context_compression,
         "citations": citations,
         "citation_count": len(citations),
         "citation_doc_ids": [
@@ -167,6 +169,7 @@ def build_rag_log_extra(
     context: str,
     doc_context: str,
     citations: list[dict],
+    context_compression: dict,
     query_classification: QueryClassification,
     answer_strategy: dict,
     sub_timings_ms: dict[str, float],
@@ -189,6 +192,7 @@ def build_rag_log_extra(
         },
         "contextPreview": preview(context, 180),
         "docContextChars": len(doc_context),
+        "contextCompression": context_compression,
         "citations": citations,
         "citationCount": len(citations),
         "citationDocIds": [

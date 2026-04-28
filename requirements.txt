@@ -5,6 +5,7 @@ langsmith
 openai
 python-dotenv
 fastapi
+python-multipart
 uvicorn
 chromadb
 httpx

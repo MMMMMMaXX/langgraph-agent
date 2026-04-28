@@ -1,6 +1,6 @@
 """RAG agent 内部数据结构。"""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -73,6 +73,7 @@ class RagContext:
     doc_context: str
     memory_context: str
     citations: list[dict]
+    context_compression: dict = field(default_factory=dict)
 
 
 @dataclass
