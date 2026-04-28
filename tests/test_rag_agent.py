@@ -195,7 +195,7 @@ def _patch_pipelines(
             timing_ms=1.0,
         )
 
-    def fake_docs(_q):
+    def fake_docs(_q, query_type=""):
         return doc_result or _empty_doc_result()
 
     def fake_memory(_q, *, session_id, enabled):

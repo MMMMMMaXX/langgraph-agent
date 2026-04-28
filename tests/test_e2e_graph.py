@@ -101,7 +101,9 @@ def isolate_rag_pipelines(monkeypatch: pytest.MonkeyPatch) -> Iterator[dict]:
         ),
     )
     monkeypatch.setattr(
-        rag_mod, "retrieve_docs_for_rag", lambda _q: captured["doc_result"]
+        rag_mod,
+        "retrieve_docs_for_rag",
+        lambda _q, query_type="": captured["doc_result"],
     )
     monkeypatch.setattr(
         rag_mod,

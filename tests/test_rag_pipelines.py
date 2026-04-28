@@ -11,6 +11,7 @@ import pytest
 
 from app.agents.rag.doc_pipeline import retrieve_docs_for_rag
 from app.agents.rag.memory_pipeline import filter_memory_hits, retrieve_memory_for_rag
+from app.agents.rag.constants import QUERY_TYPE_COMPARISON, QUERY_TYPE_FALLBACK
 from app.agents.rag.rewrite import (
     get_user_messages,
     rewrite_rag_query,
@@ -249,6 +250,21 @@ def test_doc_pipeline_soft_match_keeps_top_one(doc_pipeline_io: dict) -> None:
     assert result.filtered_docs[0]["doc_id"] == "d1"
 
 
+def test_doc_pipeline_fallback_query_disables_soft_match(
+    doc_pipeline_io: dict,
+) -> None:
+    """fallback 类问题更保守，低于硬阈值时不靠 soft-match 硬答。"""
+    doc_pipeline_io["docs"] = [
+        _doc(score=0.4, doc_id="d1"),
+        _doc(score=0.1, doc_id="d2"),
+    ]
+
+    result = retrieve_docs_for_rag("q", query_type=QUERY_TYPE_FALLBACK)
+
+    assert result.filtered_docs == []
+    assert result.retrieval_debug["query_type"] == QUERY_TYPE_FALLBACK
+
+
 def test_doc_pipeline_skips_rerank_when_policy_allows(doc_pipeline_io: dict) -> None:
     """单候选 → should_skip_doc_rerank 返回 True → 不调 rerank。"""
     doc_pipeline_io["docs"] = [_doc(score=0.9, doc_id="d1", chunk_index=0)]
@@ -257,6 +273,16 @@ def test_doc_pipeline_skips_rerank_when_policy_allows(doc_pipeline_io: dict) -> 
     assert len(result.doc_hits) == 1
     assert doc_pipeline_io["rerank_calls"] == 0
     assert result.retrieval_debug["rerank_skipped"] is True
+
+
+def test_doc_pipeline_comparison_query_uses_larger_top_k(
+    doc_pipeline_io: dict,
+) -> None:
+    result = retrieve_docs_for_rag("A 和 B 有什么区别", query_type=QUERY_TYPE_COMPARISON)
+
+    assert result.retrieval_debug["query_type"] == QUERY_TYPE_COMPARISON
+    assert result.retrieval_debug["requested_top_k"] >= 8
+    assert "threshold" in result.retrieval_debug["pipeline_steps"]
 
 
 def test_doc_pipeline_rerank_called_when_policy_forbids_skip(

@@ -73,7 +73,10 @@ def rag_agent_node(state: AgentState) -> AgentState:
     # 语义向量 + 关键词打分混合检索，然后阈值过滤 + 合并同 doc 的多个 chunk。
     # merged_doc_hits 是最终用于生成答案的文档片段集合。
     threshold = RAG_CONFIG.doc_score_threshold
-    doc_result = retrieve_docs_for_rag(rewritten)
+    doc_result = retrieve_docs_for_rag(
+        rewritten,
+        query_type=query_classification.query_type,
+    )
     docs = doc_result.docs
     filtered_docs = doc_result.filtered_docs
     doc_hits = doc_result.doc_hits

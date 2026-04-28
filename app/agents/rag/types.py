@@ -16,6 +16,36 @@ class DocRetrievalResult:
     timings_ms: dict[str, float]
 
 
+@dataclass(frozen=True)
+class DocRetrievalPipelineConfig:
+    """文档检索 pipeline 配置。"""
+
+    query_type: str
+    doc_top_k: int
+    doc_rerank_top_k: int
+    score_threshold: float
+    soft_match_threshold: float
+    dense_enabled: bool = True
+    lexical_enabled: bool = True
+    rerank_enabled: bool = True
+    chunk_merge_enabled: bool = True
+
+
+@dataclass
+class DocRetrievalPipelineState:
+    """文档检索 pipeline 中间态。"""
+
+    query: str
+    config: DocRetrievalPipelineConfig
+    docs: list[dict]
+    filtered_docs: list[dict]
+    doc_hits: list[dict]
+    merged_doc_hits: list[dict]
+    retrieval_debug: dict
+    errors: list[str]
+    timings_ms: dict[str, float]
+
+
 @dataclass
 class MemoryRetrievalResult:
     """RAG memory 兜底检索阶段的完整结果。"""
@@ -43,6 +73,15 @@ class RewriteResult:
     query: str
     errors: list[str]
     timing_ms: float
+
+
+@dataclass
+class QueryClassification:
+    """RAG query 分类结果。"""
+
+    query_type: str
+    confidence: float
+    reason: str
 
 
 @dataclass
