@@ -1,8 +1,10 @@
 """RAG 文档检索管线。
 
 该模块把文档检索拆成可插拔 step：
-search -> threshold -> rerank -> chunk merge -> debug/result。
-第一版保持外部行为基本不变，但让 query_type 可以逐步驱动不同 pipeline 配置。
+dense search -> lexical search -> hybrid merge -> threshold -> rerank
+-> chunk merge -> debug/result。
+每个召回/融合步骤都有独立开关和 debug 指标，后续替换 BM25、外部搜索引擎
+或融合策略时，不需要改 RAG agent 主编排。
 """
 
 from app.agents.rag.chunk_merge import merge_adjacent_doc_hits
@@ -17,7 +19,16 @@ from app.agents.rag.types import (
     DocRetrievalResult,
 )
 from app.config import RAG_CONFIG, VECTOR_STORE_CONFIG
-from app.rag import search_docs
+from app.retrieval.doc_retrieval import (
+    DEFAULT_HYBRID_ALPHA,
+    DEFAULT_HYBRID_BETA,
+    DOC_CANDIDATE_MULTIPLIER,
+    apply_keyword_scores,
+    dense_retrieve_docs,
+    keyword_retrieve_docs,
+    merge_doc_hits,
+    rank_hybrid,
+)
 from app.retrieval.reranker import rerank
 from app.utils.errors import build_error_info
 from app.utils.logger import now_ms
@@ -44,8 +55,11 @@ def build_doc_pipeline_config(query_type: str = "") -> DocRetrievalPipelineConfi
         query_type=query_type or "unknown",
         doc_top_k=doc_top_k,
         doc_rerank_top_k=doc_rerank_top_k,
+        candidate_top_k=max(doc_top_k * DOC_CANDIDATE_MULTIPLIER, doc_top_k),
         score_threshold=RAG_CONFIG.doc_score_threshold,
         soft_match_threshold=soft_match_threshold,
+        hybrid_alpha=DEFAULT_HYBRID_ALPHA,
+        hybrid_beta=DEFAULT_HYBRID_BETA,
     )
 
 
@@ -56,6 +70,9 @@ def create_doc_pipeline_state(
     return DocRetrievalPipelineState(
         query=query,
         config=config,
+        dense_hits=[],
+        lexical_hits=[],
+        hybrid_hits=[],
         docs=[],
         filtered_docs=[],
         doc_hits=[],
@@ -66,27 +83,109 @@ def create_doc_pipeline_state(
     )
 
 
-def run_search_step(state: DocRetrievalPipelineState) -> DocRetrievalPipelineState:
-    """执行 dense/lexical/hybrid 搜索。
+def run_dense_search_step(
+    state: DocRetrievalPipelineState,
+) -> DocRetrievalPipelineState:
+    """执行 dense 召回。
 
-    当前底层仍由 search_docs 封装 dense + lexical + hybrid。这里先把 step 边界拉开，
-    后续可以把 dense_step / lexical_step / hybrid_merge_step 逐步下沉到这里。
+    dense 负责语义相似召回，适合"表达不完全一致但语义接近"的问题。
+    它是高召回入口之一，但不在这里做最终排序。
     """
+
+    if not state.config.dense_enabled:
+        state.dense_hits = []
+        state.timings_ms["docDenseSearch"] = 0.0
+        return state
 
     started_at_ms = now_ms()
     try:
-        state.docs = search_docs(state.query, top_k=state.config.doc_top_k)
+        state.dense_hits = dense_retrieve_docs(
+            state.query,
+            top_k=state.config.candidate_top_k,
+        )
     except Exception as exc:
-        state.docs = []
+        state.dense_hits = []
         state.errors.append(
             build_error_info(
                 exc,
-                stage="search_docs",
+                stage="dense_retrieve_docs",
                 source="retrieval",
                 preferred_code="retrieval_error",
             )
         )
-    state.timings_ms["docSearch"] = round(now_ms() - started_at_ms, 2)
+    state.timings_ms["docDenseSearch"] = round(now_ms() - started_at_ms, 2)
+    return state
+
+
+def run_lexical_search_step(
+    state: DocRetrievalPipelineState,
+) -> DocRetrievalPipelineState:
+    """执行 lexical 召回。
+
+    lexical 负责精确词项、英文缩写、专有名词召回。现在底层是 SQLite FTS5，
+    以后可替换为更专业的 BM25/ES/OpenSearch 实现。
+    """
+
+    if not state.config.lexical_enabled:
+        state.lexical_hits = []
+        state.timings_ms["docLexicalSearch"] = 0.0
+        return state
+
+    started_at_ms = now_ms()
+    try:
+        state.lexical_hits = keyword_retrieve_docs(
+            state.query,
+            top_k=state.config.candidate_top_k,
+        )
+    except Exception as exc:
+        state.lexical_hits = []
+        state.errors.append(
+            build_error_info(
+                exc,
+                stage="keyword_retrieve_docs",
+                source="retrieval",
+                preferred_code="retrieval_error",
+            )
+        )
+    state.timings_ms["docLexicalSearch"] = round(now_ms() - started_at_ms, 2)
+    return state
+
+
+def run_hybrid_merge_step(
+    state: DocRetrievalPipelineState,
+) -> DocRetrievalPipelineState:
+    """合并 dense/lexical 结果并计算 hybrid 排序。
+
+    这里是检索融合层：先按 chunk id 去重，再补齐 keyword_score，最后用
+    semantic + keyword 的权重融合分排序。最终给下游 threshold 的 `docs`
+    仍只保留 doc_top_k，避免 rerank/context 阶段吞太多候选。
+    """
+
+    started_at_ms = now_ms()
+    hits = merge_doc_hits([state.dense_hits, state.lexical_hits])
+    hits = apply_keyword_scores(state.query, hits)
+    state.hybrid_hits = rank_hybrid(
+        hits,
+        alpha=state.config.hybrid_alpha,
+        beta=state.config.hybrid_beta,
+    )
+    state.docs = state.hybrid_hits[: state.config.doc_top_k]
+    state.timings_ms["docHybridMerge"] = round(now_ms() - started_at_ms, 2)
+    state.timings_ms["docSearch"] = round(
+        state.timings_ms.get("docDenseSearch", 0.0)
+        + state.timings_ms.get("docLexicalSearch", 0.0)
+        + state.timings_ms.get("docHybridMerge", 0.0),
+        2,
+    )
+    return state
+
+
+def run_search_step(state: DocRetrievalPipelineState) -> DocRetrievalPipelineState:
+    """兼容型搜索 step，按 dense -> lexical -> hybrid 顺序执行。"""
+
+    state = run_dense_search_step(state)
+    state = run_lexical_search_step(state)
+    state = run_hybrid_merge_step(state)
     return state
 
 
@@ -167,16 +266,22 @@ def run_debug_step(state: DocRetrievalPipelineState) -> DocRetrievalPipelineStat
             "where": None,
             "query_type": state.config.query_type,
             "pipeline_steps": [
-                "search",
+                "dense_search",
+                "lexical_search",
+                "hybrid_merge",
                 "threshold",
                 "rerank",
                 "chunk_merge",
             ],
             "requested_top_k": state.config.doc_top_k,
-            "candidate_top_k": max(
-                state.config.doc_top_k * 4,
-                state.config.doc_top_k,
-            ),
+            "candidate_top_k": state.config.candidate_top_k,
+            "dense_enabled": state.config.dense_enabled,
+            "lexical_enabled": state.config.lexical_enabled,
+            "hybrid_alpha": state.config.hybrid_alpha,
+            "hybrid_beta": state.config.hybrid_beta,
+            "dense_count": len(state.dense_hits),
+            "lexical_count": len(state.lexical_hits),
+            "hybrid_count": len(state.hybrid_hits),
             "returned_count": len(state.docs),
             "filtered_count": len(state.filtered_docs),
             "consumed_count": len(state.doc_hits),
@@ -209,7 +314,9 @@ def run_doc_retrieval_pipeline(
 
     state = create_doc_pipeline_state(query, config)
     for step in (
-        run_search_step,
+        run_dense_search_step,
+        run_lexical_search_step,
+        run_hybrid_merge_step,
         run_threshold_step,
         run_rerank_step,
         run_chunk_merge_step,

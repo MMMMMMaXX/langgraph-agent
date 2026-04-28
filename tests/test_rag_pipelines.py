@@ -176,35 +176,54 @@ def _doc(
 
 @pytest.fixture
 def doc_pipeline_io(monkeypatch: pytest.MonkeyPatch) -> dict:
-    """打桩 doc_pipeline 依赖的 search_docs / rerank。
+    """打桩 doc_pipeline 依赖的 dense / lexical / rerank。
 
-    返回 harness，测试里改 harness["docs"] / harness["rerank"] 即可切换场景。
+    返回 harness，测试里改 harness["docs"] / harness["lexical_docs"] 即可切换场景。
+    `docs` 保留为 dense 默认输入，兼容早期测试命名。
     """
     import app.agents.rag.doc_pipeline as dp_mod
 
     harness: dict = {
         "docs": [],
-        "search_error": None,
+        "lexical_docs": [],
+        "dense_error": None,
+        "lexical_error": None,
         "rerank_fn": lambda query, hits, top_k: hits[:top_k],
+        "dense_calls": 0,
+        "lexical_calls": 0,
         "rerank_calls": 0,
     }
 
-    def fake_search(query: str, top_k: int = 5) -> list[dict]:
-        if harness["search_error"] is not None:
-            raise harness["search_error"]
-        return harness["docs"]
+    def fake_dense_retrieve_docs(query: str, top_k: int) -> list[dict]:
+        harness["dense_calls"] += 1
+        if harness["dense_error"] is not None:
+            raise harness["dense_error"]
+        hits = [dict(hit) for hit in harness["docs"]]
+        for hit in hits:
+            hit.setdefault("retrieval_source", "dense")
+        return hits
+
+    def fake_keyword_retrieve_docs(query: str, top_k: int) -> list[dict]:
+        harness["lexical_calls"] += 1
+        if harness["lexical_error"] is not None:
+            raise harness["lexical_error"]
+        hits = [dict(hit) for hit in harness["lexical_docs"]]
+        for hit in hits:
+            hit.setdefault("retrieval_source", "keyword")
+        return hits
 
     def fake_rerank(query: str, hits: list, top_k: int = 2) -> list:
         harness["rerank_calls"] += 1
         return harness["rerank_fn"](query, hits, top_k)
 
-    monkeypatch.setattr(dp_mod, "search_docs", fake_search)
+    monkeypatch.setattr(dp_mod, "dense_retrieve_docs", fake_dense_retrieve_docs)
+    monkeypatch.setattr(dp_mod, "keyword_retrieve_docs", fake_keyword_retrieve_docs)
     monkeypatch.setattr(dp_mod, "rerank", fake_rerank)
     return harness
 
 
 def test_doc_pipeline_search_error_recorded(doc_pipeline_io: dict) -> None:
-    doc_pipeline_io["search_error"] = RuntimeError("chroma down")
+    doc_pipeline_io["dense_error"] = RuntimeError("chroma down")
     result = retrieve_docs_for_rag("天气")
 
     assert result.docs == []
@@ -212,6 +231,9 @@ def test_doc_pipeline_search_error_recorded(doc_pipeline_io: dict) -> None:
     assert result.doc_hits == []
     assert len(result.errors) == 1
     assert "docSearch" in result.timings_ms
+    assert "docDenseSearch" in result.timings_ms
+    assert "docLexicalSearch" in result.timings_ms
+    assert "docHybridMerge" in result.timings_ms
     # 搜都搜不到，rerank 不该被调
     assert doc_pipeline_io["rerank_calls"] == 0
 
@@ -241,7 +263,8 @@ def test_doc_pipeline_filters_below_threshold(doc_pipeline_io: dict) -> None:
 def test_doc_pipeline_soft_match_keeps_top_one(doc_pipeline_io: dict) -> None:
     """都没达到 0.5 硬阈值，但 top1 ≥ 0.35 → 保留 top1。"""
     doc_pipeline_io["docs"] = [
-        _doc(score=0.4, doc_id="d1"),  # 介于 0.35 ~ 0.5
+        # dense-only 候选会经过 hybrid_alpha 融合，0.62 * 0.65 ≈ 0.40。
+        _doc(score=0.62, doc_id="d1"),  # 最终分介于 0.35 ~ 0.5
         _doc(score=0.1, doc_id="d2"),
     ]
     result = retrieve_docs_for_rag("q")
@@ -255,7 +278,8 @@ def test_doc_pipeline_fallback_query_disables_soft_match(
 ) -> None:
     """fallback 类问题更保守，低于硬阈值时不靠 soft-match 硬答。"""
     doc_pipeline_io["docs"] = [
-        _doc(score=0.4, doc_id="d1"),
+        # 非 fallback 时最终 hybrid 分约 0.40，会命中 soft-match。
+        _doc(score=0.62, doc_id="d1"),
         _doc(score=0.1, doc_id="d2"),
     ]
 
@@ -282,6 +306,10 @@ def test_doc_pipeline_comparison_query_uses_larger_top_k(
 
     assert result.retrieval_debug["query_type"] == QUERY_TYPE_COMPARISON
     assert result.retrieval_debug["requested_top_k"] >= 8
+    assert result.retrieval_debug["candidate_top_k"] >= 32
+    assert "dense_search" in result.retrieval_debug["pipeline_steps"]
+    assert "lexical_search" in result.retrieval_debug["pipeline_steps"]
+    assert "hybrid_merge" in result.retrieval_debug["pipeline_steps"]
     assert "threshold" in result.retrieval_debug["pipeline_steps"]
 
 
@@ -318,6 +346,57 @@ def test_doc_pipeline_rerank_error_falls_back_to_filtered(
     # 降级为 filtered[:2]（doc_rerank_top_k=2）
     assert len(result.doc_hits) == 2
     assert len(result.errors) == 1
+
+
+def test_doc_pipeline_lexical_only_hit_can_flow_through(
+    doc_pipeline_io: dict,
+) -> None:
+    """dense 召回为空时，lexical 结果仍能进入 hybrid/threshold/rerank。"""
+    doc_pipeline_io["docs"] = []
+    doc_pipeline_io["lexical_docs"] = [
+        _doc(
+            score=0.0,
+            doc_id="lex",
+            content="WAI-ARIA text",
+            keyword_score=3.0,
+            keyword_score_norm=1.0,
+            semantic_score=0.0,
+        )
+    ]
+
+    result = retrieve_docs_for_rag("WAI-ARIA")
+
+    assert result.docs[0]["doc_id"] == "lex"
+    assert result.retrieval_debug["dense_count"] == 0
+    assert result.retrieval_debug["lexical_count"] == 1
+    assert result.retrieval_debug["hybrid_count"] == 1
+
+
+def test_doc_pipeline_hybrid_merge_dedupes_dense_and_lexical(
+    doc_pipeline_io: dict,
+) -> None:
+    """同一个 chunk 被 dense 和 lexical 同时召回时，只保留一条并记录多来源。"""
+    dense_doc = _doc(score=0.7, doc_id="same", chunk_index=1)
+    lexical_doc = _doc(
+        score=0.0,
+        doc_id="same",
+        chunk_index=1,
+        semantic_score=0.0,
+        keyword_score=3.0,
+        keyword_score_norm=1.0,
+        retrieval_sources=["keyword"],
+    )
+    doc_pipeline_io["docs"] = [dense_doc]
+    doc_pipeline_io["lexical_docs"] = [lexical_doc]
+
+    result = retrieve_docs_for_rag("WAI-ARIA")
+
+    assert len(result.docs) == 1
+    assert result.docs[0]["doc_id"] == "same"
+    assert set(result.docs[0]["retrieval_sources"]) == {"dense", "keyword"}
+    assert result.retrieval_debug["dense_count"] == 1
+    assert result.retrieval_debug["lexical_count"] == 1
+    assert result.retrieval_debug["hybrid_count"] == 1
 
 
 # ---------------------------------------------------------------------------

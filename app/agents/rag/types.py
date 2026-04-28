@@ -23,8 +23,11 @@ class DocRetrievalPipelineConfig:
     query_type: str
     doc_top_k: int
     doc_rerank_top_k: int
+    candidate_top_k: int
     score_threshold: float
     soft_match_threshold: float
+    hybrid_alpha: float
+    hybrid_beta: float
     dense_enabled: bool = True
     lexical_enabled: bool = True
     rerank_enabled: bool = True
@@ -37,6 +40,9 @@ class DocRetrievalPipelineState:
 
     query: str
     config: DocRetrievalPipelineConfig
+    dense_hits: list[dict]
+    lexical_hits: list[dict]
+    hybrid_hits: list[dict]
     docs: list[dict]
     filtered_docs: list[dict]
     doc_hits: list[dict]
