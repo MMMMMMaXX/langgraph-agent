@@ -32,6 +32,7 @@ class DocRetrievalPipelineConfig:
     lexical_enabled: bool = True
     rerank_enabled: bool = True
     chunk_merge_enabled: bool = True
+    source_diversity_enabled: bool = False
 
 
 @dataclass
@@ -47,6 +48,7 @@ class DocRetrievalPipelineState:
     filtered_docs: list[dict]
     doc_hits: list[dict]
     merged_doc_hits: list[dict]
+    diversified_doc_hits: list[dict]
     retrieval_debug: dict
     errors: list[str]
     timings_ms: dict[str, float]

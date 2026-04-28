@@ -214,6 +214,23 @@ def build_answer_citation_eval(answer: str, rag_debug: dict) -> dict:
     }
 
 
+def calculate_expected_doc_coverage(
+    *,
+    expected_doc_ids: list[str],
+    citation_doc_ids: list[str],
+) -> tuple[str, str]:
+    """计算 citation 对 expected_doc_ids 的覆盖情况。"""
+
+    if not expected_doc_ids:
+        return "-", "-"
+
+    expected = set(expected_doc_ids)
+    actual = set(citation_doc_ids)
+    covered = len(expected & actual)
+    total = len(expected)
+    return f"{covered}/{total}", bool_metric(covered == total)
+
+
 def infer_retrieval_failure_stage(metrics: dict) -> str:
     """根据各阶段命中状态推断正确文档最早在哪一步丢失。"""
 
@@ -243,12 +260,18 @@ def build_retrieval_eval(case: dict, debug_nodes: dict, answer: str = "") -> dic
         for citation in citations
         if citation.get("doc_id")
     ]
+    citation_coverage, citation_all_hit = calculate_expected_doc_coverage(
+        expected_doc_ids=expected_doc_ids,
+        citation_doc_ids=citation_doc_ids,
+    )
 
     metrics = {
         "expected_doc_ids": ",".join(expected_doc_ids) or "-",
         "expected_chunk_ids": ",".join(expected_chunk_ids) or "-",
         "citation_count": len(citations),
         "citation_doc_ids": ",".join(citation_doc_ids) or "-",
+        "citation_expected_doc_coverage": citation_coverage,
+        "citation_all_expected_docs_hit": citation_all_hit,
         "citation_hit": (
             "-"
             if not (expected_doc_ids or expected_chunk_ids)
@@ -422,6 +445,7 @@ def print_table(results: list[dict]) -> None:
         "quality",
         "citation_count",
         "citation_hit",
+        "citation_all_expected_docs_hit",
         "answer_has_citation",
         "citation_refs_valid",
         "top_k_hit",
@@ -494,6 +518,7 @@ def summarize_results(results: list[dict]) -> dict:
         "rerank_hit",
         "merged_hit",
         "citation_hit",
+        "citation_all_expected_docs_hit",
         "answer_has_citation",
         "citation_refs_valid",
     ):
@@ -600,6 +625,8 @@ def write_csv_output(results: list[dict], path: Path) -> None:
         "expected_chunk_ids",
         "citation_count",
         "citation_doc_ids",
+        "citation_expected_doc_coverage",
+        "citation_all_expected_docs_hit",
         "citation_hit",
         "answer_citation_refs",
         "answer_citation_count",

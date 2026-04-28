@@ -37,7 +37,10 @@ SKIP_REASON_TOOL_REQUEST = "tool_request"
 # 跳过原因：创作输出更适合保存成产物，不整段写入 Chroma memory。
 SKIP_REASON_CREATIVE_OUTPUT = "creative_output"
 
-# 跳过原因：RAG 定义类问题已由 docs 命中，可从文档再现，不重复写入 vector memory。
+# 跳过原因：RAG 已命中文档，可从 docs 再现，不重复写入 vector memory。
+SKIP_REASON_RAG_DOC_HIT = "rag_doc_hit"
+
+# 兼容旧调试字段：历史 eval / history 里可能已有这个 skip reason。
 SKIP_REASON_RAG_DEFINITION_DOC_HIT = "rag_definition_doc_hit"
 
 # 跳过原因：RAG 已命中文档，因此 memory 检索可以跳过。

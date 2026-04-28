@@ -283,12 +283,16 @@ def rank_hybrid(
     """按 semantic + keyword 的 hybrid 分数排序。"""
 
     for hit in hits:
-        hit["score"] = alpha * hit["semantic_score"] + beta * hit["keyword_score_norm"]
+        semantic_score = float(hit.get("semantic_score", 0.0) or 0.0)
+        keyword_score = float(hit.get("keyword_score_norm", 0.0) or 0.0)
+        hit["semantic_score"] = semantic_score
+        hit["keyword_score_norm"] = keyword_score
+        hit["score"] = alpha * semantic_score + beta * keyword_score
 
     hits.sort(
         key=lambda item: (
-            item["score"],
-            item["semantic_score"],
+            item.get("score", 0.0),
+            item.get("semantic_score", 0.0),
             -item.get("chunk_index", DEFAULT_CHUNK_INDEX),
         ),
         reverse=True,

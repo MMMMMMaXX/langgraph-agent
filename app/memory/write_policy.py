@@ -2,12 +2,11 @@ from dataclasses import asdict, dataclass
 
 from app.constants.keywords import VECTOR_STORE_BLOCK_KEYWORDS, contains_any
 from app.constants.policies import (
-    ANSWER_STRATEGY_DEFINITION_SHORT,
     SKIP_REASON_BAD_ANSWER,
     SKIP_REASON_CREATIVE_OUTPUT,
     SKIP_REASON_EMPTY_ANSWER,
     SKIP_REASON_META_QUERY,
-    SKIP_REASON_RAG_DEFINITION_DOC_HIT,
+    SKIP_REASON_RAG_DOC_HIT,
     SKIP_REASON_TOO_SHORT,
     SKIP_REASON_TOOL_REQUEST,
 )
@@ -60,13 +59,10 @@ def _skip_reason_from_route(state: AgentState) -> str:
     if routes == [ROUTE_NOVEL_SCRIPT_AGENT]:
         return SKIP_REASON_CREATIVE_OUTPUT
 
-    # 文档命中的定义类问答可以从 docs collection 再现，不重复写入 memory。
-    if (
-        routes == [ROUTE_RAG_AGENT]
-        and rag_debug.get("doc_used")
-        and rag_debug.get("answer_strategy") == ANSWER_STRATEGY_DEFINITION_SHORT
-    ):
-        return SKIP_REASON_RAG_DEFINITION_DOC_HIT
+    # RAG 文档命中答案的事实来源是 docs，长期复用时应重新检索 docs，
+    # 不把模型生成答案反写到 semantic memory，避免 docs 与 memory 形成重复事实源。
+    if routes == [ROUTE_RAG_AGENT] and rag_debug.get("doc_used"):
+        return SKIP_REASON_RAG_DOC_HIT
 
     return ""
 

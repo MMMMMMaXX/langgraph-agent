@@ -60,6 +60,7 @@ def build_doc_pipeline_config(query_type: str = "") -> DocRetrievalPipelineConfi
         soft_match_threshold=soft_match_threshold,
         hybrid_alpha=DEFAULT_HYBRID_ALPHA,
         hybrid_beta=DEFAULT_HYBRID_BETA,
+        source_diversity_enabled=query_type == QUERY_TYPE_COMPARISON,
     )
 
 
@@ -77,6 +78,7 @@ def create_doc_pipeline_state(
         filtered_docs=[],
         doc_hits=[],
         merged_doc_hits=[],
+        diversified_doc_hits=[],
         retrieval_debug={},
         errors=[],
         timings_ms={},
@@ -201,6 +203,13 @@ def run_threshold_step(state: DocRetrievalPipelineState) -> DocRetrievalPipeline
         and state.docs
         and state.docs[0]["score"] >= state.config.soft_match_threshold
     ):
+        if state.config.query_type == QUERY_TYPE_COMPARISON:
+            state.filtered_docs = [
+                doc
+                for doc in state.docs[: state.config.doc_rerank_top_k]
+                if doc["score"] >= state.config.soft_match_threshold
+            ]
+            return state
         state.filtered_docs = state.docs[:1]
 
     return state
@@ -257,6 +266,66 @@ def run_chunk_merge_step(state: DocRetrievalPipelineState) -> DocRetrievalPipeli
     return state
 
 
+def select_source_diverse_hits(
+    hits: list[dict],
+    *,
+    max_hits: int,
+) -> list[dict]:
+    """优先选择不同 doc_id 的上下文块。
+
+    对比类/综合类问题最怕 top blocks 全来自同一文档，导致回答只覆盖一边。
+    这里采用轻量两轮策略：第一轮每个 doc_id 取最高分一条，第二轮按原排序补齐。
+    """
+
+    if not hits or max_hits <= 0:
+        return []
+
+    selected: list[dict] = []
+    selected_ids: set[int] = set()
+    seen_doc_ids: set[str] = set()
+
+    for index, hit in enumerate(hits):
+        doc_id = str(hit.get("doc_id", ""))
+        if not doc_id or doc_id in seen_doc_ids:
+            continue
+        selected.append(hit)
+        selected_ids.add(index)
+        seen_doc_ids.add(doc_id)
+        if len(selected) >= max_hits:
+            return selected
+
+    for index, hit in enumerate(hits):
+        if index in selected_ids:
+            continue
+        selected.append(hit)
+        if len(selected) >= max_hits:
+            break
+
+    return selected
+
+
+def run_source_diversity_step(
+    state: DocRetrievalPipelineState,
+) -> DocRetrievalPipelineState:
+    """对 comparison query 做来源多样性选择。"""
+
+    if not state.config.source_diversity_enabled:
+        state.diversified_doc_hits = state.merged_doc_hits[:]
+        state.retrieval_debug["source_diversity_enabled"] = False
+        return state
+
+    state.diversified_doc_hits = select_source_diverse_hits(
+        state.merged_doc_hits,
+        max_hits=RAG_CONFIG.max_doc_context_blocks,
+    )
+    state.merged_doc_hits = state.diversified_doc_hits[:]
+    state.retrieval_debug["source_diversity_enabled"] = True
+    state.retrieval_debug["source_diversity_doc_ids"] = [
+        hit.get("doc_id", "") for hit in state.diversified_doc_hits
+    ]
+    return state
+
+
 def run_debug_step(state: DocRetrievalPipelineState) -> DocRetrievalPipelineState:
     """汇总 pipeline debug 指标。"""
 
@@ -272,6 +341,7 @@ def run_debug_step(state: DocRetrievalPipelineState) -> DocRetrievalPipelineStat
                 "threshold",
                 "rerank",
                 "chunk_merge",
+                "source_diversity",
             ],
             "requested_top_k": state.config.doc_top_k,
             "candidate_top_k": state.config.candidate_top_k,
@@ -287,6 +357,7 @@ def run_debug_step(state: DocRetrievalPipelineState) -> DocRetrievalPipelineStat
             "consumed_count": len(state.doc_hits),
             "merged_count": len(state.merged_doc_hits),
             "merged": len(state.merged_doc_hits) != len(state.doc_hits),
+            "source_diverse_count": len(state.diversified_doc_hits),
         }
     )
     return state
@@ -320,6 +391,7 @@ def run_doc_retrieval_pipeline(
         run_threshold_step,
         run_rerank_step,
         run_chunk_merge_step,
+        run_source_diversity_step,
         run_debug_step,
     ):
         state = step(state)

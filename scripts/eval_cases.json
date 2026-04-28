@@ -101,6 +101,19 @@
     "must_not_include": ["工具暂时无法处理"]
   },
   {
+    "id": "wai_aria_vs_virtual_list_comparison",
+    "category": "comparison",
+    "session_id": "eval-wai-aria-vs-virtual-list",
+    "message": "WAI-ARIA 和虚拟列表有什么区别？",
+    "expected_route": "rag_agent",
+    "expected_doc_ids": ["0", "3"],
+    "must_include": ["WAI-ARIA", "虚拟列表", "[1]", "[2]"],
+    "must_not_include": ["资料不足", "工具暂时无法处理"],
+    "debug_must_equal": {
+      "rag_agent.query_type": "comparison"
+    }
+  },
+  {
     "id": "unknown_concept_fallback",
     "category": "fallback",
     "session_id": "eval-unknown-concept",

@@ -22,6 +22,7 @@ from app.constants.policies import (
     SKIP_REASON_DUPLICATE,
     SKIP_REASON_EMPTY_MESSAGE,
     SKIP_REASON_META_QUERY,
+    SKIP_REASON_RAG_DOC_HIT,
 )
 from app.constants.routes import (
     NODE_MEMORY,
@@ -178,7 +179,7 @@ def _state_with_answer(
     """造一个会触发 vector write 的典型 state。
 
     答案长度 > 8 字 + 非 "资料不足"，decide_memory_write 会放行。
-    默认走 rag_agent 路由但不标 doc_used，避免触发 RAG_DEFINITION_DOC_HIT 跳过。
+    默认走 rag_agent 路由但不标 doc_used，避免触发 RAG_DOC_HIT 跳过。
     """
     return {
         "session_id": "s1",
@@ -212,6 +213,31 @@ def test_memory_node_happy_path_writes_vector_and_history(
     }
     # 实际 I/O 次数
     assert memory_io["add_memory_calls"] == 1
+    assert memory_io["append_history_calls"] == 1
+
+
+def test_memory_node_skips_vector_for_rag_doc_hit_but_keeps_history(
+    memory_io: dict[str, Any],
+) -> None:
+    """RAG 命中文档时，docs 是事实源；只写 history，不反写 semantic memory。"""
+    state = _state_with_answer(
+        answer="WAI-ARIA 和虚拟列表是不同技术，分别关注无障碍和渲染性能。",
+        rewritten_query="WAI-ARIA 和虚拟列表有什么区别？",
+    )
+    state["debug_info"][ROUTE_RAG_AGENT] = {
+        "doc_used": True,
+        "query_type": "comparison",
+        "answer_strategy": "comparison",
+    }
+
+    new_state = memory_node(state)
+
+    debug = new_state["debug_info"][NODE_MEMORY]
+    assert debug["stored_to_vector"] is False
+    assert debug["skipped_vector_store"] is True
+    assert debug["vector_store_skip_reason"] == SKIP_REASON_RAG_DOC_HIT
+    assert debug["stored_to_history"] is True
+    assert memory_io["add_memory_calls"] == 0
     assert memory_io["append_history_calls"] == 1
 
 

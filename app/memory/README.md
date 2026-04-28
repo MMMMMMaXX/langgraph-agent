@@ -153,9 +153,13 @@ app/memory/
 - route 类型
 - 是否 tool request
 - 是否 creative output
-- 是否 RAG 定义类 doc hit
+- 是否 RAG doc hit
 - answer 是否为空 / 太短 / 资料不足
 - rewritten query 是否属于 meta query
+
+特别注意：RAG 已命中 docs 的答案默认只写 conversation history，不写
+semantic memory。这样可以让“总结刚刚问过什么”仍然可用，同时避免把
+docs 中已有的知识答案再反写进 Chroma，造成 docs 和 memory 两套事实源。
 
 ### 修改什么行为时应该改这里
 

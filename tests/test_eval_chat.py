@@ -34,6 +34,8 @@ def test_build_retrieval_eval_marks_stage_hits() -> None:
     assert metrics["merged_hit"] == "true"
     assert metrics["citation_count"] == 1
     assert metrics["citation_hit"] == "true"
+    assert metrics["citation_expected_doc_coverage"] == "1/1"
+    assert metrics["citation_all_expected_docs_hit"] == "true"
     assert metrics["answer_citation_refs"] == "1"
     assert metrics["answer_has_citation"] == "true"
     assert metrics["citation_refs_valid"] == "true"
@@ -100,3 +102,19 @@ def test_build_retrieval_eval_reports_missing_answer_citation() -> None:
     assert metrics["answer_has_citation"] == "false"
     assert metrics["citation_refs_valid"] == "true"
     assert metrics["unused_citation_refs"] == "1"
+
+
+def test_build_retrieval_eval_reports_partial_expected_doc_coverage() -> None:
+    case = {"expected_doc_ids": ["0", "3"]}
+    debug_nodes = {
+        "rag_agent": {
+            "doc_used": True,
+            "citations": [{"index": 1, "doc_id": "0"}],
+            "retrieval_debug": {"doc": {}},
+        }
+    }
+
+    metrics = build_retrieval_eval(case, debug_nodes, "只引用了一个来源[1]")
+
+    assert metrics["citation_expected_doc_coverage"] == "1/2"
+    assert metrics["citation_all_expected_docs_hit"] == "false"

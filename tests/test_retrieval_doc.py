@@ -170,3 +170,14 @@ def test_rank_hybrid_keyword_breaks_tie_via_higher_score() -> None:
         hits, alpha=DEFAULT_HYBRID_ALPHA, beta=DEFAULT_HYBRID_BETA
     )
     assert ranked[0]["id"] == "high_kw"
+
+
+def test_rank_hybrid_tolerates_lexical_only_hits() -> None:
+    # SQLite FTS lexical hit 没有 semantic_score 时，应按 0 处理，不能让 RAG 500。
+    hits = [{"id": "lexical_only", "keyword_score_norm": 1.0}]
+
+    ranked = rank_hybrid(hits)
+
+    assert ranked[0]["id"] == "lexical_only"
+    assert ranked[0]["semantic_score"] == 0.0
+    assert ranked[0]["score"] == DEFAULT_HYBRID_BETA

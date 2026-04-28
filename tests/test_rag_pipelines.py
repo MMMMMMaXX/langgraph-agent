@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.agents.rag.doc_pipeline import retrieve_docs_for_rag
+from app.agents.rag.doc_pipeline import retrieve_docs_for_rag, select_source_diverse_hits
 from app.agents.rag.memory_pipeline import filter_memory_hits, retrieve_memory_for_rag
 from app.agents.rag.constants import QUERY_TYPE_COMPARISON, QUERY_TYPE_FALLBACK
 from app.agents.rag.rewrite import (
@@ -289,6 +289,20 @@ def test_doc_pipeline_fallback_query_disables_soft_match(
     assert result.retrieval_debug["query_type"] == QUERY_TYPE_FALLBACK
 
 
+def test_doc_pipeline_comparison_soft_match_keeps_multiple_docs(
+    doc_pipeline_io: dict,
+) -> None:
+    """对比类问题在 lexical-only 低分场景下，应保留多个 soft-match 候选。"""
+    doc_pipeline_io["docs"] = [
+        _doc(score=0.62, doc_id="a", chunk_index=0),
+        _doc(score=0.62, doc_id="b", chunk_index=0),
+    ]
+
+    result = retrieve_docs_for_rag("A 和 B 有什么区别", query_type=QUERY_TYPE_COMPARISON)
+
+    assert [doc["doc_id"] for doc in result.filtered_docs] == ["a", "b"]
+
+
 def test_doc_pipeline_skips_rerank_when_policy_allows(doc_pipeline_io: dict) -> None:
     """单候选 → should_skip_doc_rerank 返回 True → 不调 rerank。"""
     doc_pipeline_io["docs"] = [_doc(score=0.9, doc_id="d1", chunk_index=0)]
@@ -311,6 +325,8 @@ def test_doc_pipeline_comparison_query_uses_larger_top_k(
     assert "lexical_search" in result.retrieval_debug["pipeline_steps"]
     assert "hybrid_merge" in result.retrieval_debug["pipeline_steps"]
     assert "threshold" in result.retrieval_debug["pipeline_steps"]
+    assert "source_diversity" in result.retrieval_debug["pipeline_steps"]
+    assert result.retrieval_debug["source_diversity_enabled"] is True
 
 
 def test_doc_pipeline_rerank_called_when_policy_forbids_skip(
@@ -397,6 +413,34 @@ def test_doc_pipeline_hybrid_merge_dedupes_dense_and_lexical(
     assert result.retrieval_debug["dense_count"] == 1
     assert result.retrieval_debug["lexical_count"] == 1
     assert result.retrieval_debug["hybrid_count"] == 1
+
+
+def test_select_source_diverse_hits_prefers_distinct_doc_ids() -> None:
+    hits = [
+        _doc(score=0.95, doc_id="a", chunk_index=0),
+        _doc(score=0.9, doc_id="a", chunk_index=1),
+        _doc(score=0.85, doc_id="b", chunk_index=0),
+    ]
+
+    selected = select_source_diverse_hits(hits, max_hits=2)
+
+    assert [hit["doc_id"] for hit in selected] == ["a", "b"]
+
+
+def test_doc_pipeline_comparison_keeps_source_diverse_blocks(
+    doc_pipeline_io: dict,
+) -> None:
+    doc_pipeline_io["docs"] = [
+        _doc(score=0.95, doc_id="a", chunk_index=0),
+        _doc(score=0.9, doc_id="a", chunk_index=1),
+        _doc(score=0.86, doc_id="b", chunk_index=0),
+    ]
+
+    result = retrieve_docs_for_rag("A 和 B 有什么区别", query_type=QUERY_TYPE_COMPARISON)
+
+    assert [hit["doc_id"] for hit in result.merged_doc_hits] == ["a", "b"]
+    assert result.retrieval_debug["source_diversity_enabled"] is True
+    assert result.retrieval_debug["source_diversity_doc_ids"] == ["a", "b"]
 
 
 # ---------------------------------------------------------------------------
