@@ -70,6 +70,7 @@ class RagContext:
     context: str
     doc_context: str
     memory_context: str
+    citations: list[dict]
 
 
 @dataclass

@@ -18,7 +18,8 @@ def build_rag_doc_answer_system_prompt(answer_style: str) -> str:
 1. 只能使用资料中明确出现的信息
 2. 不要根据常识补充资料外内容
 3. 不要复述无关背景
-4. {answer_style}
+4. 如果资料中带有 [1]、[2] 这类引用编号，请在关键结论后保留对应编号
+5. {answer_style}
 """.strip()
 
 
@@ -40,4 +41,3 @@ def build_rag_memory_answer_user_prompt(question: str, memory_context: str) -> s
 问题：
 {question}
 """.strip()
-

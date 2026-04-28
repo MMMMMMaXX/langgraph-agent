@@ -1,5 +1,6 @@
 """RAG 生成上下文压缩。"""
 
+from app.agents.rag.citations import build_citations, format_cited_doc_block
 from app.agents.rag.types import RagContext
 from app.config import RAG_CONFIG
 
@@ -20,13 +21,17 @@ def compress_doc_context_with_limit(doc_hits: list[dict], max_chars: int) -> str
     避免把整段长文档原样塞给模型，导致生成耗时和 token 成本过高。
     """
 
+    citations = build_citations(doc_hits, RAG_CONFIG.max_doc_context_blocks)
     selected_blocks = []
+    citation_index = 0
 
     for doc in doc_hits[: RAG_CONFIG.max_doc_context_blocks]:
         content = doc.get("content", "").strip()
         if not content:
             continue
-        selected_blocks.append(content[:max_chars])
+        citation = citations[citation_index]
+        citation_index += 1
+        selected_blocks.append(format_cited_doc_block(doc, citation, max_chars))
 
     return "\n".join(selected_blocks)
 
@@ -43,6 +48,7 @@ def build_rag_context(
     分别保留给不同回答分支使用，避免 node.py 里散落字符串拼接。
     """
 
+    citations = build_citations(doc_hits, RAG_CONFIG.max_doc_context_blocks)
     doc_context = compress_doc_context_with_limit(doc_hits, doc_context_chars)
     memory_context = "\n".join(
         memory_hit["content"] for memory_hit in memory_hits if memory_hit["score"] >= 1
@@ -62,4 +68,5 @@ def build_rag_context(
         context=context,
         doc_context=doc_context,
         memory_context=memory_context,
+        citations=citations,
     )

@@ -101,6 +101,7 @@ def build_rag_debug_payload(
     stream_used: bool,
     threshold: float,
     doc_context: str,
+    citations: list[dict],
     query_classification: QueryClassification,
     answer_strategy: dict,
     sub_timings_ms: dict[str, float],
@@ -127,6 +128,11 @@ def build_rag_debug_payload(
         },
         "threshold": threshold,
         "doc_context_chars": len(doc_context),
+        "citations": citations,
+        "citation_count": len(citations),
+        "citation_doc_ids": [
+            citation.get("doc_id", "") for citation in citations if citation.get("doc_id")
+        ],
         "answer_strategy": answer_strategy["name"],
         "answer_context_chars": answer_strategy["context_chars"],
         "answer_max_tokens": answer_strategy["max_tokens"],
@@ -160,6 +166,7 @@ def build_rag_log_extra(
     threshold: float,
     context: str,
     doc_context: str,
+    citations: list[dict],
     query_classification: QueryClassification,
     answer_strategy: dict,
     sub_timings_ms: dict[str, float],
@@ -182,6 +189,11 @@ def build_rag_log_extra(
         },
         "contextPreview": preview(context, 180),
         "docContextChars": len(doc_context),
+        "citations": citations,
+        "citationCount": len(citations),
+        "citationDocIds": [
+            citation.get("doc_id", "") for citation in citations if citation.get("doc_id")
+        ],
         "answerStrategy": answer_strategy["name"],
         "answerContextChars": answer_strategy["context_chars"],
         "answerMaxTokens": answer_strategy["max_tokens"],

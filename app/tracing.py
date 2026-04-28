@@ -118,6 +118,7 @@ def build_rag_trace_metadata(rag_debug: dict[str, Any]) -> dict:
     top_docs = rag_debug.get("top_docs", [])
     filtered_docs = rag_debug.get("filtered_docs", [])
     merged_docs = rag_debug.get("merged_docs", [])
+    citations = rag_debug.get("citations", [])
     retrieval_debug = rag_debug.get("retrieval_debug", {})
     doc_retrieval = retrieval_debug.get("doc", {})
     memory_retrieval = retrieval_debug.get("memory", {})
@@ -135,6 +136,12 @@ def build_rag_trace_metadata(rag_debug: dict[str, Any]) -> dict:
         "rag.top_doc_score": top_docs[0].get("score") if top_docs else None,
         "rag.filtered_count": len(filtered_docs),
         "rag.merged_count": len(merged_docs),
+        "rag.citation_count": len(citations),
+        "rag.citation_doc_ids": [
+            citation.get("doc_id", "")
+            for citation in citations
+            if citation.get("doc_id")
+        ],
         "rag.doc_returned_count": doc_retrieval.get("returned_count", 0),
         "rag.doc_consumed_count": doc_retrieval.get("consumed_count", 0),
         "rag.rerank_skipped": bool(doc_retrieval.get("rerank_skipped", False)),

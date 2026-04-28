@@ -13,6 +13,7 @@ import csv
 import io
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -28,6 +29,7 @@ import app.api as api
 
 CASES_PATH = Path(__file__).resolve().parent / "eval_cases.json"
 EVAL_CONVERSATION_HISTORY_PATH = "EVAL_CONVERSATION_HISTORY_PATH"
+CITATION_REF_PATTERN = re.compile(r"\[(\d+)\]")
 
 
 def load_cases() -> list[dict]:
@@ -166,6 +168,52 @@ def bool_metric(value: bool | str) -> str:
     return "true" if value else "false"
 
 
+def extract_answer_citation_refs(answer: str) -> list[str]:
+    """提取回答中实际出现的引用编号，如 [1]、[2]。"""
+
+    return sorted(set(CITATION_REF_PATTERN.findall(answer)), key=int)
+
+
+def collect_available_citation_refs(citations: list[dict]) -> set[str]:
+    """收集 debug citations 中声明过的引用编号。"""
+
+    refs = set()
+    for citation in citations:
+        index = citation.get("index")
+        if index not in (None, ""):
+            refs.add(str(index))
+            continue
+
+        ref = str(citation.get("ref", ""))
+        match = CITATION_REF_PATTERN.fullmatch(ref.strip())
+        if match:
+            refs.add(match.group(1))
+    return refs
+
+
+def build_answer_citation_eval(answer: str, rag_debug: dict) -> dict:
+    """评估回答是否正确使用 debug 中声明过的 citation。"""
+
+    citations = rag_debug.get("citations") or []
+    available_refs = collect_available_citation_refs(citations)
+    answer_refs = extract_answer_citation_refs(answer)
+    answer_ref_set = set(answer_refs)
+    invalid_refs = sorted(answer_ref_set - available_refs, key=int)
+    missing_refs = sorted(available_refs - answer_ref_set, key=int)
+    doc_used = bool(rag_debug.get("doc_used"))
+
+    return {
+        "answer_citation_refs": ",".join(answer_refs) or "-",
+        "answer_citation_count": len(answer_refs),
+        "answer_has_citation": bool_metric(bool(answer_refs)) if doc_used else "-",
+        "citation_refs_valid": (
+            bool_metric(not invalid_refs) if answer_refs or available_refs else "-"
+        ),
+        "invalid_citation_refs": ",".join(invalid_refs) or "-",
+        "unused_citation_refs": ",".join(missing_refs) or "-",
+    }
+
+
 def infer_retrieval_failure_stage(metrics: dict) -> str:
     """根据各阶段命中状态推断正确文档最早在哪一步丢失。"""
 
@@ -182,17 +230,34 @@ def infer_retrieval_failure_stage(metrics: dict) -> str:
     return ""
 
 
-def build_retrieval_eval(case: dict, debug_nodes: dict) -> dict:
+def build_retrieval_eval(case: dict, debug_nodes: dict, answer: str = "") -> dict:
     """从 API debug payload 计算分阶段 retrieval eval 指标。"""
 
     expected_doc_ids = normalize_expected_ids(case.get("expected_doc_ids"))
     expected_chunk_ids = normalize_expected_ids(case.get("expected_chunk_ids"))
     rag_debug = debug_nodes.get("rag_agent", {})
     doc_debug = (rag_debug.get("retrieval_debug") or {}).get("doc", {})
+    citations = rag_debug.get("citations") or []
+    citation_doc_ids = [
+        str(citation.get("doc_id", ""))
+        for citation in citations
+        if citation.get("doc_id")
+    ]
 
     metrics = {
         "expected_doc_ids": ",".join(expected_doc_ids) or "-",
         "expected_chunk_ids": ",".join(expected_chunk_ids) or "-",
+        "citation_count": len(citations),
+        "citation_doc_ids": ",".join(citation_doc_ids) or "-",
+        "citation_hit": (
+            "-"
+            if not (expected_doc_ids or expected_chunk_ids)
+            else hits_contain_expected(
+                citations,
+                expected_doc_ids=expected_doc_ids,
+                expected_chunk_ids=expected_chunk_ids,
+            )
+        ),
         "top_k_hit": hits_contain_expected(
             rag_debug.get("top_docs") or [],
             expected_doc_ids=expected_doc_ids,
@@ -220,6 +285,7 @@ def build_retrieval_eval(case: dict, debug_nodes: dict) -> dict:
         "rerank_count": doc_debug.get("consumed_count", "-"),
         "merged_count": doc_debug.get("merged_count", "-"),
     }
+    metrics.update(build_answer_citation_eval(answer, rag_debug))
     metrics["retrieval_failure_stage"] = infer_retrieval_failure_stage(metrics)
 
     return {
@@ -306,7 +372,7 @@ def run_case(client, case: dict) -> dict:
         actual_route,
         debug_nodes,
     )
-    retrieval_eval = build_retrieval_eval(case, debug_nodes)
+    retrieval_eval = build_retrieval_eval(case, debug_nodes, answer)
 
     return {
         "id": case["id"],
@@ -354,6 +420,10 @@ def print_table(results: list[dict]) -> None:
         "memory_ms",
         "answer_len",
         "quality",
+        "citation_count",
+        "citation_hit",
+        "answer_has_citation",
+        "citation_refs_valid",
         "top_k_hit",
         "filtered_hit",
         "rerank_hit",
@@ -418,7 +488,15 @@ def summarize_results(results: list[dict]) -> dict:
     ]
 
     retrieval_stats = {}
-    for field in ("top_k_hit", "filtered_hit", "rerank_hit", "merged_hit"):
+    for field in (
+        "top_k_hit",
+        "filtered_hit",
+        "rerank_hit",
+        "merged_hit",
+        "citation_hit",
+        "answer_has_citation",
+        "citation_refs_valid",
+    ):
         total_with_expected = len(retrieval_cases)
         hits = sum(1 for item in retrieval_cases if item.get(field) == "true")
         retrieval_stats[field] = {
@@ -520,6 +598,15 @@ def write_csv_output(results: list[dict], path: Path) -> None:
         "quality",
         "expected_doc_ids",
         "expected_chunk_ids",
+        "citation_count",
+        "citation_doc_ids",
+        "citation_hit",
+        "answer_citation_refs",
+        "answer_citation_count",
+        "answer_has_citation",
+        "citation_refs_valid",
+        "invalid_citation_refs",
+        "unused_citation_refs",
         "top_k_hit",
         "filtered_hit",
         "rerank_hit",

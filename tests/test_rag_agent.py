@@ -42,6 +42,7 @@ def _ctx(doc: str = "", mem: str = "") -> RagContext:
         context=(doc + "\n" + mem).strip(),
         doc_context=doc,
         memory_context=mem,
+        citations=[],
     )
 
 
@@ -139,7 +140,12 @@ def _empty_doc_result() -> DocRetrievalResult:
 
 
 def _doc_result_with_hit() -> DocRetrievalResult:
-    hit = {"id": "doc-1", "content": "WAI-ARIA 是一套无障碍规范", "score": 0.9}
+    hit = {
+        "id": "0::chunk::1",
+        "doc_id": "0",
+        "content": "WAI-ARIA 是一套无障碍规范",
+        "score": 0.9,
+    }
     return DocRetrievalResult(
         docs=[hit],
         filtered_docs=[hit],
@@ -238,6 +244,8 @@ def test_rag_node_happy_path_uses_doc_answer(monkeypatch, llm_stub) -> None:
     assert debug["doc_used"] is True
     assert debug["memory_used"] is False
     assert debug["query_type"] == "definition"
+    assert debug["citation_count"] == 1
+    assert debug["citations"][0]["doc_id"] == "0"
 
 
 def test_rag_node_falls_back_to_memory_when_no_docs(monkeypatch, llm_stub) -> None:
