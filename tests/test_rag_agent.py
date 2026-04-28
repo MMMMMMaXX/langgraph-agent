@@ -237,6 +237,7 @@ def test_rag_node_happy_path_uses_doc_answer(monkeypatch, llm_stub) -> None:
     debug = result["debug_info"][ROUTE_RAG_AGENT]
     assert debug["doc_used"] is True
     assert debug["memory_used"] is False
+    assert debug["query_type"] == "definition"
 
 
 def test_rag_node_falls_back_to_memory_when_no_docs(monkeypatch, llm_stub) -> None:

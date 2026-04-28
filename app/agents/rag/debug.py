@@ -14,6 +14,7 @@ from app.constants.model_profiles import (
     PROFILE_DEFAULT_CHAT,
     PROFILE_REWRITE,
 )
+from app.agents.rag.types import QueryClassification
 from app.llm import get_profile_runtime_info
 from app.utils.logger import preview, preview_hits
 
@@ -100,6 +101,7 @@ def build_rag_debug_payload(
     stream_used: bool,
     threshold: float,
     doc_context: str,
+    query_classification: QueryClassification,
     answer_strategy: dict,
     sub_timings_ms: dict[str, float],
     errors: list[str],
@@ -117,6 +119,12 @@ def build_rag_debug_payload(
         "doc_used": len(merged_doc_hits) > 0,
         "memory_used": len(memory_hits) > 0,
         "streamed_answer": stream_used,
+        "query_type": query_classification.query_type,
+        "query_classification": {
+            "type": query_classification.query_type,
+            "confidence": query_classification.confidence,
+            "reason": query_classification.reason,
+        },
         "threshold": threshold,
         "doc_context_chars": len(doc_context),
         "answer_strategy": answer_strategy["name"],
@@ -152,6 +160,7 @@ def build_rag_log_extra(
     threshold: float,
     context: str,
     doc_context: str,
+    query_classification: QueryClassification,
     answer_strategy: dict,
     sub_timings_ms: dict[str, float],
     errors: list[str],
@@ -165,6 +174,12 @@ def build_rag_log_extra(
         "memoryHits": preview_hits(memory_hits),
         "docUsed": len(merged_doc_hits) > 0,
         "memoryUsed": len(memory_hits) > 0,
+        "queryType": query_classification.query_type,
+        "queryClassification": {
+            "type": query_classification.query_type,
+            "confidence": query_classification.confidence,
+            "reason": query_classification.reason,
+        },
         "contextPreview": preview(context, 180),
         "docContextChars": len(doc_context),
         "answerStrategy": answer_strategy["name"],

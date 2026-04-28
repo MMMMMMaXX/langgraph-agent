@@ -3,6 +3,7 @@ from app.agents.rag.context import build_rag_context
 from app.agents.rag.debug import build_rag_debug_payload, build_rag_log_extra
 from app.agents.rag.doc_pipeline import retrieve_docs_for_rag
 from app.agents.rag.memory_pipeline import retrieve_memory_for_rag
+from app.agents.rag.query_classifier import classify_rag_query
 from app.agents.rag.rewrite import rewrite_rag_query
 from app.agents.rag.strategy import build_doc_answer_strategy
 from app.config import RAG_CONFIG
@@ -62,6 +63,11 @@ def rag_agent_node(state: AgentState) -> AgentState:
     rewritten = rewrite_result.query
     errors.extend(rewrite_result.errors)
     sub_timings_ms["rewrite"] = rewrite_result.timing_ms
+    query_classification = classify_rag_query(
+        original_query=message,
+        rewritten_query=rewritten,
+        has_context=bool(summary or len(messages) > 1),
+    )
 
     # ===== 2. 文档检索（知识库） =====
     # 语义向量 + 关键词打分混合检索，然后阈值过滤 + 合并同 doc 的多个 chunk。
@@ -95,7 +101,10 @@ def rag_agent_node(state: AgentState) -> AgentState:
     # ===== 4. 构造上下文 =====
     # 策略决定：上下文多长、用什么 max_tokens、对长答案/短答案的约束。
     # 再按策略把 doc + memory 压缩拼装成最终上下文。
-    doc_answer_strategy = build_doc_answer_strategy(rewritten)
+    doc_answer_strategy = build_doc_answer_strategy(
+        rewritten,
+        classification=query_classification,
+    )
     rag_context = build_rag_context(
         doc_hits=merged_doc_hits,
         memory_hits=memory_hits,
@@ -136,6 +145,7 @@ def rag_agent_node(state: AgentState) -> AgentState:
         stream_used=stream_state["used"],
         threshold=threshold,
         doc_context=rag_context.doc_context,
+        query_classification=query_classification,
         answer_strategy=doc_answer_strategy,
         sub_timings_ms=sub_timings_ms,
         errors=errors,
@@ -146,6 +156,7 @@ def rag_agent_node(state: AgentState) -> AgentState:
         tags=[
             "node:rag_agent",
             f"rag_strategy:{doc_answer_strategy['name']}",
+            f"rag_query_type:{query_classification.query_type}",
             f"doc_used:{bool(merged_doc_hits)}",
         ],
         event_name="rag_retrieval_summary",
@@ -181,6 +192,7 @@ def rag_agent_node(state: AgentState) -> AgentState:
             threshold=threshold,
             context=rag_context.context,
             doc_context=rag_context.doc_context,
+            query_classification=query_classification,
             answer_strategy=doc_answer_strategy,
             sub_timings_ms=sub_timings_ms,
             errors=errors,

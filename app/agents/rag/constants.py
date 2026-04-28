@@ -10,6 +10,30 @@ DEFINITION_CONTEXT_CHARS = 280
 # 定义类问题的最大回答 token，约束输出为短定义。
 DEFINITION_MAX_ANSWER_TOKENS = 100
 
+# Query 类型：定义类问题，如“WAI-ARIA 是什么”。
+QUERY_TYPE_DEFINITION = "definition"
+
+# Query 类型：对比类问题，如“A 和 B 有什么区别”。
+QUERY_TYPE_COMPARISON = "comparison"
+
+# Query 类型：追问类问题，如“那上海呢 / 它和前者相比呢”。
+QUERY_TYPE_FOLLOWUP = "followup"
+
+# Query 类型：普通事实/知识问答。
+QUERY_TYPE_FACTUAL = "factual"
+
+# Query 类型：信息过少或指代不明，适合低置信兜底。
+QUERY_TYPE_FALLBACK = "fallback"
+
+# 对比类回答策略：保留更多上下文，要求输出差异点。
+ANSWER_STRATEGY_COMPARISON = "comparison"
+
+# 追问类回答策略：更强调结合改写后的完整问题回答。
+ANSWER_STRATEGY_FOLLOWUP = "followup"
+
+# 低置信兜底策略：明确资料不足时不要硬答。
+ANSWER_STRATEGY_FALLBACK = "fallback"
+
 # 少量候选时才允许跳过 LLM rerank，避免误跳过复杂候选集。
 DOC_RERANK_SKIP_MAX_CANDIDATES = 2
 
@@ -53,4 +77,3 @@ DOC_HIT_SCORE_FIELDS = {
     "semantic_score",
     "keyword_score_norm",
 }
-

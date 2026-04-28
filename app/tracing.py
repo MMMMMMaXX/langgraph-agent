@@ -126,6 +126,7 @@ def build_rag_trace_metadata(rag_debug: dict[str, Any]) -> dict:
     return {
         "rag.doc_used": bool(rag_debug.get("doc_used", False)),
         "rag.memory_used": bool(rag_debug.get("memory_used", False)),
+        "rag.query_type": rag_debug.get("query_type", ""),
         "rag.answer_strategy": rag_debug.get("answer_strategy", ""),
         "rag.threshold": rag_debug.get("threshold"),
         "rag.doc_context_chars": rag_debug.get("doc_context_chars", 0),
