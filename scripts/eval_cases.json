@@ -5,6 +5,7 @@
     "session_id": "eval-aria-definition",
     "message": "WAI-ARIA技术是什么",
     "expected_route": "rag_agent",
+    "expected_doc_ids": ["0"],
     "must_include": ["WAI-ARIA"],
     "must_not_include": ["工具暂时无法处理"]
   },
@@ -14,6 +15,7 @@
     "session_id": "eval-virtual-list-definition",
     "message": "虚拟列表是什么",
     "expected_route": "rag_agent",
+    "expected_doc_ids": ["3"],
     "must_include": ["虚拟列表"],
     "must_not_include": ["资料不足", "工具暂时无法处理"]
   },
@@ -23,6 +25,7 @@
     "session_id": "eval-beijing-climate",
     "message": "北京气候怎么样",
     "expected_route": "rag_agent",
+    "expected_doc_ids": ["1"],
     "must_include": ["北京"],
     "must_not_include": ["资料不足"]
   },
@@ -33,6 +36,7 @@
     "setup": ["北京气候怎么样"],
     "message": "那上海呢",
     "expected_route": "rag_agent",
+    "expected_doc_ids": ["2"],
     "must_include": ["上海"],
     "must_not_include": ["资料不足"]
   },
@@ -93,6 +97,7 @@
     "session_id": "eval-wai-aria-routing",
     "message": "WAI-ARIA技术",
     "expected_route": "rag_agent",
+    "expected_doc_ids": ["0"],
     "must_not_include": ["工具暂时无法处理"]
   },
   {

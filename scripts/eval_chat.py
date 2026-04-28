@@ -107,6 +107,127 @@ def get_nested_value(data: dict, dotted_path: str):
     return current
 
 
+def normalize_expected_ids(value) -> list[str]:
+    """把 case 中的期望 doc/chunk id 统一成字符串列表。"""
+
+    if not value:
+        return []
+    if isinstance(value, str):
+        return [value]
+    return [str(item) for item in value]
+
+
+def collect_hit_identifiers(hit: dict) -> set[str]:
+    """收集一个 debug hit 可以代表的所有 id。
+
+    merged_docs 可能把多个相邻 chunk 合成一段，所以这里同时看：
+    - id：当前 hit id，可能是单 chunk，也可能是 "a+b" 形式
+    - doc_id：原始文档 id，适合粗粒度评估
+    - merged_chunk_ids：合并前的 chunk id 列表，适合精确 chunk 命中评估
+    """
+
+    identifiers = set()
+    for key in ("id", "doc_id"):
+        value = hit.get(key)
+        if value not in (None, ""):
+            identifiers.add(str(value))
+
+    for value in hit.get("merged_chunk_ids") or []:
+        if value not in (None, ""):
+            identifiers.add(str(value))
+
+    return identifiers
+
+
+def hits_contain_expected(
+    hits: list[dict],
+    *,
+    expected_doc_ids: list[str],
+    expected_chunk_ids: list[str],
+) -> bool | str:
+    """判断某个检索阶段是否命中预期文档/切片。
+
+    没有配置 expected_* 时返回 "-"，表示该 case 不参与 retrieval hit 统计。
+    """
+
+    expected_ids = set(expected_doc_ids + expected_chunk_ids)
+    if not expected_ids:
+        return "-"
+
+    for hit in hits:
+        if collect_hit_identifiers(hit) & expected_ids:
+            return True
+    return False
+
+
+def bool_metric(value: bool | str) -> str:
+    if value == "-":
+        return "-"
+    return "true" if value else "false"
+
+
+def infer_retrieval_failure_stage(metrics: dict) -> str:
+    """根据各阶段命中状态推断正确文档最早在哪一步丢失。"""
+
+    if metrics["top_k_hit"] == "-":
+        return "-"
+    if not metrics["top_k_hit"]:
+        return "top_docs_miss"
+    if not metrics["filtered_hit"]:
+        return "threshold_miss"
+    if not metrics["rerank_hit"]:
+        return "rerank_miss"
+    if not metrics["merged_hit"]:
+        return "chunk_merge_miss"
+    return ""
+
+
+def build_retrieval_eval(case: dict, debug_nodes: dict) -> dict:
+    """从 API debug payload 计算分阶段 retrieval eval 指标。"""
+
+    expected_doc_ids = normalize_expected_ids(case.get("expected_doc_ids"))
+    expected_chunk_ids = normalize_expected_ids(case.get("expected_chunk_ids"))
+    rag_debug = debug_nodes.get("rag_agent", {})
+    doc_debug = (rag_debug.get("retrieval_debug") or {}).get("doc", {})
+
+    metrics = {
+        "expected_doc_ids": ",".join(expected_doc_ids) or "-",
+        "expected_chunk_ids": ",".join(expected_chunk_ids) or "-",
+        "top_k_hit": hits_contain_expected(
+            rag_debug.get("top_docs") or [],
+            expected_doc_ids=expected_doc_ids,
+            expected_chunk_ids=expected_chunk_ids,
+        ),
+        "filtered_hit": hits_contain_expected(
+            rag_debug.get("filtered_docs") or [],
+            expected_doc_ids=expected_doc_ids,
+            expected_chunk_ids=expected_chunk_ids,
+        ),
+        "rerank_hit": hits_contain_expected(
+            rag_debug.get("post_rerank_docs") or [],
+            expected_doc_ids=expected_doc_ids,
+            expected_chunk_ids=expected_chunk_ids,
+        ),
+        "merged_hit": hits_contain_expected(
+            rag_debug.get("merged_docs") or [],
+            expected_doc_ids=expected_doc_ids,
+            expected_chunk_ids=expected_chunk_ids,
+        ),
+        "dense_count": doc_debug.get("dense_count", "-"),
+        "lexical_count": doc_debug.get("lexical_count", "-"),
+        "hybrid_count": doc_debug.get("hybrid_count", "-"),
+        "filtered_count": doc_debug.get("filtered_count", "-"),
+        "rerank_count": doc_debug.get("consumed_count", "-"),
+        "merged_count": doc_debug.get("merged_count", "-"),
+    }
+    metrics["retrieval_failure_stage"] = infer_retrieval_failure_stage(metrics)
+
+    return {
+        key: bool_metric(value) if isinstance(value, bool) or value == "-" else value
+        for key, value in metrics.items()
+    }
+
+
 def evaluate_case_assertions(
     case: dict,
     answer: str,
@@ -185,6 +306,7 @@ def run_case(client, case: dict) -> dict:
         actual_route,
         debug_nodes,
     )
+    retrieval_eval = build_retrieval_eval(case, debug_nodes)
 
     return {
         "id": case["id"],
@@ -211,6 +333,7 @@ def run_case(client, case: dict) -> dict:
         "quality": answer_quality(answer),
         "assertion": assertion_status,
         "assertion_detail": assertion_detail,
+        **retrieval_eval,
         "debug_nodes": debug_nodes,
         "answer": answer,
         "detail": payload.get("detail", ""),
@@ -231,6 +354,10 @@ def print_table(results: list[dict]) -> None:
         "memory_ms",
         "answer_len",
         "quality",
+        "top_k_hit",
+        "filtered_hit",
+        "rerank_hit",
+        "merged_hit",
         "assertion",
     ]
     rows = [[str(item.get(header, "")) for header in headers] for item in results]
@@ -286,6 +413,19 @@ def summarize_results(results: list[dict]) -> dict:
         key=lambda item: parse_ms(item.get("request_ms")) or -1,
         reverse=True,
     )[:3]
+    retrieval_cases = [
+        item for item in results if item.get("top_k_hit") not in (None, "-")
+    ]
+
+    retrieval_stats = {}
+    for field in ("top_k_hit", "filtered_hit", "rerank_hit", "merged_hit"):
+        total_with_expected = len(retrieval_cases)
+        hits = sum(1 for item in retrieval_cases if item.get(field) == "true")
+        retrieval_stats[field] = {
+            "hits": hits,
+            "total": total_with_expected,
+            "rate": (hits / total_with_expected * 100) if total_with_expected else 0.0,
+        }
 
     return {
         "total": total,
@@ -295,6 +435,7 @@ def summarize_results(results: list[dict]) -> dict:
         "failed_items": failed_items,
         "category_stats": category_stats,
         "slowest_cases": slowest_cases,
+        "retrieval_stats": retrieval_stats,
     }
 
 
@@ -327,6 +468,17 @@ def print_summary(results: list[dict]) -> None:
             f"category={item.get('category', '-')} "
             f"request_ms={item.get('request_ms', '-')}"
         )
+
+    print("\nRetrieval")
+    print("---------")
+    if not any(stats["total"] for stats in summary["retrieval_stats"].values()):
+        print("no expected_doc_ids / expected_chunk_ids configured")
+    else:
+        for field, stats in summary["retrieval_stats"].items():
+            print(
+                f"{field}={stats['rate']:.1f}% "
+                f"({stats['hits']}/{stats['total']})"
+            )
 
     print("\nFailures")
     print("--------")
@@ -366,6 +518,19 @@ def write_csv_output(results: list[dict], path: Path) -> None:
         "memory_ms",
         "answer_len",
         "quality",
+        "expected_doc_ids",
+        "expected_chunk_ids",
+        "top_k_hit",
+        "filtered_hit",
+        "rerank_hit",
+        "merged_hit",
+        "retrieval_failure_stage",
+        "dense_count",
+        "lexical_count",
+        "hybrid_count",
+        "filtered_count",
+        "rerank_count",
+        "merged_count",
         "assertion",
         "assertion_detail",
         "answer",
