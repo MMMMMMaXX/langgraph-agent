@@ -20,6 +20,7 @@ from fastapi.testclient import TestClient
 
 from app.api import app, clear_session_store, session_store
 from app.knowledge.ingestion import KnowledgeImportResult
+from app.knowledge.management import KnowledgeDeleteResult, KnowledgeReindexResult
 
 
 # ---------------------------------------------------------------------------
@@ -279,6 +280,109 @@ def test_import_knowledge_file_endpoint_returns_index_summary(
     assert body["doc_id"] == "doc-upload"
     assert body["source_type"] == "md"
     assert body["indexed_to_chroma"] is True
+
+
+def test_delete_knowledge_doc_endpoint(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.api.routes as routes_mod
+
+    monkeypatch.setattr(
+        routes_mod,
+        "delete_knowledge_document",
+        lambda doc_id: KnowledgeDeleteResult(
+            doc_id=doc_id,
+            deleted=True,
+            chunk_count=2,
+            deleted_from_sqlite=True,
+            deleted_from_chroma=True,
+        ),
+    )
+
+    resp = client.delete("/knowledge/docs/doc-api")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["doc_id"] == "doc-api"
+    assert body["deleted"] is True
+    assert body["deleted_from_chroma"] is True
+
+
+def test_delete_knowledge_doc_endpoint_returns_404(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.api.routes as routes_mod
+
+    monkeypatch.setattr(
+        routes_mod,
+        "delete_knowledge_document",
+        lambda doc_id: KnowledgeDeleteResult(
+            doc_id=doc_id,
+            deleted=False,
+            chunk_count=0,
+            deleted_from_sqlite=False,
+            deleted_from_chroma=False,
+        ),
+    )
+
+    resp = client.delete("/knowledge/docs/missing")
+
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "document not found"
+
+
+def test_reindex_knowledge_doc_endpoint(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.api.routes as routes_mod
+
+    monkeypatch.setattr(
+        routes_mod,
+        "reindex_knowledge_document",
+        lambda doc_id: KnowledgeReindexResult(
+            doc_id=doc_id,
+            doc_count=1,
+            chunk_count=3,
+            reindexed_to_chroma=True,
+        ),
+    )
+
+    resp = client.post("/knowledge/docs/doc-api/reindex")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["doc_id"] == "doc-api"
+    assert body["chunk_count"] == 3
+    assert body["reindexed_to_chroma"] is True
+
+
+def test_reindex_all_knowledge_endpoint(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.api.routes as routes_mod
+
+    monkeypatch.setattr(
+        routes_mod,
+        "reindex_all_knowledge_documents",
+        lambda: KnowledgeReindexResult(
+            doc_id="*",
+            doc_count=4,
+            chunk_count=10,
+            reindexed_to_chroma=True,
+        ),
+    )
+
+    resp = client.post("/knowledge/reindex")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["doc_id"] == "*"
+    assert body["doc_count"] == 4
+    assert body["chunk_count"] == 10
 
 
 def test_chat_persists_session_state_across_turns(

@@ -79,3 +79,22 @@ class KnowledgeDocumentDetailResponse(BaseModel):
     """GET /knowledge/docs/{doc_id} 的响应。"""
 
     document: dict[str, Any]
+
+
+class KnowledgeDeleteResponse(BaseModel):
+    """DELETE /knowledge/docs/{doc_id} 的响应。"""
+
+    doc_id: str
+    deleted: bool
+    chunk_count: int
+    deleted_from_sqlite: bool
+    deleted_from_chroma: bool
+
+
+class KnowledgeReindexResponse(BaseModel):
+    """知识库 Chroma 重建索引的响应。"""
+
+    doc_id: str
+    doc_count: int
+    chunk_count: int
+    reindexed_to_chroma: bool

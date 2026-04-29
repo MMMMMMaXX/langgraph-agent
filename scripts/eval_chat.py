@@ -370,10 +370,55 @@ def post_chat(client, session_id: str, message: str) -> dict:
     }
 
 
+def post_knowledge_import(client, import_payload: dict) -> dict:
+    """导入 eval case 需要的临时知识文档。"""
+
+    response = client.post("/knowledge/import", json=import_payload)
+    payload = response.json()
+    if response.status_code >= 400:
+        raise RuntimeError(f"knowledge import failed: {payload}")
+    return payload
+
+
+def setup_knowledge_imports(client, case: dict) -> dict[str, str]:
+    """执行 case 级知识导入，并返回 import alias -> doc_id 映射。
+
+    这样 eval 不需要把内容 hash 生成的 doc_id 写死在 eval_cases.json 里。
+    """
+
+    alias_to_doc_id: dict[str, str] = {}
+    for index, import_payload in enumerate(case.get("setup_knowledge_imports", [])):
+        payload = post_knowledge_import(client, import_payload)
+        alias = str(import_payload.get("alias") or f"import_{index}")
+        alias_to_doc_id[alias] = str(payload.get("doc_id", ""))
+    return alias_to_doc_id
+
+
+def resolve_expected_doc_ids(case: dict, alias_to_doc_id: dict[str, str]) -> dict:
+    """把 expected_import_aliases 解析成实际 doc_id，返回 case 副本。"""
+
+    if not alias_to_doc_id:
+        return case
+
+    resolved = dict(case)
+    expected_doc_ids = normalize_expected_ids(case.get("expected_doc_ids"))
+    for alias in case.get("expected_import_aliases", []):
+        doc_id = alias_to_doc_id.get(str(alias), "")
+        if doc_id:
+            expected_doc_ids.append(doc_id)
+
+    if expected_doc_ids:
+        resolved["expected_doc_ids"] = expected_doc_ids
+    return resolved
+
+
 def run_case(client, case: dict) -> dict:
     capture = io.StringIO()
     started_at = time.perf_counter()
+    alias_to_doc_id: dict[str, str] = {}
     with contextlib.redirect_stdout(capture):
+        alias_to_doc_id = setup_knowledge_imports(client, case)
+        case = resolve_expected_doc_ids(case, alias_to_doc_id)
         # setup 让单条 case 可以构造真实多轮上下文，
         # 比如“先问北京，再问上海，再做总结”，这样更接近真实 agent 行为验证。
         for setup_message in case.get("setup", []):

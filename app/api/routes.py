@@ -19,7 +19,10 @@ from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from app.knowledge import (
     KnowledgeCatalog,
     KnowledgeImportInput,
+    delete_knowledge_document,
     import_knowledge_document,
+    reindex_all_knowledge_documents,
+    reindex_knowledge_document,
 )
 from .chat_runner import build_chat_result
 from .schemas import (
@@ -27,8 +30,10 @@ from .schemas import (
     ChatResponse,
     KnowledgeDocumentDetailResponse,
     KnowledgeDocumentListResponse,
+    KnowledgeDeleteResponse,
     KnowledgeImportRequest,
     KnowledgeImportResponse,
+    KnowledgeReindexResponse,
 )
 from .streaming import build_chat_stream_response
 
@@ -176,3 +181,34 @@ def get_knowledge_doc(doc_id: str) -> KnowledgeDocumentDetailResponse:
     if document is None:
         raise HTTPException(status_code=404, detail="document not found")
     return KnowledgeDocumentDetailResponse(document=document)
+
+
+@router.delete("/knowledge/docs/{doc_id}", response_model=KnowledgeDeleteResponse)
+def delete_knowledge_doc(doc_id: str) -> KnowledgeDeleteResponse:
+    """删除单篇文档，同时清理 SQLite/FTS5 和 Chroma。"""
+
+    result = delete_knowledge_document(doc_id)
+    if not result.deleted:
+        raise HTTPException(status_code=404, detail="document not found")
+    return KnowledgeDeleteResponse(**result.__dict__)
+
+
+@router.post(
+    "/knowledge/docs/{doc_id}/reindex",
+    response_model=KnowledgeReindexResponse,
+)
+def reindex_knowledge_doc(doc_id: str) -> KnowledgeReindexResponse:
+    """从 SQLite catalog 重建单篇文档的 Chroma dense index。"""
+
+    result = reindex_knowledge_document(doc_id)
+    if not result.reindexed_to_chroma:
+        raise HTTPException(status_code=404, detail="document not found")
+    return KnowledgeReindexResponse(**result.__dict__)
+
+
+@router.post("/knowledge/reindex", response_model=KnowledgeReindexResponse)
+def reindex_knowledge_all() -> KnowledgeReindexResponse:
+    """从 SQLite catalog 全量重建 Chroma docs collection。"""
+
+    result = reindex_all_knowledge_documents()
+    return KnowledgeReindexResponse(**result.__dict__)

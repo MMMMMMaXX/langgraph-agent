@@ -72,6 +72,36 @@ curl http://127.0.0.1:8000/knowledge/docs
 curl http://127.0.0.1:8000/knowledge/docs/<doc_id>
 ```
 
+### 删除文档
+
+```bash
+curl -X DELETE http://127.0.0.1:8000/knowledge/docs/<doc_id>
+```
+
+删除会同时清理：
+
+- SQLite `documents`
+- SQLite `document_chunks`
+- SQLite FTS5 index
+- Chroma docs collection 中对应 `doc_id` 的 chunk
+
+### 重建 Chroma dense index
+
+重建单篇文档：
+
+```bash
+curl -X POST http://127.0.0.1:8000/knowledge/docs/<doc_id>/reindex
+```
+
+全量重建：
+
+```bash
+curl -X POST http://127.0.0.1:8000/knowledge/reindex
+```
+
+reindex 以 SQLite catalog 为真相源，不重新切片，只重新计算 embedding 并写入
+Chroma。适合 Chroma 数据损坏、迁移目录、或后续升级 embedding 模型后使用。
+
 ## 当前边界
 
 - 支持 JSON body 导入，也支持 multipart 文件上传。

@@ -1,4 +1,8 @@
-from scripts.eval_chat import build_retrieval_eval
+from scripts.eval_chat import (
+    build_retrieval_eval,
+    resolve_expected_doc_ids,
+    setup_knowledge_imports,
+)
 
 
 def test_build_retrieval_eval_marks_stage_hits() -> None:
@@ -118,3 +122,48 @@ def test_build_retrieval_eval_reports_partial_expected_doc_coverage() -> None:
 
     assert metrics["citation_expected_doc_coverage"] == "1/2"
     assert metrics["citation_all_expected_docs_hit"] == "false"
+
+
+def test_resolve_expected_doc_ids_adds_import_alias_doc_ids() -> None:
+    case = {
+        "expected_doc_ids": ["0"],
+        "expected_import_aliases": ["skill_doc"],
+    }
+
+    resolved = resolve_expected_doc_ids(case, {"skill_doc": "doc-imported"})
+
+    assert resolved["expected_doc_ids"] == ["0", "doc-imported"]
+    assert case["expected_doc_ids"] == ["0"]
+
+
+def test_setup_knowledge_imports_returns_alias_to_doc_id() -> None:
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return {"doc_id": "doc-imported"}
+
+    class FakeClient:
+        def __init__(self) -> None:
+            self.posts = []
+
+        def post(self, path: str, json: dict):
+            self.posts.append({"path": path, "json": json})
+            return FakeResponse()
+
+    client = FakeClient()
+    case = {
+        "setup_knowledge_imports": [
+            {
+                "alias": "skill_doc",
+                "title": "Skill 文档",
+                "content": "Skill 是能力模块。",
+            }
+        ]
+    }
+
+    alias_to_doc_id = setup_knowledge_imports(client, case)
+
+    assert alias_to_doc_id == {"skill_doc": "doc-imported"}
+    assert client.posts[0]["path"] == "/knowledge/import"
+    assert client.posts[0]["json"]["title"] == "Skill 文档"

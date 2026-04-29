@@ -218,6 +218,67 @@ class KnowledgeCatalog:
             ],
         }
 
+    def list_chunks(self, doc_id: str | None = None) -> list[dict]:
+        """读取 catalog 中的 chunk 全量信息，用于重建 Chroma dense index。"""
+
+        self.init_schema()
+        where_sql = "WHERE doc_id = ?" if doc_id else ""
+        params = (doc_id,) if doc_id else ()
+        with _connect(self.path) as conn:
+            rows = conn.execute(
+                f"""
+                SELECT
+                    chunk_id, doc_id, doc_title, source, section_title,
+                    chunk_index, content, start_char, end_char,
+                    chunk_char_len, metadata_json
+                FROM document_chunks
+                {where_sql}
+                ORDER BY doc_id ASC, chunk_index ASC
+                """,
+                params,
+            ).fetchall()
+
+        return [
+            {
+                "chunk_id": row["chunk_id"],
+                "doc_id": row["doc_id"],
+                "doc_title": row["doc_title"],
+                "source": row["source"],
+                "section_title": row["section_title"],
+                "chunk_index": int(row["chunk_index"]),
+                "content": row["content"],
+                "start_char": int(row["start_char"]),
+                "end_char": int(row["end_char"]),
+                "chunk_char_len": int(row["chunk_char_len"]),
+                "metadata": json.loads(row["metadata_json"] or "{}"),
+            }
+            for row in rows
+        ]
+
+    def delete_document(self, doc_id: str) -> dict:
+        """删除单篇文档及其 SQLite chunk / FTS5 记录。"""
+
+        self.init_schema()
+        with _connect(self.path) as conn:
+            existing = conn.execute(
+                "SELECT doc_id FROM documents WHERE doc_id = ?",
+                (doc_id,),
+            ).fetchone()
+            if existing is None:
+                return {"deleted": False, "doc_id": doc_id, "chunk_count": 0}
+
+            chunk_count = int(
+                conn.execute(
+                    "SELECT COUNT(*) AS count FROM document_chunks WHERE doc_id = ?",
+                    (doc_id,),
+                ).fetchone()["count"]
+            )
+            conn.execute(f"DELETE FROM {FTS_TABLE} WHERE doc_id = ?", (doc_id,))
+            conn.execute("DELETE FROM document_chunks WHERE doc_id = ?", (doc_id,))
+            conn.execute("DELETE FROM documents WHERE doc_id = ?", (doc_id,))
+
+        return {"deleted": True, "doc_id": doc_id, "chunk_count": chunk_count}
+
     def upsert_document(
         self,
         *,

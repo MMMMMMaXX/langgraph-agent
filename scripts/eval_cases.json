@@ -114,6 +114,25 @@
     }
   },
   {
+    "id": "imported_skill_doc_definition",
+    "category": "ingestion",
+    "session_id": "eval-imported-skill-doc",
+    "setup_knowledge_imports": [
+      {
+        "alias": "skill_doc",
+        "title": "Skills 构建指南 Eval",
+        "source": "eval_how_to_use_skills.md",
+        "source_type": "md",
+        "content": "# Skills 构建指南 Eval\n\nSkill 是一种把专门工作流、领域知识和工具使用说明封装起来的能力模块。\n\n## 创建步骤\n\n创建一个新的 Skill 时，需要新建目录，编写 SKILL.md，并在其中说明触发条件、执行步骤和验证方式。"
+      }
+    ],
+    "message": "如何创建一个新的 Skill？",
+    "expected_route": "rag_agent",
+    "expected_import_aliases": ["skill_doc"],
+    "must_include": ["Skill", "[1]"],
+    "must_not_include": ["资料不足", "工具暂时无法处理"]
+  },
+  {
     "id": "unknown_concept_fallback",
     "category": "fallback",
     "session_id": "eval-unknown-concept",
