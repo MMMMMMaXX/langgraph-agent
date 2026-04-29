@@ -94,3 +94,15 @@ CONTEXT_COMPRESSION_DEFINITION_SIGNALS = (
     "作用",
     "提供",
 )
+
+# Memory context compression：每条记忆命中最多保留的字符数（约 2-3 句），
+# 控制单条 memory 过长时对 context 的冲击。
+MEMORY_COMPRESSION_MAX_BLOCK_CHARS = 120
+
+# Memory context compression：memory 上下文总字符上限，
+# 防止多轮对话积累的记忆内容撑满 token 预算。
+MEMORY_COMPRESSION_MAX_TOTAL_CHARS = 360
+
+# Memory context compression：最多纳入上下文的记忆命中条数，
+# 避免低质尾部条目引入噪声。
+MEMORY_COMPRESSION_MAX_HITS = 3

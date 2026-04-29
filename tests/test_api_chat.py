@@ -22,6 +22,7 @@ from app.api import app, clear_session_store, session_store
 from app.knowledge.chunk_inspector import ChunkQualityReport
 from app.knowledge.ingestion import KnowledgeImportResult
 from app.knowledge.management import KnowledgeDeleteResult, KnowledgeReindexResult
+from app.knowledge.search_inspector import SearchInspectReport
 
 
 # ---------------------------------------------------------------------------
@@ -444,6 +445,88 @@ def test_inspect_knowledge_doc_chunks_endpoint_returns_404(
 
     assert resp.status_code == 404
     assert resp.json()["detail"] == "document not found"
+
+
+def _search_report(query: str) -> SearchInspectReport:
+    return SearchInspectReport(
+        query=query,
+        query_type="definition",
+        query_classification={"type": "definition", "confidence": 0.9},
+        pipeline_config={"doc_top_k": 6},
+        retrieval_debug={"dense_count": 1, "lexical_count": 1},
+        timings_ms={"docSearch": 1.0},
+        dense_hits=[{"id": "doc1::chunk::0"}],
+        lexical_hits=[{"id": "doc1::chunk::0"}],
+        hybrid_hits=[{"id": "doc1::chunk::0"}],
+        returned_hits=[{"id": "doc1::chunk::0"}],
+        filtered_hits=[{"id": "doc1::chunk::0"}],
+        reranked_hits=[{"id": "doc1::chunk::0"}],
+        merged_hits=[{"id": "doc1::chunk::0"}],
+        citations=[{"ref": "[1]", "doc_id": "doc1"}],
+        context_preview="WAI-ARIA 是无障碍技术规范。",
+        context_chars=20,
+        context_compression={"enabled": True},
+        errors=[],
+    )
+
+
+def test_inspect_knowledge_search_post_endpoint(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.api.routes as routes_mod
+
+    monkeypatch.setattr(
+        routes_mod,
+        "inspect_retrieval",
+        lambda query, **kwargs: _search_report(query),
+    )
+
+    resp = client.post(
+        "/knowledge/search/inspect",
+        json={"query": "WAI-ARIA 是什么", "top_k": 3},
+    )
+
+    assert resp.status_code == 200, resp.text
+    report = resp.json()["report"]
+    assert report["query"] == "WAI-ARIA 是什么"
+    assert report["query_type"] == "definition"
+    assert report["retrieval_debug"]["dense_count"] == 1
+
+
+def test_inspect_knowledge_search_get_endpoint(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.api.routes as routes_mod
+
+    monkeypatch.setattr(
+        routes_mod,
+        "inspect_retrieval",
+        lambda query, **kwargs: _search_report(query),
+    )
+
+    resp = client.get("/knowledge/search/inspect?query=Skills%20是什么&top_k=3")
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["report"]["query"] == "Skills 是什么"
+
+
+def test_inspect_knowledge_search_post_endpoint_returns_400(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.api.routes as routes_mod
+
+    def raise_value_error(query: str, **kwargs):
+        raise ValueError("query must not be empty")
+
+    monkeypatch.setattr(routes_mod, "inspect_retrieval", raise_value_error)
+
+    resp = client.post("/knowledge/search/inspect", json={"query": "   "})
+
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "query must not be empty"
 
 
 def test_chat_persists_session_state_across_turns(

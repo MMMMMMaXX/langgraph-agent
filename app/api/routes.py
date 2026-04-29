@@ -23,6 +23,7 @@ from app.knowledge import (
     KnowledgeImportInput,
     delete_knowledge_document,
     inspect_document_chunks,
+    inspect_retrieval,
     import_knowledge_document,
     reindex_all_knowledge_documents,
     reindex_knowledge_document,
@@ -38,6 +39,8 @@ from .schemas import (
     KnowledgeImportRequest,
     KnowledgeImportResponse,
     KnowledgeReindexResponse,
+    KnowledgeSearchInspectRequest,
+    KnowledgeSearchInspectResponse,
 )
 from .streaming import build_chat_stream_response
 
@@ -233,6 +236,48 @@ def inspect_knowledge_doc_chunks(
         ),
     )
     return KnowledgeChunkInspectResponse(report=asdict(report))
+
+
+@router.post(
+    "/knowledge/search/inspect",
+    response_model=KnowledgeSearchInspectResponse,
+)
+def inspect_knowledge_search(
+    request: KnowledgeSearchInspectRequest,
+) -> KnowledgeSearchInspectResponse:
+    """解释一个 query 的知识库检索链路。"""
+
+    try:
+        report = inspect_retrieval(
+            request.query,
+            top_k=request.top_k,
+            context_preview_chars=request.context_preview_chars,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return KnowledgeSearchInspectResponse(report=asdict(report))
+
+
+@router.get(
+    "/knowledge/search/inspect",
+    response_model=KnowledgeSearchInspectResponse,
+)
+def inspect_knowledge_search_get(
+    query: str = Query(..., min_length=1),
+    top_k: int = Query(default=8, ge=1, le=50),
+    context_preview_chars: int = Query(default=360, ge=0, le=5000),
+) -> KnowledgeSearchInspectResponse:
+    """GET 版本，方便浏览器和 curl 快速调试。"""
+
+    try:
+        report = inspect_retrieval(
+            query,
+            top_k=top_k,
+            context_preview_chars=context_preview_chars,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return KnowledgeSearchInspectResponse(report=asdict(report))
 
 
 @router.delete("/knowledge/docs/{doc_id}", response_model=KnowledgeDeleteResponse)

@@ -31,3 +31,47 @@ def test_chunking_long_paragraph_falls_back_to_window() -> None:
     assert len(chunks) > 1
     assert chunks[0].chunk_index == 0
     assert chunks[1].chunk_index == 1
+
+
+def test_chunking_uses_smaller_windows_for_deep_markdown_sections() -> None:
+    paragraph = "配置步骤" * 32
+    body = f"{paragraph}\n\n{paragraph}"
+
+    top_level_chunks = chunk_document_text(
+        "doc3",
+        f"# 指南\n\n{body}",
+        source_type="md",
+    )
+    deep_level_chunks = chunk_document_text(
+        "doc4",
+        f"### 配置\n\n{body}",
+        source_type="md",
+    )
+
+    assert len(top_level_chunks) == 1
+    assert len(deep_level_chunks) > 1
+    assert all(chunk.section_title == "配置" for chunk in deep_level_chunks)
+
+
+def test_chunking_uses_smaller_windows_for_json_documents() -> None:
+    content = "结构化字段" * 55
+
+    chunks = chunk_document_text("doc5", content, source_type="json")
+
+    assert len(chunks) > 1
+    assert max(chunk.char_len for chunk in chunks) <= 240
+
+
+def test_chunking_explicit_size_overrides_dynamic_source_type() -> None:
+    content = "结构化字段" * 45
+
+    chunks = chunk_document_text(
+        "doc6",
+        content,
+        source_type="json",
+        chunk_size_chars=320,
+        chunk_overlap_chars=20,
+        min_chunk_chars=20,
+    )
+
+    assert len(chunks) == 1

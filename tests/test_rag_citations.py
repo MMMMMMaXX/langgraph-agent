@@ -1,5 +1,5 @@
 from app.agents.rag.constants import QUERY_TYPE_COMPARISON, QUERY_TYPE_DEFINITION
-from app.agents.rag.context import build_rag_context
+from app.agents.rag.context import build_rag_context, compress_memory_context
 
 
 def test_build_rag_context_adds_cited_doc_blocks() -> None:
@@ -89,9 +89,10 @@ def test_build_rag_context_compresses_irrelevant_sentences_but_keeps_citation() 
 
     assert "[1]" in context.doc_context
     assert "虚拟列表只对可见区域进行渲染" in context.doc_context
-    assert context.context_compression["before_chars"] > context.context_compression[
-        "after_chars"
-    ]
+    assert (
+        context.context_compression["before_chars"]
+        > context.context_compression["after_chars"]
+    )
     assert context.context_compression["compression_ratio"] < 1
     assert context.citations[0]["doc_id"] == "3"
 
@@ -127,3 +128,123 @@ def test_build_rag_context_keeps_multiple_sources_for_comparison() -> None:
     assert "WAI-ARIA 是无障碍技术规范" in context.doc_context
     assert "虚拟列表只渲染可见区域" in context.doc_context
     assert [citation["doc_id"] for citation in context.citations] == ["0", "3"]
+
+
+# ===== compress_memory_context 测试 =====
+
+
+def test_compress_memory_context_empty_hits_returns_empty() -> None:
+    text, stats = compress_memory_context([])
+
+    assert text == ""
+    assert stats["hits_used"] == 0
+    assert stats["hits_available"] == 0
+    assert stats["before_chars"] == 0
+    assert stats["compression_ratio"] == 0.0
+
+
+def test_compress_memory_context_compresses_long_hit() -> None:
+    """单条 memory 内容超过 block 上限时应被截断压缩。"""
+
+    long_content = (
+        "虚拟列表只渲染可见区域，不渲染屏幕外的元素。"
+        "这是一条和当前问题无关的说明。"
+        "它能大幅提升大量数据场景下的渲染性能。"
+        "还有更多不相关的背景信息补充在这里。"
+        "以及另一句无关的说明文字，继续撑大内容体积。"
+    )
+    hits = [{"content": long_content, "score": 0.9}]
+
+    text, stats = compress_memory_context(
+        hits,
+        query="虚拟列表是什么",
+        query_type=QUERY_TYPE_DEFINITION,
+    )
+
+    assert len(text) <= 120  # MEMORY_COMPRESSION_MAX_BLOCK_CHARS
+    assert stats["hits_used"] == 1
+    assert stats["before_chars"] > stats["after_chars"]
+    assert stats["compression_ratio"] < 1.0
+
+
+def test_compress_memory_context_respects_total_budget() -> None:
+    """多条 memory 命中总量不超过 MEMORY_COMPRESSION_MAX_TOTAL_CHARS。"""
+
+    hits = [
+        {"content": "A" * 200, "score": 0.9},
+        {"content": "B" * 200, "score": 0.8},
+        {"content": "C" * 200, "score": 0.7},
+        {"content": "D" * 200, "score": 0.6},  # 第 4 条应被丢弃（超出 max_hits=3）
+    ]
+
+    text, stats = compress_memory_context(hits)
+
+    # stats["after_chars"] 只计内容字符不含 join 换行符，它是预算的实际约束对象
+    assert stats["after_chars"] <= 360  # MEMORY_COMPRESSION_MAX_TOTAL_CHARS
+    assert stats["hits_available"] == 4
+    assert stats["hits_used"] <= 3  # MEMORY_COMPRESSION_MAX_HITS
+
+
+def test_compress_memory_context_preserves_query_relevant_sentences() -> None:
+    """包含 query 关键词的句子应被优先保留。"""
+
+    content = (
+        "这是一段无关背景说明，不含关键词。"
+        "LangGraph 是一个多智能体编排框架。"
+        "另一句完全无关的内容。"
+    )
+    hits = [{"content": content, "score": 0.9}]
+
+    text, stats = compress_memory_context(
+        hits,
+        query="LangGraph 是什么",
+        query_type=QUERY_TYPE_DEFINITION,
+    )
+
+    assert "LangGraph" in text
+
+
+def test_build_rag_context_memory_is_compressed() -> None:
+    """build_rag_context 中 memory_hits 的内容应经过压缩，不再是原始全量拼接。"""
+
+    long_memory = (
+        "北京气候属于温带季风气候，四季分明。"
+        "这是一句和当前问题无关的补充说明。"
+        "夏季炎热多雨，冬季寒冷干燥，春秋较短。"
+        "再补充更多无关背景来撑大原始内容体积。"
+        "最后一句继续添加冗余内容。"
+    )
+    memory_hits = [{"content": long_memory, "score": 0.9}]
+
+    context = build_rag_context(
+        doc_hits=[],
+        memory_hits=memory_hits,
+        doc_context_chars=200,
+        query="北京气候怎么样",
+        query_type=QUERY_TYPE_DEFINITION,
+    )
+
+    assert context.memory_compression["enabled"] is True
+    assert context.memory_compression["hits_used"] == 1
+    assert context.memory_compression["before_chars"] == len(long_memory)
+    # 压缩后应短于原始内容
+    assert (
+        context.memory_compression["after_chars"]
+        < context.memory_compression["before_chars"]
+    )
+    # memory_context 和 context 应使用同一份压缩结果（不再有 score 过滤不一致的 bug）
+    assert context.memory_context in context.context
+
+
+def test_build_rag_context_memory_compression_stats_when_no_memory() -> None:
+    """无 memory_hits 时 memory_compression 应返回空统计，不报错。"""
+
+    context = build_rag_context(
+        doc_hits=[],
+        memory_hits=[],
+        doc_context_chars=200,
+    )
+
+    assert context.memory_compression["hits_used"] == 0
+    assert context.memory_compression["hits_available"] == 0
+    assert context.memory_compression["before_chars"] == 0

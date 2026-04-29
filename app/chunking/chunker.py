@@ -6,6 +6,21 @@ SENTENCE_BOUNDARY_CHARS = "。！？!?；;\n"
 OVERLAP_START_BOUNDARY_CHARS = "。！？!?；;，,、：: \n\t"
 OVERLAP_START_ALIGN_SCAN_CHARS = 40
 
+# 自适应 chunk 参数是经验初始值，用来在默认 280/60 的基础上按文档结构微调。
+# 后续应结合 retrieval eval / chunk inspector 指标继续校准。
+LONG_DOCUMENT_CHARS = 6000
+LONG_TEXT_CHUNK_SIZE_CHARS = 360
+LONG_TEXT_CHUNK_OVERLAP_CHARS = 80
+STRUCTURED_CHUNK_SIZE_CHARS = 240
+STRUCTURED_CHUNK_OVERLAP_CHARS = 40
+DEEP_HEADING_CHUNK_OVERLAP_CHARS = 50
+FAQ_CHUNK_SIZE_CHARS = 220
+FAQ_CHUNK_OVERLAP_CHARS = 40
+STEP_CHUNK_SIZE_CHARS = 260
+STEP_CHUNK_OVERLAP_CHARS = 50
+FAQ_SIGNAL_PREFIXES = ("q:", "q：", "问：", "问题：")
+STEP_SIGNAL_PREFIXES = ("- ", "* ", "1. ", "2. ", "3. ", "1、", "2、", "3、")
+
 
 def _is_heading_line(line: str) -> bool:
     stripped = line.strip()
@@ -16,6 +31,11 @@ def _is_heading_line(line: str) -> bool:
 
 def _heading_title(line: str) -> str:
     return line.strip().lstrip("#").strip()
+
+
+def _heading_level(line: str) -> int:
+    stripped = line.strip()
+    return len(stripped) - len(stripped.lstrip("#"))
 
 
 def _split_paragraph_ranges(text: str) -> list[tuple[int, int, str]]:
@@ -35,7 +55,7 @@ def _split_paragraph_ranges(text: str) -> list[tuple[int, int, str]]:
     return ranges
 
 
-def _split_section_ranges(text: str) -> list[tuple[int, int, str]]:
+def _split_section_ranges(text: str) -> list[tuple[int, int, str, int]]:
     """按 Markdown 标题拆 section；没有标题时退化为整篇文档。
 
     工业 RAG 里 chunk 最怕把标题和正文关系切散。这里先做轻量 section 感知：
@@ -43,22 +63,91 @@ def _split_section_ranges(text: str) -> list[tuple[int, int, str]]:
     """
 
     lines = text.splitlines(keepends=True)
-    sections: list[tuple[int, int, str]] = []
+    sections: list[tuple[int, int, str, int]] = []
     section_start = 0
     section_title = ""
+    section_level = 0
     offset = 0
 
     for line in lines:
         if _is_heading_line(line):
             if offset > section_start:
-                sections.append((section_start, offset, section_title))
+                sections.append((section_start, offset, section_title, section_level))
             section_start = offset
             section_title = _heading_title(line)
+            section_level = _heading_level(line)
         offset += len(line)
 
     if text:
-        sections.append((section_start, len(text), section_title))
-    return sections or [(0, len(text), "")]
+        sections.append((section_start, len(text), section_title, section_level))
+    return sections or [(0, len(text), "", 0)]
+
+
+def _clamp_chunk_params(size: int, overlap: int, minimum: int) -> tuple[int, int, int]:
+    overlap = min(overlap, max(size - 1, 0))
+    minimum = min(minimum, size)
+    return size, overlap, minimum
+
+
+def _count_prefixed_lines(text: str, prefixes: tuple[str, ...]) -> int:
+    count = 0
+    for line in text.splitlines():
+        stripped = line.strip().lower()
+        if stripped.startswith(prefixes):
+            count += 1
+    return count
+
+
+def _looks_like_faq_section(section_text: str) -> bool:
+    return _count_prefixed_lines(section_text, FAQ_SIGNAL_PREFIXES) >= 2
+
+
+def _looks_like_step_section(section_text: str) -> bool:
+    return _count_prefixed_lines(section_text, STEP_SIGNAL_PREFIXES) >= 3
+
+
+def _resolve_section_chunk_params(
+    *,
+    source_type: str,
+    document_chars: int,
+    section_text: str,
+    heading_level: int,
+    chunk_size_chars: int | None,
+    chunk_overlap_chars: int | None,
+    min_chunk_chars: int | None,
+) -> tuple[int, int, int]:
+    """按文档类型、标题层级和段落形态动态生成 section 级切块参数。"""
+
+    size = chunk_size_chars or CHUNKING_CONFIG.chunk_size_chars
+    overlap = chunk_overlap_chars or CHUNKING_CONFIG.chunk_overlap_chars
+    minimum = min_chunk_chars or CHUNKING_CONFIG.min_chunk_chars
+
+    if chunk_size_chars is not None:
+        return _clamp_chunk_params(size, overlap, minimum)
+
+    normalized_source_type = source_type.strip().lower()
+    if normalized_source_type == "json":
+        size = min(size, STRUCTURED_CHUNK_SIZE_CHARS)
+        overlap = min(overlap, STRUCTURED_CHUNK_OVERLAP_CHARS)
+    elif normalized_source_type == "txt" and document_chars >= LONG_DOCUMENT_CHARS:
+        size = max(size, LONG_TEXT_CHUNK_SIZE_CHARS)
+        overlap = max(overlap, LONG_TEXT_CHUNK_OVERLAP_CHARS)
+
+    if heading_level in {1, 2} and len(section_text) >= size * 2:
+        size = max(size, LONG_TEXT_CHUNK_SIZE_CHARS)
+        overlap = max(overlap, LONG_TEXT_CHUNK_OVERLAP_CHARS)
+    elif heading_level >= 3:
+        size = min(size, STRUCTURED_CHUNK_SIZE_CHARS)
+        overlap = min(overlap, DEEP_HEADING_CHUNK_OVERLAP_CHARS)
+
+    if _looks_like_faq_section(section_text):
+        size = min(size, FAQ_CHUNK_SIZE_CHARS)
+        overlap = min(overlap, FAQ_CHUNK_OVERLAP_CHARS)
+    elif _looks_like_step_section(section_text):
+        size = min(size, STEP_CHUNK_SIZE_CHARS)
+        overlap = min(overlap, STEP_CHUNK_OVERLAP_CHARS)
+
+    return _clamp_chunk_params(size, overlap, minimum)
 
 
 def _normalize_text(text: str) -> str:
@@ -319,6 +408,7 @@ def chunk_document_text(
     chunk_size_chars: int | None = None,
     chunk_overlap_chars: int | None = None,
     min_chunk_chars: int | None = None,
+    source_type: str = "",
 ) -> list[DocumentChunk]:
     """按“标题/段落优先 + 字符窗口兜底”把单篇文档切成多个 chunk。
 
@@ -331,15 +421,25 @@ def chunk_document_text(
     if not normalized:
         return []
 
-    size = chunk_size_chars or CHUNKING_CONFIG.chunk_size_chars
-    overlap = chunk_overlap_chars or CHUNKING_CONFIG.chunk_overlap_chars
-    minimum = min_chunk_chars or CHUNKING_CONFIG.min_chunk_chars
-
     chunks: list[DocumentChunk] = []
-    for section_start, section_end, section_title in _split_section_ranges(normalized):
+    for (
+        section_start,
+        section_end,
+        section_title,
+        heading_level,
+    ) in _split_section_ranges(normalized):
         section_text = normalized[section_start:section_end].strip()
         if not section_text:
             continue
+        size, overlap, minimum = _resolve_section_chunk_params(
+            source_type=source_type,
+            document_chars=len(normalized),
+            section_text=section_text,
+            heading_level=heading_level,
+            chunk_size_chars=chunk_size_chars,
+            chunk_overlap_chars=chunk_overlap_chars,
+            min_chunk_chars=min_chunk_chars,
+        )
         section_chunks = _pack_section_paragraphs(
             doc_id=doc_id,
             section_text=section_text,

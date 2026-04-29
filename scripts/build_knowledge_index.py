@@ -39,6 +39,13 @@ def infer_source(doc: dict, default_path: Path = DB_PATH) -> str:
     return str(doc.get("source") or doc.get("path") or default_path.name)
 
 
+def infer_source_type(doc: dict, source: str) -> str:
+    explicit = str(doc.get("source_type") or "").strip()
+    if explicit:
+        return explicit
+    return Path(source).suffix.lower().lstrip(".") or "txt"
+
+
 def build_doc_chunks(docs: list[dict]) -> list[dict]:
     """把原始文档转换成可写入 SQLite/Chroma 的 chunk 记录。"""
 
@@ -49,7 +56,12 @@ def build_doc_chunks(docs: list[dict]) -> list[dict]:
         content = str(doc.get("content", ""))
         doc_title = infer_doc_title(doc, doc_id, content)
         source = infer_source(doc)
-        chunks = chunk_document_text(doc_id=doc_id, text=content)
+        source_type = infer_source_type(doc, source)
+        chunks = chunk_document_text(
+            doc_id=doc_id,
+            text=content,
+            source_type=source_type,
+        )
 
         for chunk in chunks:
             metadata = {

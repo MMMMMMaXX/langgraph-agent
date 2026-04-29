@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.knowledge import KnowledgeCatalog
+from app.knowledge.catalog import KnowledgeCatalog
 
 
 class SQLiteFtsLexicalRetriever:

@@ -91,6 +91,33 @@ PYTHONPATH=. ./.venv/bin/python scripts/inspect_knowledge_chunks.py \
 返回/输出会包含 chunk 数量、长度分布、短/长 chunk 数量、章节分布、样例和
 warnings。这个检查只读 SQLite catalog，不会重新切片，也不会改 Chroma。
 
+### 查看检索链路
+
+API：
+
+```bash
+curl -X POST http://127.0.0.1:8000/knowledge/search/inspect \
+  -H "Content-Type: application/json" \
+  -d '{"query":"Skills 是什么","top_k":5}'
+```
+
+也可以用 GET 方便浏览器调试：
+
+```bash
+curl "http://127.0.0.1:8000/knowledge/search/inspect?query=Skills%20是什么&top_k=5"
+```
+
+本地 CLI：
+
+```bash
+PYTHONPATH=. ./.venv/bin/python scripts/inspect_retrieval.py \
+  --query "Skills 是什么" \
+  --top-k 5
+```
+
+输出会展示 dense、lexical、hybrid、threshold、rerank、chunk merge 和最终
+context preview。它只解释检索链路，不生成答案、不写 memory。
+
 ### 删除文档
 
 ```bash

@@ -104,12 +104,11 @@ def _parse_json_document(raw_content: str) -> dict[str, Any]:
         return {"content": raw_content}
 
     content = str(
-        parsed.get("content")
-        or parsed.get("text")
-        or parsed.get("body")
-        or "",
+        parsed.get("content") or parsed.get("text") or parsed.get("body") or "",
     )
-    metadata = parsed.get("metadata") if isinstance(parsed.get("metadata"), dict) else {}
+    metadata = (
+        parsed.get("metadata") if isinstance(parsed.get("metadata"), dict) else {}
+    )
     return {
         "doc_id": str(parsed.get("doc_id") or parsed.get("id") or ""),
         "title": str(parsed.get("title") or parsed.get("name") or ""),
@@ -118,7 +117,19 @@ def _parse_json_document(raw_content: str) -> dict[str, Any]:
         "metadata": {
             key: value
             for key, value in parsed.items()
-            if key not in {"doc_id", "id", "title", "name", "source", "path", "content", "text", "body", "metadata"}
+            if key
+            not in {
+                "doc_id",
+                "id",
+                "title",
+                "name",
+                "source",
+                "path",
+                "content",
+                "text",
+                "body",
+                "metadata",
+            }
         }
         | metadata,
     }
@@ -166,13 +177,18 @@ def build_chunk_records(
     title: str,
     source: str,
     content: str,
+    source_type: str = "",
 ) -> tuple[list[KnowledgeChunkRecord], list[dict]]:
     """构造 SQLite catalog record 和 Chroma upsert record。"""
 
     catalog_records: list[KnowledgeChunkRecord] = []
     chroma_records: list[dict] = []
 
-    for chunk in chunk_document_text(doc_id=doc_id, text=content):
+    for chunk in chunk_document_text(
+        doc_id=doc_id,
+        text=content,
+        source_type=source_type,
+    ):
         metadata = {
             "doc_id": chunk.doc_id,
             "doc_title": title,
@@ -261,6 +277,7 @@ def import_knowledge_document(
         title=title,
         source=source,
         content=normalized.content,
+        source_type=normalized.source_type,
     )
 
     active_catalog = catalog or KnowledgeCatalog()

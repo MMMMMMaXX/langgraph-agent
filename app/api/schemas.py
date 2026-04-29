@@ -91,6 +91,20 @@ class KnowledgeChunkInspectResponse(BaseModel):
     report: dict[str, Any]
 
 
+class KnowledgeSearchInspectRequest(BaseModel):
+    """POST /knowledge/search/inspect 的请求体。"""
+
+    query: str
+    top_k: int = Field(default=8, ge=1, le=50)
+    context_preview_chars: int = Field(default=360, ge=0, le=5000)
+
+
+class KnowledgeSearchInspectResponse(BaseModel):
+    """知识库检索解释响应。"""
+
+    report: dict[str, Any]
+
+
 class KnowledgeDeleteResponse(BaseModel):
     """DELETE /knowledge/docs/{doc_id} 的响应。"""
 

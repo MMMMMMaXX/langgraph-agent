@@ -17,6 +17,21 @@ from app.knowledge.management import (
     reindex_knowledge_document,
 )
 
+
+def __getattr__(name: str):
+    if name in {"SearchInspectReport", "inspect_retrieval"}:
+        from app.knowledge.search_inspector import (
+            SearchInspectReport,
+            inspect_retrieval,
+        )
+
+        return {
+            "SearchInspectReport": SearchInspectReport,
+            "inspect_retrieval": inspect_retrieval,
+        }[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 __all__ = [
     "KnowledgeCatalog",
     "KnowledgeChunkRecord",
@@ -26,7 +41,9 @@ __all__ = [
     "KnowledgeImportResult",
     "KnowledgeDeleteResult",
     "KnowledgeReindexResult",
+    "SearchInspectReport",
     "inspect_document_chunks",
+    "inspect_retrieval",
     "import_knowledge_document",
     "delete_knowledge_document",
     "reindex_knowledge_document",

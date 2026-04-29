@@ -74,6 +74,7 @@ class RagContext:
     memory_context: str
     citations: list[dict]
     context_compression: dict = field(default_factory=dict)
+    memory_compression: dict = field(default_factory=dict)
 
 
 @dataclass

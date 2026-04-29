@@ -15,6 +15,9 @@ from app.agents.rag.constants import (
     CONTEXT_COMPRESSION_DEFINITION_SIGNALS,
     CONTEXT_COMPRESSION_MAX_SENTENCES_PER_BLOCK,
     CONTEXT_COMPRESSION_MIN_BLOCK_CHARS,
+    MEMORY_COMPRESSION_MAX_BLOCK_CHARS,
+    MEMORY_COMPRESSION_MAX_HITS,
+    MEMORY_COMPRESSION_MAX_TOTAL_CHARS,
     QUERY_TYPE_DEFINITION,
 )
 from app.agents.rag.types import RagContext
@@ -162,6 +165,62 @@ def _compress_block_content(
     }
 
 
+def compress_memory_context(
+    memory_hits: list[dict],
+    *,
+    query: str = "",
+    query_type: str = "",
+) -> tuple[str, dict]:
+    """对 memory 命中做轻量句子级压缩，复用 doc 侧的压缩逻辑。
+
+    多轮对话时 memory_hits 原始内容可能长达数百字（完整的 Q&A 对），
+    直接全量拼接会撑满 context 预算，并引入和当前问题无关的噪声句子。
+
+    对每条 hit 独立做句子评分选优，再用总字符上限做第二道截断。
+    """
+
+    hits_to_use = memory_hits[:MEMORY_COMPRESSION_MAX_HITS]
+    compressed_parts: list[str] = []
+    block_stats: list[dict] = []
+    total_chars = 0
+
+    for i, hit in enumerate(hits_to_use):
+        content = hit.get("content", "").strip()
+        if not content:
+            continue
+
+        remaining_budget = MEMORY_COMPRESSION_MAX_TOTAL_CHARS - total_chars
+        if remaining_budget <= 0:
+            break
+
+        block_max = min(MEMORY_COMPRESSION_MAX_BLOCK_CHARS, remaining_budget)
+        compressed, stats = _compress_block_content(
+            content=content,
+            query=query,
+            query_type=query_type,
+            max_chars=block_max,
+        )
+        if compressed:
+            compressed_parts.append(compressed)
+            total_chars += len(compressed)
+            block_stats.append({"hit_index": i, **stats})
+
+    compressed_text = "\n".join(compressed_parts)
+    before_chars = sum(s["before_chars"] for s in block_stats)
+    after_chars = sum(s["after_chars"] for s in block_stats)
+    return compressed_text, {
+        "enabled": True,
+        "hits_used": len(compressed_parts),
+        "hits_available": len(memory_hits),
+        "before_chars": before_chars,
+        "after_chars": after_chars,
+        "compression_ratio": (
+            round(after_chars / before_chars, 4) if before_chars else 0.0
+        ),
+        "blocks": block_stats,
+    }
+
+
 def compress_doc_context(doc_hits: list[dict]) -> str:
     """按默认 RAG 配置压缩文档上下文。"""
 
@@ -253,6 +312,9 @@ def build_rag_context(
 
     context 是 doc/memory 的完整拼接版本；doc_context 和 memory_context
     分别保留给不同回答分支使用，避免 node.py 里散落字符串拼接。
+
+    memory_hits 经过与 doc_hits 相同级别的句子压缩：每条命中有字符上限，
+    整体有总量预算，防止多轮积累的历史噪声撑满 token。
     """
 
     citations = build_citations(doc_hits, RAG_CONFIG.max_doc_context_blocks)
@@ -262,8 +324,10 @@ def build_rag_context(
         query=query,
         query_type=query_type,
     )
-    memory_context = "\n".join(
-        memory_hit["content"] for memory_hit in memory_hits if memory_hit["score"] >= 1
+    memory_context, memory_compression_stats = compress_memory_context(
+        memory_hits,
+        query=query,
+        query_type=query_type,
     )
 
     context = ""
@@ -273,8 +337,7 @@ def build_rag_context(
 
     if memory_hits:
         context += "\n历史相关记录：\n"
-        for memory_hit in memory_hits:
-            context += memory_hit["content"] + "\n"
+        context += memory_context + "\n"
 
     return RagContext(
         context=context,
@@ -282,4 +345,5 @@ def build_rag_context(
         memory_context=memory_context,
         citations=citations,
         context_compression=compression_stats,
+        memory_compression=memory_compression_stats,
     )
