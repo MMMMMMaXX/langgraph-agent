@@ -10,9 +10,9 @@ import hashlib
 import json
 import sqlite3
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 from app.config import KNOWLEDGE_BASE_CONFIG
 from app.retrieval.lexical.tokenizer import build_fts_index_text, build_fts_query

@@ -9,12 +9,6 @@ from __future__ import annotations
 
 import pytest
 
-from app.agents.rag.doc_pipeline import (
-    build_query_type_hybrid_weights,
-    retrieve_docs_for_rag,
-    select_source_diverse_hits,
-)
-from app.agents.rag.memory_pipeline import filter_memory_hits, retrieve_memory_for_rag
 from app.agents.rag.constants import (
     ANSWER_TOKENS_MIN,
     QUERY_TYPE_COMPARISON,
@@ -22,6 +16,12 @@ from app.agents.rag.constants import (
     QUERY_TYPE_FALLBACK,
     QUERY_TYPE_FOLLOWUP,
 )
+from app.agents.rag.doc_pipeline import (
+    build_query_type_hybrid_weights,
+    retrieve_docs_for_rag,
+    select_source_diverse_hits,
+)
+from app.agents.rag.memory_pipeline import filter_memory_hits, retrieve_memory_for_rag
 from app.agents.rag.rewrite import (
     get_user_messages,
     rewrite_rag_query,

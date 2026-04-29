@@ -8,7 +8,6 @@ from app.llm import rewrite_query
 from app.utils.errors import build_error_info
 from app.utils.logger import now_ms
 
-
 REWRITE_MODE_LLM = "llm"
 REWRITE_MODE_SKIP = "skip"
 REWRITE_TRIGGER_FOLLOWUP = "followup_query"

@@ -10,11 +10,11 @@ from app.agents.rag.constants import (
     DOC_HIT_SCORE_FIELDS,
     HYBRID_DOC_TEXT_PREVIEW_CHARS,
 )
+from app.agents.rag.types import QueryClassification, RewriteResult
 from app.constants.model_profiles import (
     PROFILE_DEFAULT_CHAT,
     PROFILE_REWRITE,
 )
-from app.agents.rag.types import QueryClassification, RewriteResult
 from app.llm import get_profile_runtime_info
 from app.utils.logger import preview, preview_hits
 

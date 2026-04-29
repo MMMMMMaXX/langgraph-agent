@@ -24,7 +24,6 @@ from app.knowledge.ingestion import KnowledgeImportResult
 from app.knowledge.management import KnowledgeDeleteResult, KnowledgeReindexResult
 from app.knowledge.search_inspector import SearchInspectReport
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

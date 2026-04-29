@@ -9,8 +9,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 import threading
+from collections.abc import Callable
 from typing import Any
 
 from app.constants.runtime import (
@@ -20,13 +20,13 @@ from app.runtime.checkpoint_store import (
     load_checkpoint_snapshot,
     persist_final_checkpoint_state,
 )
+from app.runtime.initial_state import create_initial_state
 from app.runtime.session_cache import (
     clear_session_state,
     get_session_lock,
     get_session_state,
     set_session_state,
 )
-from app.runtime.initial_state import create_initial_state
 from app.runtime.snapshot import ConversationSnapshot
 from app.state import AgentState
 

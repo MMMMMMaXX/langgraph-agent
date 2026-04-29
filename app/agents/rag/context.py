@@ -24,7 +24,6 @@ from app.agents.rag.types import RagContext
 from app.config import RAG_CONFIG
 from app.retrieval.lexical.tokenizer import lexical_terms
 
-
 SENTENCE_SPLIT_RE = re.compile(r"(?<=[。！？!?；;])\s*|\n+")
 
 

@@ -1,6 +1,6 @@
+from app.agents.rag.answer import check_citation_coverage
 from app.agents.rag.constants import QUERY_TYPE_COMPARISON, QUERY_TYPE_DEFINITION
 from app.agents.rag.context import build_rag_context, compress_memory_context
-from app.agents.rag.answer import check_citation_coverage
 
 
 def test_build_rag_context_adds_cited_doc_blocks() -> None:

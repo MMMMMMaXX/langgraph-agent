@@ -13,12 +13,12 @@ from app.agents.rag.constants import (
     QUERY_TYPE_FALLBACK,
     QUERY_TYPE_FOLLOWUP,
 )
+from app.agents.rag.types import QueryClassification
 from app.config import RAG_CONFIG
 from app.constants.policies import (
     ANSWER_STRATEGY_DEFAULT_SHORT,
     ANSWER_STRATEGY_DEFINITION_SHORT,
 )
-from app.agents.rag.types import QueryClassification
 
 
 def is_definition_query(message: str) -> bool:

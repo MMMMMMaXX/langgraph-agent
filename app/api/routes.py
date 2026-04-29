@@ -22,20 +22,21 @@ from app.knowledge import (
     KnowledgeCatalog,
     KnowledgeImportInput,
     delete_knowledge_document,
+    import_knowledge_document,
     inspect_document_chunks,
     inspect_retrieval,
-    import_knowledge_document,
     reindex_all_knowledge_documents,
     reindex_knowledge_document,
 )
+
 from .chat_runner import build_chat_result
 from .schemas import (
     ChatRequest,
     ChatResponse,
     KnowledgeChunkInspectResponse,
+    KnowledgeDeleteResponse,
     KnowledgeDocumentDetailResponse,
     KnowledgeDocumentListResponse,
-    KnowledgeDeleteResponse,
     KnowledgeImportRequest,
     KnowledgeImportResponse,
     KnowledgeReindexResponse,
