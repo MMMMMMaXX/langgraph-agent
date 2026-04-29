@@ -48,6 +48,9 @@ PROFILE_MEMORY_EMBEDDING = "memory_embedding"
 # 查询 embedding profile，doc search / memory search 共用。
 PROFILE_QUERY_EMBEDDING = "query_embedding"
 
+# 查询分类 profile：低置信度时的 LLM 二裁，轻量模型即可。
+PROFILE_CLASSIFY = "classify"
+
 # Provider 选择环境变量：默认 chat provider。
 ENV_DEFAULT_CHAT_PROVIDER = "DEFAULT_CHAT_PROVIDER"
 

@@ -1,5 +1,6 @@
 from app.agents.rag.constants import QUERY_TYPE_COMPARISON, QUERY_TYPE_DEFINITION
 from app.agents.rag.context import build_rag_context, compress_memory_context
+from app.agents.rag.answer import check_citation_coverage
 
 
 def test_build_rag_context_adds_cited_doc_blocks() -> None:
@@ -248,3 +249,48 @@ def test_build_rag_context_memory_compression_stats_when_no_memory() -> None:
     assert context.memory_compression["hits_used"] == 0
     assert context.memory_compression["hits_available"] == 0
     assert context.memory_compression["before_chars"] == 0
+
+
+# ===== check_citation_coverage 测试 =====
+
+
+def _make_citations(*refs: str) -> list[dict]:
+    return [{"ref": ref} for ref in refs]
+
+
+def test_check_citation_coverage_true_when_ref_present() -> None:
+    citations = _make_citations("[1]", "[2]")
+    assert (
+        check_citation_coverage(
+            "WAI-ARIA 是无障碍规范 [1]，虚拟列表用于性能优化。", citations
+        )
+        is True
+    )
+
+
+def test_check_citation_coverage_true_when_partial_refs_present() -> None:
+    """只要有一个 ref 出现即视为覆盖，不要求全部。"""
+
+    citations = _make_citations("[1]", "[2]")
+    assert check_citation_coverage("答案只引用了第二个来源 [2]。", citations) is True
+
+
+def test_check_citation_coverage_false_when_no_ref_present() -> None:
+    citations = _make_citations("[1]", "[2]")
+    assert check_citation_coverage("答案里没有任何引用标记。", citations) is False
+
+
+def test_check_citation_coverage_true_when_citations_empty() -> None:
+    """没有 citations 时（无文档命中），直接返回 True，不应误报。"""
+
+    assert check_citation_coverage("任何答案文本", []) is True
+
+
+def test_check_citation_coverage_false_on_bare_number_without_brackets() -> None:
+    """纯数字不算引用，必须是 [N] 格式。"""
+
+    citations = _make_citations("[1]")
+    assert (
+        check_citation_coverage("答案提到了第1个来源，但没有括号格式。", citations)
+        is False
+    )

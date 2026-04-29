@@ -104,6 +104,7 @@ def build_rag_debug_payload(
     citations: list[dict],
     context_compression: dict,
     memory_compression: dict,
+    citation_correction: dict,
     query_classification: QueryClassification,
     rewrite_result: RewriteResult,
     answer_strategy: dict,
@@ -138,6 +139,7 @@ def build_rag_debug_payload(
         "doc_context_chars": len(doc_context),
         "context_compression": context_compression,
         "memory_compression": memory_compression,
+        "citation_correction": citation_correction,
         "citations": citations,
         "citation_count": len(citations),
         "citation_doc_ids": [
@@ -181,6 +183,7 @@ def build_rag_log_extra(
     citations: list[dict],
     context_compression: dict,
     memory_compression: dict,
+    citation_correction: dict,
     query_classification: QueryClassification,
     answer_strategy: dict,
     sub_timings_ms: dict[str, float],
@@ -205,6 +208,7 @@ def build_rag_log_extra(
         "docContextChars": len(doc_context),
         "contextCompression": context_compression,
         "memoryCompression": memory_compression,
+        "citationCorrection": citation_correction,
         "citations": citations,
         "citationCount": len(citations),
         "citationDocIds": [

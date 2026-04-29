@@ -106,3 +106,16 @@ MEMORY_COMPRESSION_MAX_TOTAL_CHARS = 360
 # Memory context compression：最多纳入上下文的记忆命中条数，
 # 避免低质尾部条目引入噪声。
 MEMORY_COMPRESSION_MAX_HITS = 3
+
+# 动态 max_tokens：单次答案允许的最小 token 下限，
+# 避免 context 极短时答案被压缩到无法成句。
+ANSWER_TOKENS_MIN = 40
+
+# 动态 max_tokens：context 字符数到答案 token 上限的换算比例。
+# 中文约 1.5~2 chars/token，取 2 作保守值：360 chars → 180 tokens。
+# 实际上限 = max(ANSWER_TOKENS_MIN, min(策略上限, context_chars // RATIO))
+ANSWER_TOKENS_CONTEXT_RATIO = 2
+
+# LLM 分类器：规则置信度低于此值时触发 LLM 二裁。
+# FACTUAL 默认 0.6、FALLBACK 默认 0.75，均低于阈值；高置信 DEFINITION/FOLLOWUP 不受影响。
+CLASSIFIER_LLM_CONFIDENCE_THRESHOLD = 0.8

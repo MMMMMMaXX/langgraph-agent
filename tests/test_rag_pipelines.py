@@ -10,11 +10,13 @@ from __future__ import annotations
 import pytest
 
 from app.agents.rag.doc_pipeline import (
+    build_query_type_hybrid_weights,
     retrieve_docs_for_rag,
     select_source_diverse_hits,
 )
 from app.agents.rag.memory_pipeline import filter_memory_hits, retrieve_memory_for_rag
 from app.agents.rag.constants import (
+    ANSWER_TOKENS_MIN,
     QUERY_TYPE_COMPARISON,
     QUERY_TYPE_DEFINITION,
     QUERY_TYPE_FALLBACK,
@@ -24,7 +26,7 @@ from app.agents.rag.rewrite import (
     get_user_messages,
     rewrite_rag_query,
 )
-
+from app.agents.rag.strategy import adapt_strategy_max_tokens
 
 # ---------------------------------------------------------------------------
 # rewrite.get_user_messages （纯函数）
@@ -204,6 +206,36 @@ def doc_pipeline_io(monkeypatch: pytest.MonkeyPatch) -> dict:
     monkeypatch.setattr(dp_mod, "keyword_retrieve_docs", fake_keyword_retrieve_docs)
     monkeypatch.setattr(dp_mod, "rerank", fake_rerank)
     return harness
+
+
+def test_build_query_type_hybrid_weights_are_centralized() -> None:
+    # confidence=1.0（默认）时，与原始 type-specific 权重完全一致
+    assert build_query_type_hybrid_weights(QUERY_TYPE_DEFINITION) == (0.55, 0.45)
+    assert build_query_type_hybrid_weights(QUERY_TYPE_COMPARISON) == (0.6, 0.4)
+    assert build_query_type_hybrid_weights(QUERY_TYPE_FOLLOWUP) == (0.7, 0.3)
+    assert build_query_type_hybrid_weights(QUERY_TYPE_FALLBACK) == (0.5, 0.5)
+    assert build_query_type_hybrid_weights("unknown") == (0.65, 0.35)
+
+
+def test_build_query_type_hybrid_weights_confidence_decay() -> None:
+    # FACTUAL（base 0.65/0.35）在 confidence=0.6 时应向 balanced 收敛
+    # 公式：alpha = 0.65 * 0.6 + 0.5 * 0.4 = 0.59
+    alpha, beta = build_query_type_hybrid_weights("unknown", confidence=0.6)
+    assert alpha == 0.59
+    assert beta == 0.41
+
+    # 高置信度（0.9）对高 alpha 类型影响很小
+    # alpha = 0.7 * 0.9 + 0.5 * 0.1 = 0.68
+    alpha2, beta2 = build_query_type_hybrid_weights(QUERY_TYPE_FOLLOWUP, confidence=0.9)
+    assert alpha2 == 0.68
+    assert beta2 == 0.32
+
+    # confidence=0.5 → 完全均衡
+    alpha3, beta3 = build_query_type_hybrid_weights(
+        QUERY_TYPE_DEFINITION, confidence=0.5
+    )
+    assert alpha3 == 0.525
+    assert beta3 == 0.475
 
 
 def test_doc_pipeline_search_error_recorded(doc_pipeline_io: dict) -> None:
@@ -591,3 +623,68 @@ def test_memory_pipeline_rerank_error_falls_back(memory_pipeline_io: dict) -> No
     # 回退为 memory_before_rerank[:memory_rerank_top_k=5]
     assert len(result.memory_hits) == 3
     assert len(result.errors) == 1
+
+
+# ---------------------------------------------------------------------------
+# adapt_strategy_max_tokens — 动态 max_token 收紧
+# ---------------------------------------------------------------------------
+
+
+def test_adapt_strategy_max_tokens_unchanged_when_context_large() -> None:
+    """实际 context 足够长时，max_tokens 不变。"""
+
+    strategy = {"name": "default_short", "context_chars": 360, "max_tokens": 180}
+    adapted = adapt_strategy_max_tokens(strategy, actual_context_chars=360)
+
+    # 360 // 2 = 180 == base，不需要复制新 dict
+    assert adapted is strategy
+    assert adapted["max_tokens"] == 180
+
+
+def test_adapt_strategy_max_tokens_reduced_for_short_context() -> None:
+    """实际 context 短时，max_tokens 向下收紧。"""
+
+    strategy = {"name": "default_short", "context_chars": 360, "max_tokens": 180}
+    adapted = adapt_strategy_max_tokens(strategy, actual_context_chars=100)
+
+    # 100 // 2 = 50 < 180，应收紧到 50
+    assert adapted["max_tokens"] == 50
+    assert adapted is not strategy  # 返回新 dict，不修改原策略
+
+
+def test_adapt_strategy_max_tokens_floors_at_minimum() -> None:
+    """极短 context 时 max_tokens 不低于 ANSWER_TOKENS_MIN。"""
+
+    strategy = {"name": "default_short", "context_chars": 360, "max_tokens": 180}
+    adapted = adapt_strategy_max_tokens(strategy, actual_context_chars=20)
+
+    # 20 // 2 = 10 < ANSWER_TOKENS_MIN，应保底
+    assert adapted["max_tokens"] == ANSWER_TOKENS_MIN
+
+
+def test_adapt_strategy_max_tokens_respects_strategy_ceiling() -> None:
+    """即使 context 很长，max_tokens 也不超过策略本身的上限。"""
+
+    strategy = {"name": "definition_short", "context_chars": 280, "max_tokens": 100}
+    adapted = adapt_strategy_max_tokens(strategy, actual_context_chars=500)
+
+    # 500 // 2 = 250 > 100，应被 base=100 截断
+    assert adapted["max_tokens"] == 100
+    assert adapted is strategy  # 无变化时返回同一对象
+
+
+def test_adapt_strategy_preserves_other_fields() -> None:
+    """adapt 只改 max_tokens，其他字段原样保留。"""
+
+    strategy = {
+        "name": "comparison",
+        "answer_style": "用对比方式回答",
+        "context_chars": 360,
+        "max_tokens": 180,
+    }
+    adapted = adapt_strategy_max_tokens(strategy, actual_context_chars=80)
+
+    assert adapted["name"] == "comparison"
+    assert adapted["answer_style"] == "用对比方式回答"
+    assert adapted["context_chars"] == 360
+    assert adapted["max_tokens"] == 40  # 80 // 2

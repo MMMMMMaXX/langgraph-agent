@@ -37,6 +37,7 @@ from app.constants.model_profiles import (
     ENV_OPENAI_MODEL,
     ENV_QUERY_EMBEDDING_MODEL,
     ENV_QUERY_EMBEDDING_PROVIDER,
+    PROFILE_CLASSIFY,
     PROFILE_CREATIVE_PLANNER,
     PROFILE_CREATIVE_REVIEW,
     PROFILE_CREATIVE_WRITE,
@@ -174,6 +175,7 @@ def _build_profile_registry() -> dict[str, ModelProfile]:
         PROFILE_ROUTING: ModelProfile(PROFILE_ROUTING, default_provider),
         PROFILE_SUMMARY: ModelProfile(PROFILE_SUMMARY, default_provider),
         PROFILE_REWRITE: ModelProfile(PROFILE_REWRITE, default_provider),
+        PROFILE_CLASSIFY: ModelProfile(PROFILE_CLASSIFY, default_provider),
     }
 
 
@@ -217,7 +219,9 @@ def _build_embedding_profile_registry() -> dict[str, ModelProfile]:
 # 注意：env 在 app/env.py 中于进程启动时加载完成，才能正确 build。
 PROVIDER_CONFIGS: dict[str, ProviderConfig] = _build_provider_configs()
 CHAT_PROFILE_REGISTRY: dict[str, ModelProfile] = _build_profile_registry()
-EMBEDDING_PROFILE_REGISTRY: dict[str, ModelProfile] = _build_embedding_profile_registry()
+EMBEDDING_PROFILE_REGISTRY: dict[str, ModelProfile] = (
+    _build_embedding_profile_registry()
+)
 
 
 def _resolve_profile(profile: str | None, kind: str = "chat") -> ModelProfile:

@@ -4,6 +4,8 @@ from app.agents.rag.constants import (
     ANSWER_STRATEGY_COMPARISON,
     ANSWER_STRATEGY_FALLBACK,
     ANSWER_STRATEGY_FOLLOWUP,
+    ANSWER_TOKENS_CONTEXT_RATIO,
+    ANSWER_TOKENS_MIN,
     DEFINITION_CONTEXT_CHARS,
     DEFINITION_MAX_ANSWER_TOKENS,
     QUERY_TYPE_COMPARISON,
@@ -23,6 +25,28 @@ def is_definition_query(message: str) -> bool:
     """判断是否是定义类问题。"""
 
     return any(keyword in message for keyword in ["是什么", "什么是", "定义", "概念"])
+
+
+def adapt_strategy_max_tokens(strategy: dict, actual_context_chars: int) -> dict:
+    """根据实际上下文字符数动态收紧 max_tokens。
+
+    strategy 的初始 max_tokens 是策略维度的理论上限；这里进一步根据真实
+    context 长度向下约束：短 context 不需要也不应该允许长答案。
+
+    公式：max(ANSWER_TOKENS_MIN, min(策略上限, context_chars // RATIO))
+    - 360 chars context → min(180, 180) = 180（正常场景不受影响）
+    - 100 chars context → min(180, 50) = 50（短 context 收紧）
+    - 30 chars context  → max(40, 15) = 40（极短 context 保底）
+    """
+
+    base = strategy["max_tokens"]
+    dynamic = max(
+        ANSWER_TOKENS_MIN,
+        min(base, actual_context_chars // ANSWER_TOKENS_CONTEXT_RATIO),
+    )
+    if dynamic == base:
+        return strategy
+    return {**strategy, "max_tokens": dynamic}
 
 
 def build_doc_answer_strategy(
@@ -71,7 +95,9 @@ def build_doc_answer_strategy(
             "name": ANSWER_STRATEGY_FALLBACK,
             "answer_style": "如果资料不足或问题指代不清，不要猜测；简短说明需要更明确的问题或更多资料。",
             "context_chars": DEFINITION_CONTEXT_CHARS,
-            "max_tokens": min(RAG_CONFIG.max_doc_answer_tokens, DEFINITION_MAX_ANSWER_TOKENS),
+            "max_tokens": min(
+                RAG_CONFIG.max_doc_answer_tokens, DEFINITION_MAX_ANSWER_TOKENS
+            ),
         }
 
     return {

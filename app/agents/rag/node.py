@@ -5,7 +5,7 @@ from app.agents.rag.doc_pipeline import retrieve_docs_for_rag
 from app.agents.rag.memory_pipeline import retrieve_memory_for_rag
 from app.agents.rag.query_classifier import classify_rag_query
 from app.agents.rag.rewrite import rewrite_rag_query
-from app.agents.rag.strategy import build_doc_answer_strategy
+from app.agents.rag.strategy import adapt_strategy_max_tokens, build_doc_answer_strategy
 from app.config import RAG_CONFIG
 from app.constants.model_profiles import (
     PROFILE_DOC_EMBEDDING,
@@ -76,6 +76,7 @@ def rag_agent_node(state: AgentState) -> AgentState:
         original_query=message,
         rewritten_query=rewritten,
         has_context=has_context,
+        llm_fallback=True,  # 改写后 query 完整，允许 LLM 二裁提升分类精度
     )
 
     # ===== 2. 文档检索（知识库） =====
@@ -85,6 +86,7 @@ def rag_agent_node(state: AgentState) -> AgentState:
     doc_result = retrieve_docs_for_rag(
         rewritten,
         query_type=query_classification.query_type,
+        confidence=query_classification.confidence,
     )
     docs = doc_result.docs
     filtered_docs = doc_result.filtered_docs
@@ -124,6 +126,12 @@ def rag_agent_node(state: AgentState) -> AgentState:
         query=rewritten,
         query_type=query_classification.query_type,
     )
+    # 根据实际 doc_context 字符数动态收紧 max_tokens：
+    # 短 context 时避免 LLM 在信息不足的情况下被允许输出过长答案。
+    doc_answer_strategy = adapt_strategy_max_tokens(
+        doc_answer_strategy,
+        actual_context_chars=len(rag_context.doc_context),
+    )
 
     # ===== 5. 生成答案 =====
     # build_answer_streamer 同时返回 on_delta 回调和共享的 stream_state，
@@ -162,6 +170,7 @@ def rag_agent_node(state: AgentState) -> AgentState:
         citations=rag_context.citations,
         context_compression=rag_context.context_compression,
         memory_compression=rag_context.memory_compression,
+        citation_correction=answer_result.citation_correction,
         query_classification=query_classification,
         rewrite_result=rewrite_result,
         answer_strategy=doc_answer_strategy,
@@ -213,6 +222,7 @@ def rag_agent_node(state: AgentState) -> AgentState:
             citations=rag_context.citations,
             context_compression=rag_context.context_compression,
             memory_compression=rag_context.memory_compression,
+            citation_correction=answer_result.citation_correction,
             query_classification=query_classification,
             answer_strategy=doc_answer_strategy,
             sub_timings_ms=sub_timings_ms,

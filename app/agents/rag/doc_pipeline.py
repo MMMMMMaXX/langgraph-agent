@@ -35,36 +35,60 @@ from app.retrieval.reranker import rerank
 from app.utils.errors import build_error_info
 from app.utils.logger import now_ms
 
+# Hybrid 权重统一维护在这里：alpha=dense semantic，beta=lexical keyword。
+# 这些值是检索策略的经验初始值，后续应结合 retrieval eval 指标继续校准。
+HYBRID_WEIGHT_BY_QUERY_TYPE: dict[str, tuple[float, float]] = {
+    # 定义类通常包含专有名词/缩写，适当提高 lexical，避免 dense 漏掉精确词。
+    QUERY_TYPE_DEFINITION: (0.55, 0.45),
+    # 对比类需要覆盖多个对象；保留 dense 稳定性，同时增强 lexical 对对象名的约束。
+    QUERY_TYPE_COMPARISON: (0.6, 0.4),
+    # 追问已先改写成完整 query，语义表达更重要，避免被局部关键词带偏。
+    QUERY_TYPE_FOLLOWUP: (0.7, 0.3),
+    # 兜底类低置信，dense/lexical 均衡，后续再由 threshold 保守过滤。
+    QUERY_TYPE_FALLBACK: (0.5, 0.5),
+}
+DEFAULT_HYBRID_WEIGHTS = (DEFAULT_HYBRID_ALPHA, DEFAULT_HYBRID_BETA)
 
-def build_query_type_hybrid_weights(query_type: str) -> tuple[float, float]:
-    """按 query_type 动态调整 dense/lexical 融合权重。"""
 
-    if query_type == QUERY_TYPE_DEFINITION:
-        return 0.55, 0.45
-    if query_type == QUERY_TYPE_COMPARISON:
-        return 0.6, 0.4
-    if query_type == QUERY_TYPE_FOLLOWUP:
-        return 0.7, 0.3
-    if query_type == QUERY_TYPE_FALLBACK:
-        return 0.5, 0.5
-    return DEFAULT_HYBRID_ALPHA, DEFAULT_HYBRID_BETA
+def build_query_type_hybrid_weights(
+    query_type: str,
+    confidence: float = 1.0,
+) -> tuple[float, float]:
+    """按 query_type 和分类置信度动态调整 dense/lexical 融合权重。
+
+    置信度衰减策略：confidence < 1.0 时，权重向均衡 (0.5, 0.5) 线性收敛。
+    公式：alpha = base_alpha * confidence + 0.5 * (1 - confidence)
+
+    示例（FACTUAL 默认 confidence=0.6，base=(0.65, 0.35)）：
+      alpha = 0.65 * 0.6 + 0.5 * 0.4 = 0.59，更接近均衡，减少误分类损失。
+    高置信度（0.9）几乎不影响 type-specific 权重（偏差 < 0.01）。
+    """
+    base_alpha, base_beta = HYBRID_WEIGHT_BY_QUERY_TYPE.get(
+        query_type, DEFAULT_HYBRID_WEIGHTS
+    )
+    if confidence >= 1.0:
+        return (base_alpha, base_beta)
+    alpha = round(base_alpha * confidence + 0.5 * (1.0 - confidence), 4)
+    return (alpha, round(1.0 - alpha, 4))
 
 
 def build_doc_pipeline_config(
     query_type: str = "",
     query: str = "",
+    confidence: float = 1.0,
 ) -> DocRetrievalPipelineConfig:
     """根据 query_type/query 生成文档检索 pipeline 配置。
 
     对比类问题需要更广覆盖；定义类问题更依赖关键词和专有名词；追问改写后更依赖
     语义召回；fallback 类问题更保守，避免低置信模糊问题硬答。
+    confidence 用于衰减 hybrid 权重：分类不确定时向均衡 (0.5, 0.5) 收敛。
     """
 
     doc_top_k = RAG_CONFIG.doc_top_k
     doc_rerank_top_k = RAG_CONFIG.doc_rerank_top_k
     soft_match_threshold = RAG_CONFIG.doc_soft_match_threshold
     candidate_multiplier = DOC_CANDIDATE_MULTIPLIER
-    hybrid_alpha, hybrid_beta = build_query_type_hybrid_weights(query_type)
+    hybrid_alpha, hybrid_beta = build_query_type_hybrid_weights(query_type, confidence)
     normalized_query = query.strip()
 
     if query_type == QUERY_TYPE_COMPARISON:
@@ -431,8 +455,12 @@ def run_doc_retrieval_pipeline(
     return build_doc_retrieval_result(state)
 
 
-def retrieve_docs_for_rag(query: str, query_type: str = "") -> DocRetrievalResult:
+def retrieve_docs_for_rag(
+    query: str,
+    query_type: str = "",
+    confidence: float = 1.0,
+) -> DocRetrievalResult:
     """执行 RAG 文档检索主流程。"""
 
-    config = build_doc_pipeline_config(query_type, query=query)
+    config = build_doc_pipeline_config(query_type, query=query, confidence=confidence)
     return run_doc_retrieval_pipeline(query, config)

@@ -105,3 +105,4 @@ class RagAnswerResult:
     answer: str
     errors: list[str]
     timing_ms: float
+    citation_correction: dict = field(default_factory=dict)
