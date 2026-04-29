@@ -49,7 +49,20 @@ def test_classifies_followup_from_original_query() -> None:
     assert result.query_type == QUERY_TYPE_FOLLOWUP
 
 
+def test_classifies_pronoun_query_as_followup_with_context() -> None:
+    result = _classify("它怎么配置", has_context=True)
+
+    assert result.query_type == QUERY_TYPE_FOLLOWUP
+
+
+def test_classifies_vague_instruction_as_followup_with_context() -> None:
+    result = _classify("介绍一下", has_context=True)
+
+    assert result.query_type == QUERY_TYPE_FOLLOWUP
+
+
 def test_classifies_vague_query_as_fallback_without_context() -> None:
+
     result = _classify("介绍一下", has_context=False)
 
     assert result.query_type == QUERY_TYPE_FALLBACK

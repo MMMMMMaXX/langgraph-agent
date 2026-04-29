@@ -83,6 +83,9 @@ class RewriteResult:
     query: str
     errors: list[str]
     timing_ms: float
+    mode: str = "default"
+    trigger: str = ""
+    skipped_reason: str = ""
 
 
 @dataclass

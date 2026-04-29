@@ -9,48 +9,21 @@ from __future__ import annotations
 
 import pytest
 
-from app.agents.rag.doc_pipeline import retrieve_docs_for_rag, select_source_diverse_hits
+from app.agents.rag.doc_pipeline import (
+    retrieve_docs_for_rag,
+    select_source_diverse_hits,
+)
 from app.agents.rag.memory_pipeline import filter_memory_hits, retrieve_memory_for_rag
-from app.agents.rag.constants import QUERY_TYPE_COMPARISON, QUERY_TYPE_FALLBACK
+from app.agents.rag.constants import (
+    QUERY_TYPE_COMPARISON,
+    QUERY_TYPE_DEFINITION,
+    QUERY_TYPE_FALLBACK,
+    QUERY_TYPE_FOLLOWUP,
+)
 from app.agents.rag.rewrite import (
     get_user_messages,
     rewrite_rag_query,
-    simple_rewrite,
 )
-
-
-# ---------------------------------------------------------------------------
-# rewrite.simple_rewrite （纯函数）
-# ---------------------------------------------------------------------------
-
-
-def test_simple_rewrite_handles_na_xxx_ne_pattern() -> None:
-    """ "那 北京 呢" → "北京气候怎么样？"（确定性兜底，省一次 LLM）。"""
-    assert simple_rewrite("那北京呢") == "北京气候怎么样？"
-    assert simple_rewrite("  那深圳呢  ") == "深圳气候怎么样？"
-
-
-def test_simple_rewrite_short_city_query() -> None:
-    """4 字以内 & 不带问号 → 补成天气问法。"""
-    assert simple_rewrite("北京") == "北京气候怎么样？"
-    assert simple_rewrite("上海") == "上海气候怎么样？"
-
-
-def test_simple_rewrite_returns_none_for_long_query() -> None:
-    """长文本不做轻量改写，留给 LLM 或默认兜底。"""
-    assert simple_rewrite("请问上海今天天气怎么样") is None
-
-
-def test_simple_rewrite_returns_none_when_question_mark_present() -> None:
-    """已经带问号的短问题不改写。"""
-    assert simple_rewrite("北京？") is None
-
-
-def test_simple_rewrite_returns_none_when_only_na_ne() -> None:
-    """纯 "那呢" → city 为空，走不到 city 分支，但会落入短句兜底。"""
-    # 行为记录：此处不会返回 None，而是被当作短句补成 "那呢气候怎么样？"。
-    # 这更多是"短句兜底优先级高"的副作用，记录当前行为，防止将来静默改动。
-    assert simple_rewrite("那呢") == "那呢气候怎么样？"
 
 
 # ---------------------------------------------------------------------------
@@ -88,18 +61,19 @@ def test_get_user_messages_no_user_role_returns_empty() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_rewrite_rag_query_simple_branch_skips_llm(llm_stub) -> None:
-    """simple_rewrite 命中时，不应发起任何 LLM 调用。"""
+def test_rewrite_rag_query_short_followup_without_context_skips_llm(llm_stub) -> None:
+    """没有上下文时，短追问不调 LLM，只做问号归一化。"""
     result = rewrite_rag_query("那北京呢", messages=[], summary="")
-    assert result.query == "北京气候怎么样？"
+    assert result.query == "那北京呢？"
     assert result.errors == []
     assert result.timing_ms >= 0
-    # simple_rewrite 分支不调 LLM
+    assert result.mode == "skip"
+    assert result.skipped_reason == "no_context"
     assert llm_stub.calls == []
 
 
 def test_rewrite_rag_query_na_prefix_triggers_llm(llm_stub) -> None:
-    """不命中 simple_rewrite 的 "那xxx..." → 走 LLM 改写路径。"""
+    """有上下文的追问走 LLM 改写路径。"""
     llm_stub.set_response("北京今天气温多少度")
 
     result = rewrite_rag_query(
@@ -107,8 +81,10 @@ def test_rewrite_rag_query_na_prefix_triggers_llm(llm_stub) -> None:
         messages=[{"role": "user", "content": "上海气温"}],
         summary="用户关注各城市气温",
     )
-    assert result.query == "北京今天气温多少度"
+    assert result.query == "北京今天气温多少度？"
     assert result.errors == []
+    assert result.mode == "llm"
+    assert result.trigger == "followup_query"
     # 确实调用了 LLM
     assert len(llm_stub.calls) == 1
     call = llm_stub.calls[0]
@@ -128,7 +104,15 @@ def test_rewrite_rag_query_llm_failure_falls_back_to_append_mark(llm_stub) -> No
 
     llm_stub.set_response_fn(raise_error)
 
-    result = rewrite_rag_query("那上海怎么样", messages=[], summary="")
+    result = rewrite_rag_query(
+        "那上海怎么样",
+        messages=[
+            {"role": "user", "content": "北京气候怎么样？"},
+            {"role": "assistant", "content": "北京气候四季分明。"},
+            {"role": "user", "content": "那上海怎么样"},
+        ],
+        summary="用户在比较城市气候",
+    )
     # 原 message 不以问号结尾 → 补上
     assert result.query.endswith("？")
     # 错误信息被记录
@@ -136,7 +120,7 @@ def test_rewrite_rag_query_llm_failure_falls_back_to_append_mark(llm_stub) -> No
 
 
 def test_rewrite_rag_query_default_branch_appends_question_mark(llm_stub) -> None:
-    """既不命中 simple_rewrite、又不以"那"开头 → 默认直接补问号。"""
+    """非追问默认直接补问号，不调用 LLM。"""
     result = rewrite_rag_query("深圳下周空气质量", messages=[], summary="")
     assert result.query == "深圳下周空气质量？"
     assert result.errors == []
@@ -298,7 +282,9 @@ def test_doc_pipeline_comparison_soft_match_keeps_multiple_docs(
         _doc(score=0.62, doc_id="b", chunk_index=0),
     ]
 
-    result = retrieve_docs_for_rag("A 和 B 有什么区别", query_type=QUERY_TYPE_COMPARISON)
+    result = retrieve_docs_for_rag(
+        "A 和 B 有什么区别", query_type=QUERY_TYPE_COMPARISON
+    )
 
     assert [doc["doc_id"] for doc in result.filtered_docs] == ["a", "b"]
 
@@ -316,17 +302,70 @@ def test_doc_pipeline_skips_rerank_when_policy_allows(doc_pipeline_io: dict) -> 
 def test_doc_pipeline_comparison_query_uses_larger_top_k(
     doc_pipeline_io: dict,
 ) -> None:
-    result = retrieve_docs_for_rag("A 和 B 有什么区别", query_type=QUERY_TYPE_COMPARISON)
+    result = retrieve_docs_for_rag(
+        "A 和 B 有什么区别", query_type=QUERY_TYPE_COMPARISON
+    )
 
     assert result.retrieval_debug["query_type"] == QUERY_TYPE_COMPARISON
     assert result.retrieval_debug["requested_top_k"] >= 8
-    assert result.retrieval_debug["candidate_top_k"] >= 32
+    assert result.retrieval_debug["candidate_top_k"] >= 40
+    assert result.retrieval_debug["hybrid_alpha"] == 0.6
+    assert result.retrieval_debug["hybrid_beta"] == 0.4
     assert "dense_search" in result.retrieval_debug["pipeline_steps"]
     assert "lexical_search" in result.retrieval_debug["pipeline_steps"]
     assert "hybrid_merge" in result.retrieval_debug["pipeline_steps"]
     assert "threshold" in result.retrieval_debug["pipeline_steps"]
     assert "source_diversity" in result.retrieval_debug["pipeline_steps"]
     assert result.retrieval_debug["source_diversity_enabled"] is True
+
+
+def test_doc_pipeline_definition_query_boosts_lexical_weight(
+    doc_pipeline_io: dict,
+) -> None:
+    doc_pipeline_io["docs"] = [
+        _doc(score=0.8, doc_id="dense", content="semantic only", chunk_index=0),
+    ]
+    doc_pipeline_io["lexical_docs"] = [
+        _doc(
+            score=0.0,
+            doc_id="lexical",
+            content="WAI-ARIA exact match",
+            semantic_score=0.0,
+            keyword_score=10.0,
+            keyword_score_norm=1.0,
+            chunk_index=0,
+        ),
+    ]
+
+    result = retrieve_docs_for_rag("WAI-ARIA 是什么", query_type=QUERY_TYPE_DEFINITION)
+
+    assert result.docs[0]["doc_id"] == "lexical"
+    assert result.retrieval_debug["requested_top_k"] >= 6
+    assert result.retrieval_debug["hybrid_alpha"] == 0.55
+    assert result.retrieval_debug["hybrid_beta"] == 0.45
+    assert result.retrieval_debug["hybrid_weight_strategy"] == "query_type_dynamic"
+
+
+def test_doc_pipeline_followup_query_expands_rerank_top_k(
+    doc_pipeline_io: dict,
+) -> None:
+    result = retrieve_docs_for_rag(
+        "Comate Skill 怎么调试？", query_type=QUERY_TYPE_FOLLOWUP
+    )
+
+    assert result.retrieval_debug["requested_top_k"] >= 6
+    assert result.retrieval_debug["candidate_top_k"] >= 24
+    assert result.retrieval_debug["hybrid_alpha"] == 0.7
+    assert result.retrieval_debug["hybrid_beta"] == 0.3
+
+
+def test_doc_pipeline_short_query_expands_candidate_pool(
+    doc_pipeline_io: dict,
+) -> None:
+    result = retrieve_docs_for_rag("WAI-ARIA")
+
+    assert result.retrieval_debug["requested_top_k"] >= 6
+    assert result.retrieval_debug["candidate_top_k"] >= 30
 
 
 def test_doc_pipeline_rerank_called_when_policy_forbids_skip(
@@ -436,7 +475,9 @@ def test_doc_pipeline_comparison_keeps_source_diverse_blocks(
         _doc(score=0.86, doc_id="b", chunk_index=0),
     ]
 
-    result = retrieve_docs_for_rag("A 和 B 有什么区别", query_type=QUERY_TYPE_COMPARISON)
+    result = retrieve_docs_for_rag(
+        "A 和 B 有什么区别", query_type=QUERY_TYPE_COMPARISON
+    )
 
     assert [hit["doc_id"] for hit in result.merged_doc_hits] == ["a", "b"]
     assert result.retrieval_debug["source_diversity_enabled"] is True

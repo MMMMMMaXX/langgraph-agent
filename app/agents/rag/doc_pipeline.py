@@ -10,7 +10,9 @@ dense search -> lexical search -> hybrid merge -> threshold -> rerank
 from app.agents.rag.chunk_merge import merge_adjacent_doc_hits
 from app.agents.rag.constants import (
     QUERY_TYPE_COMPARISON,
+    QUERY_TYPE_DEFINITION,
     QUERY_TYPE_FALLBACK,
+    QUERY_TYPE_FOLLOWUP,
 )
 from app.agents.rag.doc_policy import should_skip_doc_rerank
 from app.agents.rag.types import (
@@ -34,32 +36,62 @@ from app.utils.errors import build_error_info
 from app.utils.logger import now_ms
 
 
-def build_doc_pipeline_config(query_type: str = "") -> DocRetrievalPipelineConfig:
-    """根据 query_type 生成文档检索 pipeline 配置。
+def build_query_type_hybrid_weights(query_type: str) -> tuple[float, float]:
+    """按 query_type 动态调整 dense/lexical 融合权重。"""
 
-    对比类问题通常需要更多候选进入 rerank；fallback 类问题则更保守，避免低置信
-    模糊问题硬答。
+    if query_type == QUERY_TYPE_DEFINITION:
+        return 0.55, 0.45
+    if query_type == QUERY_TYPE_COMPARISON:
+        return 0.6, 0.4
+    if query_type == QUERY_TYPE_FOLLOWUP:
+        return 0.7, 0.3
+    if query_type == QUERY_TYPE_FALLBACK:
+        return 0.5, 0.5
+    return DEFAULT_HYBRID_ALPHA, DEFAULT_HYBRID_BETA
+
+
+def build_doc_pipeline_config(
+    query_type: str = "",
+    query: str = "",
+) -> DocRetrievalPipelineConfig:
+    """根据 query_type/query 生成文档检索 pipeline 配置。
+
+    对比类问题需要更广覆盖；定义类问题更依赖关键词和专有名词；追问改写后更依赖
+    语义召回；fallback 类问题更保守，避免低置信模糊问题硬答。
     """
 
     doc_top_k = RAG_CONFIG.doc_top_k
     doc_rerank_top_k = RAG_CONFIG.doc_rerank_top_k
     soft_match_threshold = RAG_CONFIG.doc_soft_match_threshold
+    candidate_multiplier = DOC_CANDIDATE_MULTIPLIER
+    hybrid_alpha, hybrid_beta = build_query_type_hybrid_weights(query_type)
+    normalized_query = query.strip()
 
     if query_type == QUERY_TYPE_COMPARISON:
         doc_top_k = max(doc_top_k, 8)
+        doc_rerank_top_k = max(doc_rerank_top_k, 4)
+        candidate_multiplier = max(candidate_multiplier, 5)
+    elif query_type == QUERY_TYPE_DEFINITION:
+        doc_top_k = max(doc_top_k, 6)
+    elif query_type == QUERY_TYPE_FOLLOWUP:
+        doc_top_k = max(doc_top_k, 6)
         doc_rerank_top_k = max(doc_rerank_top_k, 3)
     elif query_type == QUERY_TYPE_FALLBACK:
         soft_match_threshold = RAG_CONFIG.doc_score_threshold
+
+    if normalized_query and len(normalized_query) <= 12:
+        doc_top_k = max(doc_top_k, 6)
+        candidate_multiplier = max(candidate_multiplier, 5)
 
     return DocRetrievalPipelineConfig(
         query_type=query_type or "unknown",
         doc_top_k=doc_top_k,
         doc_rerank_top_k=doc_rerank_top_k,
-        candidate_top_k=max(doc_top_k * DOC_CANDIDATE_MULTIPLIER, doc_top_k),
+        candidate_top_k=max(doc_top_k * candidate_multiplier, doc_top_k),
         score_threshold=RAG_CONFIG.doc_score_threshold,
         soft_match_threshold=soft_match_threshold,
-        hybrid_alpha=DEFAULT_HYBRID_ALPHA,
-        hybrid_beta=DEFAULT_HYBRID_BETA,
+        hybrid_alpha=hybrid_alpha,
+        hybrid_beta=hybrid_beta,
         source_diversity_enabled=query_type == QUERY_TYPE_COMPARISON,
     )
 
@@ -349,6 +381,7 @@ def run_debug_step(state: DocRetrievalPipelineState) -> DocRetrievalPipelineStat
             "lexical_enabled": state.config.lexical_enabled,
             "hybrid_alpha": state.config.hybrid_alpha,
             "hybrid_beta": state.config.hybrid_beta,
+            "hybrid_weight_strategy": "query_type_dynamic",
             "dense_count": len(state.dense_hits),
             "lexical_count": len(state.lexical_hits),
             "hybrid_count": len(state.hybrid_hits),
@@ -401,5 +434,5 @@ def run_doc_retrieval_pipeline(
 def retrieve_docs_for_rag(query: str, query_type: str = "") -> DocRetrievalResult:
     """执行 RAG 文档检索主流程。"""
 
-    config = build_doc_pipeline_config(query_type)
+    config = build_doc_pipeline_config(query_type, query=query)
     return run_doc_retrieval_pipeline(query, config)

@@ -42,7 +42,9 @@ def rag_agent_node(state: AgentState) -> AgentState:
     # 收集 embedding 的 profile 信息（模型、维度等），只用于 debug 展示，
     # 不影响实际检索，便于在 trace 里对齐"查询侧"和"索引侧"是否使用同一模型。
     embedding_profiles = {
-        "doc_query": get_profile_runtime_info(PROFILE_QUERY_EMBEDDING, kind="embedding"),
+        "doc_query": get_profile_runtime_info(
+            PROFILE_QUERY_EMBEDDING, kind="embedding"
+        ),
         "memory_query": get_profile_runtime_info(
             PROFILE_QUERY_EMBEDDING, kind="embedding"
         ),
@@ -53,12 +55,19 @@ def rag_agent_node(state: AgentState) -> AgentState:
     }
 
     # ===== 1. 查询改写 =====
-    # 把"那上海呢？"这种省略型追问，借助历史 messages 和 summary，
-    # 改写成"上海气候怎么样？"这种可以独立检索的完整问题。
+    # 先基于原始问题做预分类，用 FOLLOWUP 等策略信号决定是否需要 LLM 改写；
+    # 改写后再最终分类，保证检索和回答策略基于完整 query 与原始追问信号共同决策。
+    has_context = bool(summary or len(messages) > 1)
+    pre_query_classification = classify_rag_query(
+        original_query=message,
+        rewritten_query=message,
+        has_context=has_context,
+    )
     rewrite_result = rewrite_rag_query(
         message,
         messages=messages,
         summary=summary,
+        classification=pre_query_classification,
     )
     rewritten = rewrite_result.query
     errors.extend(rewrite_result.errors)
@@ -66,7 +75,7 @@ def rag_agent_node(state: AgentState) -> AgentState:
     query_classification = classify_rag_query(
         original_query=message,
         rewritten_query=rewritten,
-        has_context=bool(summary or len(messages) > 1),
+        has_context=has_context,
     )
 
     # ===== 2. 文档检索（知识库） =====
@@ -153,6 +162,7 @@ def rag_agent_node(state: AgentState) -> AgentState:
         citations=rag_context.citations,
         context_compression=rag_context.context_compression,
         query_classification=query_classification,
+        rewrite_result=rewrite_result,
         answer_strategy=doc_answer_strategy,
         sub_timings_ms=sub_timings_ms,
         errors=errors,

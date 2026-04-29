@@ -194,7 +194,7 @@ def _patch_pipelines(
 
     captured = {"memory_enabled": None}
 
-    def fake_rewrite(message, messages, summary):
+    def fake_rewrite(message, messages, summary, classification=None):
         return RewriteResult(
             query=rewritten,
             errors=list(rewrite_errors or []),

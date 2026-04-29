@@ -35,10 +35,13 @@ COMPARISON_QUERY_KEYWORDS = (
 )
 FOLLOWUP_REFERENCE_KEYWORDS = (
     "它",
+    "这",
     "这个",
+    "该",
     "那个",
     "前者",
     "后者",
+    "上述",
     "上面",
     "刚才",
 )
@@ -94,7 +97,11 @@ def classify_rag_query(
     combined = f"{original}\n{rewritten}"
 
     if _looks_like_short_followup(original) or (
-        has_context and _contains_any(original, FOLLOWUP_REFERENCE_KEYWORDS)
+        has_context
+        and (
+            _contains_any(original, FOLLOWUP_REFERENCE_KEYWORDS)
+            or _contains_any(original, VAGUE_QUERY_KEYWORDS)
+        )
     ):
         return QueryClassification(
             query_type=QUERY_TYPE_FOLLOWUP,

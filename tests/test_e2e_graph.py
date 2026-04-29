@@ -96,7 +96,7 @@ def isolate_rag_pipelines(monkeypatch: pytest.MonkeyPatch) -> Iterator[dict]:
     monkeypatch.setattr(
         rag_mod,
         "rewrite_rag_query",
-        lambda message, messages, summary: RewriteResult(
+        lambda message, messages, summary, classification=None: RewriteResult(
             query=message, errors=[], timing_ms=0.1
         ),
     )

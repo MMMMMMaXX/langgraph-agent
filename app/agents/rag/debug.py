@@ -14,7 +14,7 @@ from app.constants.model_profiles import (
     PROFILE_DEFAULT_CHAT,
     PROFILE_REWRITE,
 )
-from app.agents.rag.types import QueryClassification
+from app.agents.rag.types import QueryClassification, RewriteResult
 from app.llm import get_profile_runtime_info
 from app.utils.logger import preview, preview_hits
 
@@ -104,6 +104,7 @@ def build_rag_debug_payload(
     citations: list[dict],
     context_compression: dict,
     query_classification: QueryClassification,
+    rewrite_result: RewriteResult,
     answer_strategy: dict,
     sub_timings_ms: dict[str, float],
     errors: list[str],
@@ -127,13 +128,20 @@ def build_rag_debug_payload(
             "confidence": query_classification.confidence,
             "reason": query_classification.reason,
         },
+        "query_rewrite": {
+            "mode": rewrite_result.mode,
+            "trigger": rewrite_result.trigger,
+            "skipped_reason": rewrite_result.skipped_reason,
+        },
         "threshold": threshold,
         "doc_context_chars": len(doc_context),
         "context_compression": context_compression,
         "citations": citations,
         "citation_count": len(citations),
         "citation_doc_ids": [
-            citation.get("doc_id", "") for citation in citations if citation.get("doc_id")
+            citation.get("doc_id", "")
+            for citation in citations
+            if citation.get("doc_id")
         ],
         "answer_strategy": answer_strategy["name"],
         "answer_context_chars": answer_strategy["context_chars"],
@@ -196,7 +204,9 @@ def build_rag_log_extra(
         "citations": citations,
         "citationCount": len(citations),
         "citationDocIds": [
-            citation.get("doc_id", "") for citation in citations if citation.get("doc_id")
+            citation.get("doc_id", "")
+            for citation in citations
+            if citation.get("doc_id")
         ],
         "answerStrategy": answer_strategy["name"],
         "answerContextChars": answer_strategy["context_chars"],
