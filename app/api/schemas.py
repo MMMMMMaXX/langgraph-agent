@@ -81,6 +81,16 @@ class KnowledgeDocumentDetailResponse(BaseModel):
     document: dict[str, Any]
 
 
+class KnowledgeChunkInspectResponse(BaseModel):
+    """GET /knowledge/docs/{doc_id}/chunks/inspect 的响应。
+
+    report 是只读诊断报告，用来观察 chunk 长度、章节分布和样例，
+    不会触发重新切片或重建索引。
+    """
+
+    report: dict[str, Any]
+
+
 class KnowledgeDeleteResponse(BaseModel):
     """DELETE /knowledge/docs/{doc_id} 的响应。"""
 

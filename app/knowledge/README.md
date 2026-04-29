@@ -72,6 +72,25 @@ curl http://127.0.0.1:8000/knowledge/docs
 curl http://127.0.0.1:8000/knowledge/docs/<doc_id>
 ```
 
+### 查看 chunk 质量
+
+API：
+
+```bash
+curl "http://127.0.0.1:8000/knowledge/docs/<doc_id>/chunks/inspect?sample_limit=3"
+```
+
+本地 CLI：
+
+```bash
+PYTHONPATH=. ./.venv/bin/python scripts/inspect_knowledge_chunks.py \
+  --doc-id <doc_id> \
+  --sample-limit 3
+```
+
+返回/输出会包含 chunk 数量、长度分布、短/长 chunk 数量、章节分布、样例和
+warnings。这个检查只读 SQLite catalog，不会重新切片，也不会改 Chroma。
+
 ### 删除文档
 
 ```bash

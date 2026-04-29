@@ -19,6 +19,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api import app, clear_session_store, session_store
+from app.knowledge.chunk_inspector import ChunkQualityReport
 from app.knowledge.ingestion import KnowledgeImportResult
 from app.knowledge.management import KnowledgeDeleteResult, KnowledgeReindexResult
 
@@ -383,6 +384,66 @@ def test_reindex_all_knowledge_endpoint(
     assert body["doc_id"] == "*"
     assert body["doc_count"] == 4
     assert body["chunk_count"] == 10
+
+
+def test_inspect_knowledge_doc_chunks_endpoint(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.api.routes as routes_mod
+
+    class FakeCatalog:
+        def get_document(self, doc_id: str) -> dict:
+            assert doc_id == "doc-api"
+            return {"doc_id": doc_id}
+
+    monkeypatch.setattr(routes_mod, "KnowledgeCatalog", lambda: FakeCatalog())
+    monkeypatch.setattr(
+        routes_mod,
+        "inspect_document_chunks",
+        lambda doc_id, **kwargs: ChunkQualityReport(
+            doc_id=doc_id,
+            chunk_count=2,
+            total_chars=180,
+            min_chars=80,
+            max_chars=100,
+            avg_chars=90.0,
+            median_chars=90.0,
+            short_chunk_count=0,
+            long_chunk_count=0,
+            section_count=1,
+            top_sections=[{"section_title": "Intro", "chunk_count": 2}],
+            samples=[{"chunk_id": "doc-api::chunk::0", "preview": "hello"}],
+            warnings=["low_section_diversity"],
+        ),
+    )
+
+    resp = client.get("/knowledge/docs/doc-api/chunks/inspect?sample_limit=1")
+
+    assert resp.status_code == 200, resp.text
+    report = resp.json()["report"]
+    assert report["doc_id"] == "doc-api"
+    assert report["chunk_count"] == 2
+    assert report["top_sections"][0]["section_title"] == "Intro"
+    assert report["warnings"] == ["low_section_diversity"]
+
+
+def test_inspect_knowledge_doc_chunks_endpoint_returns_404(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.api.routes as routes_mod
+
+    class FakeCatalog:
+        def get_document(self, doc_id: str) -> None:
+            return None
+
+    monkeypatch.setattr(routes_mod, "KnowledgeCatalog", lambda: FakeCatalog())
+
+    resp = client.get("/knowledge/docs/missing/chunks/inspect")
+
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "document not found"
 
 
 def test_chat_persists_session_state_across_turns(

@@ -11,15 +11,18 @@ from __future__ import annotations
 
 import json
 import uuid
+from dataclasses import asdict
 from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 
 from app.knowledge import (
+    ChunkQualityThresholds,
     KnowledgeCatalog,
     KnowledgeImportInput,
     delete_knowledge_document,
+    inspect_document_chunks,
     import_knowledge_document,
     reindex_all_knowledge_documents,
     reindex_knowledge_document,
@@ -28,6 +31,7 @@ from .chat_runner import build_chat_result
 from .schemas import (
     ChatRequest,
     ChatResponse,
+    KnowledgeChunkInspectResponse,
     KnowledgeDocumentDetailResponse,
     KnowledgeDocumentListResponse,
     KnowledgeDeleteResponse,
@@ -181,6 +185,54 @@ def get_knowledge_doc(doc_id: str) -> KnowledgeDocumentDetailResponse:
     if document is None:
         raise HTTPException(status_code=404, detail="document not found")
     return KnowledgeDocumentDetailResponse(document=document)
+
+
+def _build_chunk_quality_thresholds(
+    *,
+    short_chars: int | None,
+    long_chars: int | None,
+) -> ChunkQualityThresholds | None:
+    """把查询参数转成 chunk 质量阈值；不传时使用 chunking 默认配置。"""
+
+    if short_chars is None and long_chars is None:
+        return None
+
+    defaults = ChunkQualityThresholds()
+    return ChunkQualityThresholds(
+        short_chars=short_chars or defaults.short_chars,
+        long_chars=long_chars or defaults.long_chars,
+    )
+
+
+@router.get(
+    "/knowledge/docs/{doc_id}/chunks/inspect",
+    response_model=KnowledgeChunkInspectResponse,
+)
+def inspect_knowledge_doc_chunks(
+    doc_id: str,
+    sample_limit: int = Query(default=5, ge=0, le=50),
+    short_chars: int | None = Query(default=None, ge=0),
+    long_chars: int | None = Query(default=None, ge=0),
+) -> KnowledgeChunkInspectResponse:
+    """查看单篇文档的 chunk 质量统计。
+
+    这是诊断接口，只读 SQLite catalog，不修改文档、不重建 Chroma。
+    """
+
+    catalog = KnowledgeCatalog()
+    if catalog.get_document(doc_id) is None:
+        raise HTTPException(status_code=404, detail="document not found")
+
+    report = inspect_document_chunks(
+        doc_id,
+        catalog=catalog,
+        sample_limit=sample_limit,
+        thresholds=_build_chunk_quality_thresholds(
+            short_chars=short_chars,
+            long_chars=long_chars,
+        ),
+    )
+    return KnowledgeChunkInspectResponse(report=asdict(report))
 
 
 @router.delete("/knowledge/docs/{doc_id}", response_model=KnowledgeDeleteResponse)
