@@ -453,6 +453,7 @@ def _search_report(query: str) -> SearchInspectReport:
         query_classification={"type": "definition", "confidence": 0.9},
         pipeline_config={"doc_top_k": 6},
         retrieval_debug={"dense_count": 1, "lexical_count": 1},
+        stage_metrics={"counts": {"dense": 1, "lexical": 1}},
         timings_ms={"docSearch": 1.0},
         dense_hits=[{"id": "doc1::chunk::0"}],
         lexical_hits=[{"id": "doc1::chunk::0"}],
@@ -491,6 +492,7 @@ def test_inspect_knowledge_search_post_endpoint(
     assert report["query"] == "WAI-ARIA 是什么"
     assert report["query_type"] == "definition"
     assert report["retrieval_debug"]["dense_count"] == 1
+    assert report["stage_metrics"]["counts"]["dense"] == 1
 
 
 def test_inspect_knowledge_search_get_endpoint(

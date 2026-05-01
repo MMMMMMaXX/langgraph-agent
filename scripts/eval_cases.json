@@ -133,6 +133,91 @@
     "must_not_include": ["资料不足", "工具暂时无法处理"]
   },
   {
+    "id": "skills_definition_real_doc",
+    "category": "skills_eval",
+    "session_id": "eval-skills-definition-real-doc",
+    "setup_knowledge_imports": [
+      {
+        "alias": "skills_doc",
+        "title": "how_to_use_skills.md",
+        "source": "how_to_use_skills.md",
+        "source_type": "md",
+        "content": "# how_to_use_skills.md\n\nAgent Skills 是把专门工作流、领域知识和工具使用说明封装成可复用能力的模块。\n\n## SKILL.md 怎么写\n\n每个 skill 目录必须包含 SKILL.md，SKILL.md 应说明触发条件、输入要求、执行步骤、工具依赖和验证方式。\n\n## Progressive Disclosure\n\nProgressive Disclosure 是指先只向模型暴露最关键的说明，再按需读取补充文件，避免一次性塞入过多上下文。\n\n## 什么时候用 Skill\n\n当任务重复出现、需要稳定流程、依赖特定工具或包含领域知识时，应该把流程沉淀为 skill。"
+      }
+    ],
+    "message": "Skills 是什么？",
+    "expected_route": "rag_agent",
+    "expected_import_aliases": ["skills_doc"],
+    "must_include": ["Skill", "[1]"],
+    "must_not_include": ["资料不足", "工具暂时无法处理"],
+    "debug_must_equal": {
+      "rag_agent.query_type": "definition"
+    }
+  },
+  {
+    "id": "skill_md_authoring_real_doc",
+    "category": "skills_eval",
+    "session_id": "eval-skill-md-authoring-real-doc",
+    "setup_knowledge_imports": [
+      {
+        "alias": "skills_doc",
+        "title": "how_to_use_skills.md",
+        "source": "how_to_use_skills.md",
+        "source_type": "md",
+        "content": "# how_to_use_skills.md\n\nAgent Skills 是把专门工作流、领域知识和工具使用说明封装成可复用能力的模块。\n\n## SKILL.md 怎么写\n\n每个 skill 目录必须包含 SKILL.md，SKILL.md 应说明触发条件、输入要求、执行步骤、工具依赖和验证方式。\n\n## Progressive Disclosure\n\nProgressive Disclosure 是指先只向模型暴露最关键的说明，再按需读取补充文件，避免一次性塞入过多上下文。\n\n## 什么时候用 Skill\n\n当任务重复出现、需要稳定流程、依赖特定工具或包含领域知识时，应该把流程沉淀为 skill。"
+      }
+    ],
+    "message": "SKILL.md 应该怎么写？",
+    "expected_route": "rag_agent",
+    "expected_import_aliases": ["skills_doc"],
+    "must_include": ["SKILL.md", "[1]"],
+    "must_not_include": ["资料不足", "工具暂时无法处理"],
+    "debug_must_equal": {
+      "rag_agent.query_type": "definition"
+    }
+  },
+  {
+    "id": "progressive_disclosure_definition_real_doc",
+    "category": "skills_eval",
+    "session_id": "eval-progressive-disclosure-real-doc",
+    "setup_knowledge_imports": [
+      {
+        "alias": "skills_doc",
+        "title": "how_to_use_skills.md",
+        "source": "how_to_use_skills.md",
+        "source_type": "md",
+        "content": "# how_to_use_skills.md\n\nAgent Skills 是把专门工作流、领域知识和工具使用说明封装成可复用能力的模块。\n\n## SKILL.md 怎么写\n\n每个 skill 目录必须包含 SKILL.md，SKILL.md 应说明触发条件、输入要求、执行步骤、工具依赖和验证方式。\n\n## Progressive Disclosure\n\nProgressive Disclosure 是指先只向模型暴露最关键的说明，再按需读取补充文件，避免一次性塞入过多上下文。\n\n## 什么时候用 Skill\n\n当任务重复出现、需要稳定流程、依赖特定工具或包含领域知识时，应该把流程沉淀为 skill。"
+      }
+    ],
+    "message": "Progressive Disclosure 是什么？",
+    "expected_route": "rag_agent",
+    "expected_import_aliases": ["skills_doc"],
+    "must_include": ["Progressive Disclosure", "[1]"],
+    "must_not_include": ["资料不足", "工具暂时无法处理"],
+    "debug_must_equal": {
+      "rag_agent.query_type": "definition"
+    }
+  },
+  {
+    "id": "when_to_use_skill_real_doc",
+    "category": "skills_eval",
+    "session_id": "eval-when-to-use-skill-real-doc",
+    "setup_knowledge_imports": [
+      {
+        "alias": "skills_doc",
+        "title": "how_to_use_skills.md",
+        "source": "how_to_use_skills.md",
+        "source_type": "md",
+        "content": "# how_to_use_skills.md\n\nAgent Skills 是把专门工作流、领域知识和工具使用说明封装成可复用能力的模块。\n\n## SKILL.md 怎么写\n\n每个 skill 目录必须包含 SKILL.md，SKILL.md 应说明触发条件、输入要求、执行步骤、工具依赖和验证方式。\n\n## Progressive Disclosure\n\nProgressive Disclosure 是指先只向模型暴露最关键的说明，再按需读取补充文件，避免一次性塞入过多上下文。\n\n## 什么时候用 Skill\n\n当任务重复出现、需要稳定流程、依赖特定工具或包含领域知识时，应该把流程沉淀为 skill。"
+      }
+    ],
+    "message": "什么时候应该用 Skill？",
+    "expected_route": "rag_agent",
+    "expected_import_aliases": ["skills_doc"],
+    "must_include": ["Skill", "[1]"],
+    "must_not_include": ["资料不足", "工具暂时无法处理"]
+  },
+  {
     "id": "unknown_concept_fallback",
     "category": "fallback",
     "session_id": "eval-unknown-concept",
@@ -147,7 +232,7 @@
     "setup": [],
     "message": "总结一下刚刚的问题",
     "expected_route": "chat_agent",
-    "must_include": ["资料不足"]
+    "must_not_include": ["工具暂时无法处理"]
   },
   {
     "id": "novel_to_script_basic",

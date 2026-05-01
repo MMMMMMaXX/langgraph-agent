@@ -15,6 +15,7 @@ from app.agents.rag.constants import (
 )
 from app.agents.rag.types import QueryClassification
 from app.config import RAG_CONFIG
+from app.constants.keywords import DEFINITION_QUERY_KEYWORDS, contains_any
 from app.constants.policies import (
     ANSWER_STRATEGY_DEFAULT_SHORT,
     ANSWER_STRATEGY_DEFINITION_SHORT,
@@ -24,7 +25,7 @@ from app.constants.policies import (
 def is_definition_query(message: str) -> bool:
     """判断是否是定义类问题。"""
 
-    return any(keyword in message for keyword in ["是什么", "什么是", "定义", "概念"])
+    return contains_any(message, DEFINITION_QUERY_KEYWORDS)
 
 
 def adapt_strategy_max_tokens(strategy: dict, actual_context_chars: int) -> dict:

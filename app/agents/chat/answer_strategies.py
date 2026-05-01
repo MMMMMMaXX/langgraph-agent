@@ -9,7 +9,11 @@ from app.agents.chat.history_summary import (
 )
 from app.agents.chat.intent import extract_city_from_query, is_immediate_summary_query
 from app.agents.chat.types import ChatAnswerResult
-from app.constants.policies import HISTORY_POLICY_NONE, HISTORY_POLICY_RECENT
+from app.constants.policies import (
+    HISTORY_POLICY_NONE,
+    HISTORY_POLICY_RECENT,
+    INSUFFICIENT_KNOWLEDGE_ANSWER,
+)
 from app.llm import LLMCallError
 from app.memory.vector_memory import build_global_memory_index
 from app.utils.errors import build_error_info
@@ -45,7 +49,7 @@ def answer_existence_query(
         else:
             answer = f"没有查询过{city}的相关信息。"
     else:
-        answer = "资料不足"
+        answer = INSUFFICIENT_KNOWLEDGE_ANSWER
 
     return ChatAnswerResult(
         answer=answer,
@@ -105,7 +109,7 @@ def answer_summary_query(
                 answer = generate_summary_answer(message, summary, on_delta=on_delta)
                 used_summary = True
             except LLMCallError as exc:
-                answer = "资料不足"
+                answer = INSUFFICIENT_KNOWLEDGE_ANSWER
                 errors.append(
                     build_error_info(
                         exc,
@@ -174,8 +178,10 @@ def answer_fallback_summary(
     try:
         answer = generate_summary_answer(message, summary, on_delta=on_delta)
     except LLMCallError as exc:
-        answer = "资料不足"
-        errors.append(build_error_info(exc, stage="generate_summary_answer", source="llm"))
+        answer = INSUFFICIENT_KNOWLEDGE_ANSWER
+        errors.append(
+            build_error_info(exc, stage="generate_summary_answer", source="llm")
+        )
 
     return ChatAnswerResult(
         answer=answer,

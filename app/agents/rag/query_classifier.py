@@ -18,37 +18,13 @@ from app.agents.rag.constants import (
 )
 from app.agents.rag.types import QueryClassification
 from app.constants.keywords import (
+    DEFINITION_QUERY_KEYWORDS,
     FOLLOWUP_QUERY_MAX_CHARS,
     FOLLOWUP_QUERY_PREFIXES,
     FOLLOWUP_QUERY_SUFFIXES,
+    contains_any,
 )
 
-DEFINITION_QUERY_KEYWORDS = (
-    # 概念类
-    "是什么",
-    "什么是",
-    "定义",
-    "概念",
-    "含义",
-    "是什么意思",
-    "指的是",
-    "什么叫",
-    "怎么理解",
-    # 操作/使用类：这类问题同样需要"概念 + 关键作用"的定义型回答策略
-    "怎么用",
-    "如何使用",
-    "怎么使用",
-    "如何配置",
-    "怎么配置",
-    "如何设置",
-    "怎么设置",
-    # 功能/作用类
-    "有什么作用",
-    "用来做什么",
-    "有什么功能",
-    "有什么用",
-    "能做什么",
-)
 COMPARISON_QUERY_KEYWORDS = (
     "区别",
     "差异",
@@ -85,10 +61,6 @@ _VALID_QUERY_TYPES = {
 }
 
 
-def _contains_any(text: str, keywords: tuple[str, ...]) -> bool:
-    return any(keyword in text for keyword in keywords)
-
-
 def _looks_like_short_followup(message: str) -> bool:
     stripped = message.strip()
     if len(stripped) > FOLLOWUP_QUERY_MAX_CHARS:
@@ -99,7 +71,7 @@ def _looks_like_short_followup(message: str) -> bool:
 
 
 def _looks_like_comparison(message: str) -> bool:
-    if _contains_any(message, COMPARISON_QUERY_KEYWORDS):
+    if contains_any(message, COMPARISON_QUERY_KEYWORDS):
         return True
     return ("和" in message or "与" in message) and (
         "关系" in message or "不同" in message or "一样" in message
@@ -112,7 +84,7 @@ def _looks_like_vague_query(message: str, has_context: bool) -> bool:
         return True
     if len(stripped) <= 2:
         return True
-    if _contains_any(stripped, VAGUE_QUERY_KEYWORDS) and not has_context:
+    if contains_any(stripped, VAGUE_QUERY_KEYWORDS) and not has_context:
         return True
     return False
 
@@ -215,8 +187,8 @@ def classify_rag_query(
     if _looks_like_short_followup(original) or (
         has_context
         and (
-            _contains_any(original, FOLLOWUP_REFERENCE_KEYWORDS)
-            or _contains_any(original, VAGUE_QUERY_KEYWORDS)
+            contains_any(original, FOLLOWUP_REFERENCE_KEYWORDS)
+            or contains_any(original, VAGUE_QUERY_KEYWORDS)
         )
     ):
         return QueryClassification(
@@ -232,7 +204,7 @@ def classify_rag_query(
             reason="query_contains_comparison_signal",
         )
 
-    if _contains_any(combined, DEFINITION_QUERY_KEYWORDS):
+    if contains_any(combined, DEFINITION_QUERY_KEYWORDS):
         return QueryClassification(
             query_type=QUERY_TYPE_DEFINITION,
             confidence=0.9,

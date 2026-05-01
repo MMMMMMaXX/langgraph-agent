@@ -66,3 +66,52 @@ def test_knowledge_catalog_fts_search_supports_chinese_bigram(tmp_path) -> None:
 
     assert hits
     assert hits[0]["id"] == "doc2::chunk::0"
+
+
+def test_knowledge_catalog_fts_search_downweights_repeated_doc_title(
+    tmp_path,
+) -> None:
+    db_path = tmp_path / "knowledge.sqlite3"
+    catalog = KnowledgeCatalog(db_path)
+    catalog.reset()
+    catalog.upsert_document(
+        doc_id="doc-skills",
+        title="Skills 构建指南",
+        source="skills.md",
+        content="Skills 构建指南",
+    )
+    catalog.replace_chunks(
+        [
+            KnowledgeChunkRecord(
+                chunk_id="doc-skills::chunk::0",
+                doc_id="doc-skills",
+                doc_title="Skills 构建指南",
+                source="skills.md",
+                section_title="定义成功标准",
+                chunk_index=0,
+                content="用户不需要提示 Claude 下一步该做什么。",
+                start_char=0,
+                end_char=20,
+                chunk_char_len=20,
+            ),
+            KnowledgeChunkRecord(
+                chunk_id="doc-skills::chunk::1",
+                doc_id="doc-skills",
+                doc_title="Skills 构建指南",
+                source="skills.md",
+                section_title="Skills 是什么",
+                chunk_index=1,
+                content="Agent Skills 是用于扩展 AI 助手能力的模块化能力单元。",
+                start_char=21,
+                end_char=60,
+                chunk_char_len=39,
+            ),
+        ]
+    )
+
+    hits = catalog.search_chunks("Skills 是什么", top_k=2)
+
+    assert [hit["id"] for hit in hits] == [
+        "doc-skills::chunk::1",
+        "doc-skills::chunk::0",
+    ]

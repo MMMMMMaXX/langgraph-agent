@@ -4,6 +4,7 @@ from app.agents.rag.constants import ANSWER_TOKENS_CONTEXT_RATIO, ANSWER_TOKENS_
 from app.agents.rag.types import RagAnswerResult, RagContext
 from app.config import RAG_CONFIG
 from app.constants.model_profiles import PROFILE_DEFAULT_CHAT
+from app.constants.policies import INSUFFICIENT_KNOWLEDGE_ANSWER
 from app.llm import chat
 from app.prompts.rag import (
     RAG_MEMORY_ANSWER_SYSTEM_PROMPT,
@@ -195,7 +196,7 @@ def generate_answer_for_context(
                 on_delta=on_delta,
             )
         else:
-            answer = "资料不足"
+            answer = INSUFFICIENT_KNOWLEDGE_ANSWER
     except Exception as exc:
         answer = "知识检索暂时失败，请稍后再试。"
         errors.append(build_error_info(exc, stage="answer_generation", source="llm"))

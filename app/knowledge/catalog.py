@@ -15,9 +15,26 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.config import KNOWLEDGE_BASE_CONFIG
-from app.retrieval.lexical.tokenizer import build_fts_index_text, build_fts_query
+from app.constants.keywords import DEFINITION_QUERY_KEYWORDS
+from app.retrieval.lexical.tokenizer import (
+    build_fts_index_text,
+    build_fts_query,
+    lexical_terms,
+)
 
 FTS_TABLE = "document_chunks_fts"
+# FTS5 bm25 column weights, aligned with FTS_TABLE columns:
+# chunk_id, doc_id, doc_title, section_title, source, content.
+#
+# doc_title 会被复制到同一文档的每个 chunk，如果权重太高，像 “Skills 是什么”
+# 这种 query 会让整篇同标题文档的所有 chunk 都看起来相关。正文权重最高，
+# section 次之，doc_title 只做弱召回信号，避免标题污染 chunk 级排序。
+FTS_BM25_WEIGHTS = (0.0, 0.0, 0.2, 1.2, 0.0, 3.0)
+FTS_BM25_SCORE_WEIGHT = 0.35
+FTS_CONTENT_SCORE_WEIGHT = 0.65
+# 定义型正文信号词（通用语义，不含领域词）
+DEFINITION_CONTENT_TERMS = ("是", "指", "用于", "定义", "概念")
+LOW_VALUE_QUERY_TERMS = {"什么", "是什", "么"}
 
 
 @dataclass(frozen=True)
@@ -67,6 +84,56 @@ def normalize_bm25_scores(rows: list[sqlite3.Row]) -> list[float]:
     return [(worst - score) / (worst - best) for score in raw_scores]
 
 
+def _normalize_scores(scores: list[float]) -> list[float]:
+    """把普通相关性分归一化为 0~1，越大越相关。"""
+
+    if not scores:
+        return []
+
+    best = max(scores)
+    worst = min(scores)
+    if best == worst:
+        return [1.0 if best > 0 else 0.0 for _ in scores]
+    return [(score - worst) / (best - worst) for score in scores]
+
+
+def _lexical_content_score(
+    query_terms: list[str],
+    is_definition_query: bool,
+    row: sqlite3.Row,
+) -> float:
+    """给 FTS 结果增加正文/章节级别的轻量二次排序信号。
+
+    FTS5 负责高召回，但 doc_title 会复制到每个 chunk，容易带来标题污染。
+    这里刻意更看重 section/content 中的 query term 命中，让 chunk 级排序更贴近
+    最终要喂给 RAG 的正文片段。
+
+    query_terms 由调用方预计算（lexical_terms 对同一 query 结果相同），
+    避免在 N 行结果上重复调用 jieba 分词。
+    """
+
+    content = str(row["content"] or "").lower()
+    section_title = str(row["section_title"] or "").lower()
+    doc_title = str(row["doc_title"] or "").lower()
+    score = 0.0
+
+    for term in query_terms:
+        if term in content:
+            score += 2.0
+        if term in section_title:
+            score += 1.5
+        if term in doc_title:
+            score += 0.2
+
+    if is_definition_query:
+        combined = f"{section_title}\n{content}"
+        for term in DEFINITION_CONTENT_TERMS:
+            if term.lower() in combined:
+                score += 0.8
+
+    return score
+
+
 class KnowledgeCatalog:
     """知识库 SQLite catalog 的最小访问层。"""
 
@@ -75,8 +142,7 @@ class KnowledgeCatalog:
 
     def init_schema(self) -> None:
         with _connect(self.path) as conn:
-            conn.executescript(
-                f"""
+            conn.executescript(f"""
                 CREATE TABLE IF NOT EXISTS documents (
                     doc_id TEXT PRIMARY KEY,
                     title TEXT NOT NULL,
@@ -116,8 +182,7 @@ class KnowledgeCatalog:
 
                 CREATE INDEX IF NOT EXISTS idx_document_chunks_doc_id
                 ON document_chunks(doc_id);
-                """
-            )
+                """)
 
     def reset(self) -> None:
         self.init_schema()
@@ -393,7 +458,8 @@ class KnowledgeCatalog:
                     c.start_char,
                     c.end_char,
                     c.chunk_char_len,
-                    bm25({FTS_TABLE}) AS bm25_score
+                    bm25({FTS_TABLE}, {", ".join(str(w) for w in FTS_BM25_WEIGHTS)})
+                        AS bm25_score
                 FROM {FTS_TABLE}
                 JOIN document_chunks c ON c.chunk_id = {FTS_TABLE}.chunk_id
                 WHERE {FTS_TABLE} MATCH ?
@@ -404,8 +470,30 @@ class KnowledgeCatalog:
             ).fetchall()
 
         normalized_scores = normalize_bm25_scores(rows)
+        # 预计算 query_terms，避免对每行重复调用 jieba 分词
+        _cleaned_query_terms = [
+            t.lower()
+            for t in lexical_terms(query)
+            if t.lower() not in LOW_VALUE_QUERY_TERMS
+        ]
+        _is_definition_query = any(term in query for term in DEFINITION_QUERY_KEYWORDS)
+        content_scores = _normalize_scores(
+            [
+                _lexical_content_score(_cleaned_query_terms, _is_definition_query, row)
+                for row in rows
+            ]
+        )
         hits: list[dict] = []
-        for row, lexical_score in zip(rows, normalized_scores, strict=False):
+        for row, bm25_score_norm, content_score_norm in zip(
+            rows,
+            normalized_scores,
+            content_scores,
+            strict=False,
+        ):
+            lexical_score = (
+                FTS_BM25_SCORE_WEIGHT * bm25_score_norm
+                + FTS_CONTENT_SCORE_WEIGHT * content_score_norm
+            )
             hits.append(
                 {
                     "id": row["chunk_id"],
@@ -419,8 +507,11 @@ class KnowledgeCatalog:
                     "end_char": int(row["end_char"]),
                     "chunk_char_len": int(row["chunk_char_len"]),
                     "bm25_score": float(row["bm25_score"]),
+                    "bm25_score_norm": bm25_score_norm,
+                    "lexical_content_score_norm": content_score_norm,
                     "keyword_score": lexical_score,
                     "keyword_score_norm": lexical_score,
                 }
             )
+        hits.sort(key=lambda hit: hit["keyword_score_norm"], reverse=True)
         return hits

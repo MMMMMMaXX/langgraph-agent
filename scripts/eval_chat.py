@@ -26,6 +26,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import app.api as api
+from app.constants.policies import INSUFFICIENT_KNOWLEDGE_ANSWER
 
 CASES_PATH = Path(__file__).resolve().parent / "eval_cases.json"
 EVAL_CONVERSATION_HISTORY_PATH = "EVAL_CONVERSATION_HISTORY_PATH"
@@ -85,7 +86,13 @@ def parse_ms(value) -> float | None:
 
 
 def answer_quality(answer: str) -> str:
-    if not answer or answer == "资料不足":
+    """粗粒度答案质量信号，仅基于长度和兜底字符串，不做语义评分。
+
+    - poor：空答案或知识不足兜底
+    - ok：有内容但过短（< 20 字），可能是错误信息
+    - good：正常长度回答（≥ 20 字），不代表内容正确
+    """
+    if not answer or answer == INSUFFICIENT_KNOWLEDGE_ANSWER:
         return "poor"
     if len(answer) < 20:
         return "ok"
@@ -328,7 +335,9 @@ def evaluate_case_assertions(
 
     expected_route = case.get("expected_route", "")
     if expected_route and expected_route not in actual_route.split(","):
-        problems.append(f"route mismatch: expected {expected_route}, got {actual_route}")
+        problems.append(
+            f"route mismatch: expected {expected_route}, got {actual_route}"
+        )
 
     must_include = case.get("must_include", [])
     if must_include and not contains_all(answer, must_include):
@@ -456,9 +465,11 @@ def run_case(client, case: dict) -> dict:
         "memory_used": (
             str(debug_nodes.get("rag_agent", {}).get("memory_used"))
             if "rag_agent" in debug_nodes
-            else str(debug_nodes.get("chat_agent", {}).get("used_memory"))
-            if "chat_agent" in debug_nodes
-            else extract_bool(log_text, "memoryUsed")
+            else (
+                str(debug_nodes.get("chat_agent", {}).get("used_memory"))
+                if "chat_agent" in debug_nodes
+                else extract_bool(log_text, "memoryUsed")
+            )
         ),
         "request_ms": format_ms(duration_ms),
         "rag_ms": format_ms(node_timings.get("rag_agent")),
@@ -624,8 +635,7 @@ def print_summary(results: list[dict]) -> None:
     else:
         for field, stats in summary["retrieval_stats"].items():
             print(
-                f"{field}={stats['rate']:.1f}% "
-                f"({stats['hits']}/{stats['total']})"
+                f"{field}={stats['rate']:.1f}% " f"({stats['hits']}/{stats['total']})"
             )
 
     print("\nFailures")
@@ -636,8 +646,7 @@ def print_summary(results: list[dict]) -> None:
 
     for item in summary["failed_items"]:
         print(
-            f"[{item['id']}] "
-            f"assertion_detail={item.get('assertion_detail', '-')}"
+            f"[{item['id']}] " f"assertion_detail={item.get('assertion_detail', '-')}"
         )
 
 

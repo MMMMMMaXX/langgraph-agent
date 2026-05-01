@@ -16,6 +16,7 @@ from app.constants.model_profiles import (
     PROFILE_CREATIVE_REVIEW,
     PROFILE_CREATIVE_WRITE,
 )
+from app.constants.policies import INSUFFICIENT_KNOWLEDGE_ANSWER
 from app.constants.routes import ROUTE_NOVEL_SCRIPT_AGENT
 from app.llm import get_profile_runtime_info
 from app.runtime_context import get_stream_callback
@@ -146,7 +147,7 @@ def novel_script_agent_node(state: AgentState) -> AgentState:
     # 真正的 ReAct 循环发生在子图里：
     # planner -> tool_executor -> planner ... -> finalizer
     result = novel_script_graph.invoke(react_state)
-    answer = result.get("final_script", "") or "资料不足"
+    answer = result.get("final_script", "") or INSUFFICIENT_KNOWLEDGE_ANSWER
 
     # 把子图内部的中间产物透出到 debug_info，
     # 方便你在 debug 模式下观察“它到底做了几轮、用了哪些动作”。

@@ -1,5 +1,6 @@
 from scripts.eval_chat import (
     build_retrieval_eval,
+    load_cases,
     resolve_expected_doc_ids,
     setup_knowledge_imports,
 )
@@ -136,6 +137,17 @@ def test_resolve_expected_doc_ids_adds_import_alias_doc_ids() -> None:
     assert case["expected_doc_ids"] == ["0"]
 
 
+def test_eval_cases_include_skills_real_doc_questions() -> None:
+    case_ids = {case["id"] for case in load_cases()}
+
+    assert {
+        "skills_definition_real_doc",
+        "skill_md_authoring_real_doc",
+        "progressive_disclosure_definition_real_doc",
+        "when_to_use_skill_real_doc",
+    }.issubset(case_ids)
+
+
 def test_setup_knowledge_imports_returns_alias_to_doc_id() -> None:
     class FakeResponse:
         status_code = 200
@@ -167,3 +179,44 @@ def test_setup_knowledge_imports_returns_alias_to_doc_id() -> None:
     assert alias_to_doc_id == {"skill_doc": "doc-imported"}
     assert client.posts[0]["path"] == "/knowledge/import"
     assert client.posts[0]["json"]["title"] == "Skill 文档"
+
+
+def test_build_retrieval_eval_reports_rerank_miss() -> None:
+    case = {"expected_doc_ids": ["0"]}
+    debug_nodes = {
+        "rag_agent": {
+            "top_docs": [{"doc_id": "0"}],
+            "filtered_docs": [{"doc_id": "0"}],
+            "post_rerank_docs": [{"doc_id": "1"}],  # 正确文档被 rerank 排出
+            "merged_docs": [{"doc_id": "1"}],
+            "retrieval_debug": {"doc": {}},
+        }
+    }
+
+    metrics = build_retrieval_eval(case, debug_nodes)
+
+    assert metrics["top_k_hit"] == "true"
+    assert metrics["filtered_hit"] == "true"
+    assert metrics["rerank_hit"] == "false"
+    assert metrics["retrieval_failure_stage"] == "rerank_miss"
+
+
+def test_build_retrieval_eval_reports_chunk_merge_miss() -> None:
+    case = {"expected_doc_ids": ["0"]}
+    debug_nodes = {
+        "rag_agent": {
+            "top_docs": [{"doc_id": "0"}],
+            "filtered_docs": [{"doc_id": "0"}],
+            "post_rerank_docs": [{"doc_id": "0"}],
+            "merged_docs": [{"doc_id": "1"}],  # 合并阶段覆盖了正确文档
+            "retrieval_debug": {"doc": {}},
+        }
+    }
+
+    metrics = build_retrieval_eval(case, debug_nodes)
+
+    assert metrics["top_k_hit"] == "true"
+    assert metrics["filtered_hit"] == "true"
+    assert metrics["rerank_hit"] == "true"
+    assert metrics["merged_hit"] == "false"
+    assert metrics["retrieval_failure_stage"] == "chunk_merge_miss"

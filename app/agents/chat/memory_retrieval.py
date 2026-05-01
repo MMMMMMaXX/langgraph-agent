@@ -2,14 +2,13 @@ from app.agents.chat.constants import (
     CHAT_MEMORY_SEARCH_TOP_K,
     CHAT_QA_RERANK_TOP_K,
     CHAT_RECALL_RERANK_TOP_K,
-    LOW_VALUE_MEMORY_BLOCK_KEYWORDS,
     LOW_VALUE_MEMORY_MIN_CONTENT_CHARS,
     TASK_RECALL,
     TASK_SUMMARY,
 )
 from app.agents.chat.intent import classify_chat_task
 from app.agents.chat.policies import choose_memory_lookup_policy
-from app.constants.policies import MEMORY_POLICY_WORKING_ONLY
+from app.constants.policies import BAD_ANSWER_KEYWORDS, MEMORY_POLICY_WORKING_ONLY
 from app.constants.tags import CITY_TAGS, TOPIC_TAGS
 from app.memory.vector_memory import search_memory
 from app.retrieval.reranker import rerank
@@ -66,7 +65,7 @@ def filter_low_value_memory(memory_hits: list[dict]) -> list[dict]:
         content = m.get("content", "")
 
         # 没有城市也没有主题价值的低质量条目。
-        if any(keyword in content for keyword in LOW_VALUE_MEMORY_BLOCK_KEYWORDS):
+        if any(keyword in content for keyword in BAD_ANSWER_KEYWORDS):
             continue
 
         # 太短且没结构信息。

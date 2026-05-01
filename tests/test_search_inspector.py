@@ -46,10 +46,18 @@ def test_inspect_retrieval_exposes_pipeline_steps(monkeypatch) -> None:
     assert report.retrieval_debug["filtered_count"] == 1
     assert report.dense_hits[0]["id"] == "doc1::chunk::0"
     assert report.lexical_hits[0]["id"] == "doc1::chunk::0"
+    assert report.hybrid_hits[0]["rank"] == 1
     assert report.hybrid_hits[0]["keyword_score_norm"] == 1.0
+    assert "bm25_score_norm" in report.hybrid_hits[0]
+    assert "lexical_content_score_norm" in report.hybrid_hits[0]
     assert report.filtered_hits
     assert report.reranked_hits
     assert report.merged_hits
+    assert report.stage_metrics["counts"]["dense"] == 1
+    assert report.stage_metrics["counts"]["lexical"] == 1
+    assert report.stage_metrics["top_ids"]["hybrid"] == ["doc1::chunk::0"]
+    assert report.stage_metrics["score_weights"]["hybrid_alpha"] > 0
+    assert report.stage_metrics["context"]["citation_count"] == 1
     assert report.citations[0]["ref"] == "[1]"
     assert "WAI-ARIA" in report.context_preview
 

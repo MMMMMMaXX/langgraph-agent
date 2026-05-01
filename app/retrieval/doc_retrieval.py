@@ -1,5 +1,12 @@
 from app.config import RAG_CONFIG, VECTOR_STORE_CONFIG
 from app.constants.model_profiles import PROFILE_QUERY_EMBEDDING
+from app.constants.retrieval import (
+    DEFAULT_HYBRID_ALPHA,
+    DEFAULT_HYBRID_BETA,
+    DOC_CANDIDATE_MULTIPLIER,
+    RETRIEVAL_SOURCE_DENSE,
+    RETRIEVAL_SOURCE_KEYWORD,
+)
 from app.constants.tags import LITERAL_MATCH_WEIGHT, TAG_MATCH_TERMS, TAG_WEIGHTS
 from app.retrieval.embedder import get_embedding
 from app.retrieval.lexical.factory import get_lexical_retriever
@@ -7,12 +14,7 @@ from app.utils.logger import logger
 from app.utils.tags import extract_tags
 from app.vector_store import ChromaVectorStore
 
-DEFAULT_HYBRID_ALPHA = 0.65
-DEFAULT_HYBRID_BETA = 0.35
-DOC_CANDIDATE_MULTIPLIER = 4
 DEFAULT_CHUNK_INDEX = 0
-RETRIEVAL_SOURCE_DENSE = "dense"
-RETRIEVAL_SOURCE_KEYWORD = "keyword"
 
 
 def normalize_keyword_text(text: str) -> str:

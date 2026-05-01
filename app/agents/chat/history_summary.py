@@ -1,6 +1,14 @@
-from app.agents.chat.intent import TASK_SUMMARY, classify_chat_task, is_immediate_summary_query
+from app.agents.chat.intent import (
+    TASK_SUMMARY,
+    classify_chat_task,
+    is_immediate_summary_query,
+)
 from app.config import CONVERSATION_HISTORY_CONFIG
-from app.constants.policies import HISTORY_POLICY_ALL, HISTORY_POLICY_RECENT
+from app.constants.policies import (
+    HISTORY_POLICY_ALL,
+    HISTORY_POLICY_RECENT,
+    INSUFFICIENT_KNOWLEDGE_ANSWER,
+)
 from app.memory.conversation_history import get_all_history, get_recent_history
 
 # 最近问题总结标题：用于“刚才/刚刚”这类强时效总结。
@@ -77,7 +85,7 @@ def generate_summary_from_items(
     """把问题列表渲染成用户可读的总结回答。"""
 
     if not items:
-        return "资料不足"
+        return INSUFFICIENT_KNOWLEDGE_ANSWER
 
     lines = [heading]
     for index, item in enumerate(items, start=1):

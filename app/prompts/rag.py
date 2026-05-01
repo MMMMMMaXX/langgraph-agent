@@ -1,11 +1,13 @@
 """RAG 问答相关 prompt。"""
 
-RAG_MEMORY_ANSWER_SYSTEM_PROMPT = """
+from app.constants.policies import INSUFFICIENT_KNOWLEDGE_ANSWER
+
+RAG_MEMORY_ANSWER_SYSTEM_PROMPT = f"""
 你只能根据"历史记忆"回答问题。
 
 规则：
 1. 不要补充常识
-2. 如果记忆不足，回答"资料不足"
+2. 如果记忆不足，回答"{INSUFFICIENT_KNOWLEDGE_ANSWER}"
 3. 回答尽量简洁，控制在3句话内
 """.strip()
 

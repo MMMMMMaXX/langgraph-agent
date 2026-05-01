@@ -4,6 +4,8 @@
 避免散落在 node 主流程里。后续如果多个 agent 复用，再上移到 app/constants。
 """
 
+from app.constants.retrieval import HIGH_CONFIDENCE_RETRIEVAL_SOURCES
+
 # 定义类问题送入模型的最大上下文字符数，减少短问答的 token 和延迟。
 DEFINITION_CONTEXT_CHARS = 280
 
@@ -39,9 +41,6 @@ DOC_RERANK_SKIP_MAX_CANDIDATES = 2
 
 # 候选分差小于该值时，认为相邻 chunk 的排序不需要再交给 LLM 判断。
 DOC_RERANK_SKIP_SCORE_DELTA = 0.05
-
-# 同时命中 dense 和 keyword 时，认为召回来源更可靠。
-HIGH_CONFIDENCE_RETRIEVAL_SOURCES = {"dense", "keyword"}
 
 # 合并相邻 chunk 时使用的段落分隔符。
 MERGED_CHUNK_SEPARATOR = "\n"

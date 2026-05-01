@@ -57,3 +57,11 @@ DOC_RERANK_SKIP_REASON_SINGLE_CANDIDATE = "single_candidate"
 
 # RAG rerank 跳过原因：相邻 chunk 高置信命中，直接合并更稳定且省一次 LLM 调用。
 DOC_RERANK_SKIP_REASON_ADJACENT_HIGH_CONFIDENCE = "adjacent_high_confidence"
+
+# RAG 知识不足时返回给用户的兜底答案：answer.py 生成，write_policy.py 检测。
+# 两处共享同一字符串，避免写入了不该写的"知识不足"兜底答案。
+INSUFFICIENT_KNOWLEDGE_ANSWER = "资料不足"
+
+# 表示本次 LLM 调用无法处理请求的信号词，用于识别低质量答案，阻止其写入长期 memory。
+# write_policy.py（写入决策）和 chat/memory_retrieval.py（检索过滤）共用此集合。
+BAD_ANSWER_KEYWORDS = ("无法处理",)

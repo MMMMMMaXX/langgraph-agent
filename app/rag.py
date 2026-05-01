@@ -5,6 +5,12 @@
 后续新增 BM25、多路召回、相邻 chunk 合并时，优先改 retrieval 模块。
 """
 
+from app.constants.retrieval import (
+    DEFAULT_HYBRID_ALPHA,
+    DEFAULT_HYBRID_BETA,
+    RETRIEVAL_SOURCE_DENSE,
+    RETRIEVAL_SOURCE_KEYWORD,
+)
 from app.constants.tags import (
     CITY_TAG_WEIGHTS,
     CONCEPT_TAG_WEIGHTS,
@@ -14,10 +20,6 @@ from app.constants.tags import (
     TOPIC_TAG_WEIGHTS,
 )
 from app.retrieval.doc_retrieval import (
-    DEFAULT_HYBRID_ALPHA,
-    DEFAULT_HYBRID_BETA,
-    RETRIEVAL_SOURCE_DENSE,
-    RETRIEVAL_SOURCE_KEYWORD,
     apply_keyword_scores,
     build_doc_hit,
     dense_retrieve_docs,

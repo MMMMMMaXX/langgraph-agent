@@ -21,10 +21,12 @@ from app.agents.rag.types import (
     DocRetrievalResult,
 )
 from app.config import RAG_CONFIG, VECTOR_STORE_CONFIG
-from app.retrieval.doc_retrieval import (
+from app.constants.retrieval import (
     DEFAULT_HYBRID_ALPHA,
     DEFAULT_HYBRID_BETA,
     DOC_CANDIDATE_MULTIPLIER,
+)
+from app.retrieval.doc_retrieval import (
     apply_keyword_scores,
     dense_retrieve_docs,
     keyword_retrieve_docs,
@@ -385,6 +387,11 @@ def run_source_diversity_step(
 def run_debug_step(state: DocRetrievalPipelineState) -> DocRetrievalPipelineState:
     """汇总 pipeline debug 指标。"""
 
+    failed_stages = {
+        str(error.get("stage", ""))
+        for error in state.errors
+        if isinstance(error, dict) and error.get("stage")
+    }
     state.retrieval_debug.update(
         {
             "collection": VECTOR_STORE_CONFIG.doc_collection_name,
@@ -415,6 +422,10 @@ def run_debug_step(state: DocRetrievalPipelineState) -> DocRetrievalPipelineStat
             "merged_count": len(state.merged_doc_hits),
             "merged": len(state.merged_doc_hits) != len(state.doc_hits),
             "source_diverse_count": len(state.diversified_doc_hits),
+            "error_count": len(state.errors),
+            "dense_failed": "dense_retrieve_docs" in failed_stages,
+            "lexical_failed": "keyword_retrieve_docs" in failed_stages,
+            "rerank_failed": "doc_rerank" in failed_stages,
         }
     )
     return state

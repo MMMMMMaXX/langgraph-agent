@@ -1,4 +1,5 @@
 from app.constants.model_profiles import PROFILE_DEFAULT_CHAT
+from app.constants.policies import INSUFFICIENT_KNOWLEDGE_ANSWER
 from app.constants.routes import NODE_MERGE
 from app.llm import LLMCallError, chat, get_profile_runtime_info
 from app.prompts.merge import MERGE_SYSTEM_PROMPT, build_merge_user_prompt
@@ -14,7 +15,7 @@ def merge_node(state: AgentState) -> AgentState:
     merge_error = ""
 
     if not outputs:
-        answer = "资料不足"
+        answer = INSUFFICIENT_KNOWLEDGE_ANSWER
     elif len(outputs) == 1:
         answer = list(outputs.values())[0]
     else:
@@ -42,7 +43,7 @@ def merge_node(state: AgentState) -> AgentState:
                 str(v).strip() for v in outputs.values() if str(v).strip()
             )
             if not answer:
-                answer = "资料不足"
+                answer = INSUFFICIENT_KNOWLEDGE_ANSWER
         except Exception as exc:
             # 兜底：prompt 构造异常、编码错误、stream 回调内部异常等非预期情况。
             # 不能让 merge 节点抛出，否则整个 graph 失败；保留 repr 方便排查。
@@ -51,7 +52,7 @@ def merge_node(state: AgentState) -> AgentState:
                 str(v).strip() for v in outputs.values() if str(v).strip()
             )
             if not answer:
-                answer = "资料不足"
+                answer = INSUFFICIENT_KNOWLEDGE_ANSWER
 
     next_state: AgentState = {
         "answer": answer,

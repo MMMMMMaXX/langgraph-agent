@@ -2,6 +2,8 @@ from dataclasses import asdict, dataclass
 
 from app.constants.keywords import VECTOR_STORE_BLOCK_KEYWORDS, contains_any
 from app.constants.policies import (
+    BAD_ANSWER_KEYWORDS,
+    INSUFFICIENT_KNOWLEDGE_ANSWER,
     SKIP_REASON_BAD_ANSWER,
     SKIP_REASON_CREATIVE_OUTPUT,
     SKIP_REASON_EMPTY_ANSWER,
@@ -70,7 +72,9 @@ def _skip_reason_from_route(state: AgentState) -> str:
 def _skip_reason_from_content(answer: str, rewritten_query: str) -> str:
     if not answer:
         return SKIP_REASON_EMPTY_ANSWER
-    if answer == "资料不足" or "无法处理" in answer:
+    if answer == INSUFFICIENT_KNOWLEDGE_ANSWER or contains_any(
+        answer, BAD_ANSWER_KEYWORDS
+    ):
         return SKIP_REASON_BAD_ANSWER
     if len(answer) < 8:
         return SKIP_REASON_TOO_SHORT
