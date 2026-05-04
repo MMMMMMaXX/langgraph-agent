@@ -16,6 +16,11 @@ from app.knowledge.management import (
     reindex_all_knowledge_documents,
     reindex_knowledge_document,
 )
+from app.knowledge.rechunk_preview import (
+    RechunkPreviewParams,
+    RechunkPreviewReport,
+    preview_rechunk_document,
+)
 
 
 def __getattr__(name: str):
@@ -41,9 +46,12 @@ __all__ = [
     "KnowledgeImportResult",
     "KnowledgeDeleteResult",
     "KnowledgeReindexResult",
+    "RechunkPreviewParams",
+    "RechunkPreviewReport",
     "SearchInspectReport",
     "inspect_document_chunks",
     "inspect_retrieval",
+    "preview_rechunk_document",
     "import_knowledge_document",
     "delete_knowledge_document",
     "reindex_knowledge_document",

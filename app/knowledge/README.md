@@ -118,6 +118,37 @@ PYTHONPATH=. ./.venv/bin/python scripts/inspect_retrieval.py \
 输出会展示 dense、lexical、hybrid、threshold、rerank、chunk merge 和最终
 context preview。它只解释检索链路，不生成答案、不写 memory。
 
+### 预览重新切片
+
+API：
+
+```bash
+curl -X POST http://127.0.0.1:8000/knowledge/docs/<doc_id>/rechunk/preview \
+  -H "Content-Type: application/json" \
+  -d '{
+    "chunk_size_chars": 360,
+    "chunk_overlap_chars": 80,
+    "min_chunk_chars": 40,
+    "sample_limit": 3
+  }'
+```
+
+本地 CLI：
+
+```bash
+PYTHONPATH=. ./.venv/bin/python scripts/preview_rechunk.py \
+  --doc-id <doc_id> \
+  --chunk-size 360 \
+  --overlap 80 \
+  --min-chars 40 \
+  --sample-limit 3
+```
+
+rechunk preview 是 dry-run，只返回当前 chunk 与候选 chunk 的质量对比，
+不会写 SQLite，也不会重建 Chroma。当前 catalog 尚未保存完整原文，所以历史
+文档会通过已有 chunks 近似重建文本，响应里的 `source_mode` 会标记为
+`reconstructed_from_chunks`。
+
 ### 删除文档
 
 ```bash

@@ -22,6 +22,7 @@ from app.api import app, clear_session_store, session_store
 from app.knowledge.chunk_inspector import ChunkQualityReport
 from app.knowledge.ingestion import KnowledgeImportResult
 from app.knowledge.management import KnowledgeDeleteResult, KnowledgeReindexResult
+from app.knowledge.rechunk_preview import RechunkPreviewReport
 from app.knowledge.search_inspector import SearchInspectReport
 
 # ---------------------------------------------------------------------------
@@ -528,6 +529,95 @@ def test_inspect_knowledge_search_post_endpoint_returns_400(
 
     assert resp.status_code == 400
     assert resp.json()["detail"] == "query must not be empty"
+
+
+def test_preview_knowledge_doc_rechunk_endpoint(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.api.routes as routes_mod
+
+    current = ChunkQualityReport(
+        doc_id="doc-api",
+        chunk_count=2,
+        total_chars=180,
+        min_chars=80,
+        max_chars=100,
+        avg_chars=90.0,
+        median_chars=90.0,
+        short_chunk_count=0,
+        long_chunk_count=0,
+        section_count=1,
+        top_sections=[],
+        samples=[],
+        warnings=[],
+    )
+    preview = ChunkQualityReport(
+        doc_id="doc-api",
+        chunk_count=3,
+        total_chars=180,
+        min_chars=50,
+        max_chars=70,
+        avg_chars=60.0,
+        median_chars=60.0,
+        short_chunk_count=0,
+        long_chunk_count=0,
+        section_count=1,
+        top_sections=[],
+        samples=[],
+        warnings=[],
+    )
+
+    def fake_preview(doc_id: str, **kwargs):
+        assert doc_id == "doc-api"
+        return RechunkPreviewReport(
+            doc_id=doc_id,
+            title="API 文档",
+            source="api.md",
+            source_type="md",
+            applied=False,
+            source_mode="reconstructed_from_chunks",
+            params={"chunk_size_chars": 120},
+            current=current,
+            preview=preview,
+            delta={"chunk_count": 1},
+            warnings=[],
+        )
+
+    monkeypatch.setattr(routes_mod, "preview_rechunk_document", fake_preview)
+
+    resp = client.post(
+        "/knowledge/docs/doc-api/rechunk/preview",
+        json={
+            "chunk_size_chars": 120,
+            "chunk_overlap_chars": 20,
+            "min_chunk_chars": 20,
+        },
+    )
+
+    assert resp.status_code == 200, resp.text
+    report = resp.json()["report"]
+    assert report["doc_id"] == "doc-api"
+    assert report["applied"] is False
+    assert report["preview"]["chunk_count"] == 3
+    assert report["delta"]["chunk_count"] == 1
+
+
+def test_preview_knowledge_doc_rechunk_endpoint_returns_404(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.api.routes as routes_mod
+
+    def fake_preview(doc_id: str, **kwargs):
+        raise ValueError("document not found")
+
+    monkeypatch.setattr(routes_mod, "preview_rechunk_document", fake_preview)
+
+    resp = client.post("/knowledge/docs/missing/rechunk/preview", json={})
+
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "document not found"
 
 
 def test_chat_persists_session_state_across_turns(

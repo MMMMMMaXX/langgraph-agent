@@ -21,10 +21,12 @@ from app.knowledge import (
     ChunkQualityThresholds,
     KnowledgeCatalog,
     KnowledgeImportInput,
+    RechunkPreviewParams,
     delete_knowledge_document,
     import_knowledge_document,
     inspect_document_chunks,
     inspect_retrieval,
+    preview_rechunk_document,
     reindex_all_knowledge_documents,
     reindex_knowledge_document,
 )
@@ -40,6 +42,8 @@ from .schemas import (
     KnowledgeImportRequest,
     KnowledgeImportResponse,
     KnowledgeReindexResponse,
+    KnowledgeRechunkPreviewRequest,
+    KnowledgeRechunkPreviewResponse,
     KnowledgeSearchInspectRequest,
     KnowledgeSearchInspectResponse,
 )
@@ -279,6 +283,33 @@ def inspect_knowledge_search_get(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return KnowledgeSearchInspectResponse(report=asdict(report))
+
+
+@router.post(
+    "/knowledge/docs/{doc_id}/rechunk/preview",
+    response_model=KnowledgeRechunkPreviewResponse,
+)
+def preview_knowledge_doc_rechunk(
+    doc_id: str,
+    request: KnowledgeRechunkPreviewRequest,
+) -> KnowledgeRechunkPreviewResponse:
+    """预览重新切片结果；只读 dry-run，不写 SQLite/Chroma。"""
+
+    try:
+        report = preview_rechunk_document(
+            doc_id,
+            params=RechunkPreviewParams(
+                chunk_size_chars=request.chunk_size_chars,
+                chunk_overlap_chars=request.chunk_overlap_chars,
+                min_chunk_chars=request.min_chunk_chars,
+                sample_limit=request.sample_limit,
+            ),
+        )
+    except ValueError as exc:
+        detail = str(exc)
+        status_code = 404 if detail == "document not found" else 400
+        raise HTTPException(status_code=status_code, detail=detail) from exc
+    return KnowledgeRechunkPreviewResponse(report=asdict(report))
 
 
 @router.delete("/knowledge/docs/{doc_id}", response_model=KnowledgeDeleteResponse)

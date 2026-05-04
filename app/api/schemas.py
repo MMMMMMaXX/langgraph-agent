@@ -11,6 +11,18 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.config import CHUNKING_CONFIG
+from app.constants.knowledge import (
+    RECHUNK_PREVIEW_DEFAULT_SAMPLE_LIMIT,
+    RECHUNK_PREVIEW_MAX_CHUNK_SIZE_CHARS,
+    RECHUNK_PREVIEW_MAX_MIN_CHUNK_CHARS,
+    RECHUNK_PREVIEW_MAX_OVERLAP_CHARS,
+    RECHUNK_PREVIEW_MAX_SAMPLE_LIMIT,
+    RECHUNK_PREVIEW_MIN_CHUNK_SIZE_CHARS,
+    RECHUNK_PREVIEW_MIN_MIN_CHUNK_CHARS,
+    RECHUNK_PREVIEW_MIN_OVERLAP_CHARS,
+)
+
 
 class ChatRequest(BaseModel):
     """POST /chat 和 POST /chat/stream 的请求体。"""
@@ -101,6 +113,37 @@ class KnowledgeSearchInspectRequest(BaseModel):
 
 class KnowledgeSearchInspectResponse(BaseModel):
     """知识库检索解释响应。"""
+
+    report: dict[str, Any]
+
+
+class KnowledgeRechunkPreviewRequest(BaseModel):
+    """POST /knowledge/docs/{doc_id}/rechunk/preview 的请求体。"""
+
+    chunk_size_chars: int = Field(
+        default=CHUNKING_CONFIG.chunk_size_chars,
+        ge=RECHUNK_PREVIEW_MIN_CHUNK_SIZE_CHARS,
+        le=RECHUNK_PREVIEW_MAX_CHUNK_SIZE_CHARS,
+    )
+    chunk_overlap_chars: int = Field(
+        default=CHUNKING_CONFIG.chunk_overlap_chars,
+        ge=RECHUNK_PREVIEW_MIN_OVERLAP_CHARS,
+        le=RECHUNK_PREVIEW_MAX_OVERLAP_CHARS,
+    )
+    min_chunk_chars: int = Field(
+        default=CHUNKING_CONFIG.min_chunk_chars,
+        ge=RECHUNK_PREVIEW_MIN_MIN_CHUNK_CHARS,
+        le=RECHUNK_PREVIEW_MAX_MIN_CHUNK_CHARS,
+    )
+    sample_limit: int = Field(
+        default=RECHUNK_PREVIEW_DEFAULT_SAMPLE_LIMIT,
+        ge=0,
+        le=RECHUNK_PREVIEW_MAX_SAMPLE_LIMIT,
+    )
+
+
+class KnowledgeRechunkPreviewResponse(BaseModel):
+    """Rechunk dry-run 响应。"""
 
     report: dict[str, Any]
 
