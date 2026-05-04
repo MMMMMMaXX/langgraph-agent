@@ -212,6 +212,7 @@ def test_import_knowledge_endpoint_returns_index_summary(
             source="api.md",
             source_type="md",
             content_hash="hash",
+            content_char_len=len("WAI-ARIA 是无障碍技术规范。"),
             chunk_count=1,
             indexed_to_sqlite=True,
             indexed_to_chroma=True,
@@ -232,6 +233,7 @@ def test_import_knowledge_endpoint_returns_index_summary(
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["doc_id"] == "doc-api"
+    assert body["content_char_len"] == len("WAI-ARIA 是无障碍技术规范。")
     assert body["chunk_count"] == 1
     assert body["indexed_to_sqlite"] is True
     assert body["indexed_to_chroma"] is True
@@ -255,6 +257,7 @@ def test_import_knowledge_file_endpoint_returns_index_summary(
             source="upload.md",
             source_type="md",
             content_hash="hash",
+            content_char_len=len("# WAI-ARIA\n\nWAI-ARIA 是无障碍技术规范。"),
             chunk_count=1,
             indexed_to_sqlite=True,
             indexed_to_chroma=True,
@@ -280,6 +283,7 @@ def test_import_knowledge_file_endpoint_returns_index_summary(
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["doc_id"] == "doc-upload"
+    assert body["content_char_len"] == len("# WAI-ARIA\n\nWAI-ARIA 是无障碍技术规范。")
     assert body["source_type"] == "md"
     assert body["indexed_to_chroma"] is True
 

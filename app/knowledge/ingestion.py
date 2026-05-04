@@ -52,6 +52,7 @@ class KnowledgeImportResult:
     source: str
     source_type: str
     content_hash: str
+    content_char_len: int
     chunk_count: int
     indexed_to_sqlite: bool
     indexed_to_chroma: bool
@@ -305,6 +306,7 @@ def import_knowledge_document(
         source=source,
         source_type=normalized.source_type,
         content_hash=content_hash(normalized.content),
+        content_char_len=len(normalized.content),
         chunk_count=len(catalog_records),
         indexed_to_sqlite=True,
         indexed_to_chroma=True,

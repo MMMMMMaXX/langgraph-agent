@@ -22,6 +22,11 @@ POST /knowledge/import
 导入时会先按 `doc_id` 删除旧 Chroma chunk，再写入新 chunk，避免重导入后
 旧向量残留。
 
+`KnowledgeCatalog.upsert_document` 会保存规范化后的完整原文
+`content_text`、轻量指标 `content_char_len`，以及 parser 名称/版本。文档列表和
+详情默认只返回 `content_char_len`，不直接返回完整正文，避免大文档让 API 响应
+过重。
+
 ## API 示例
 
 ### JSON 内容导入
@@ -46,6 +51,7 @@ curl -X POST http://127.0.0.1:8000/knowledge/import \
   "source": "accessibility.md",
   "source_type": "md",
   "content_hash": "...",
+  "content_char_len": 67,
   "chunk_count": 1,
   "indexed_to_sqlite": true,
   "indexed_to_chroma": true
@@ -145,9 +151,10 @@ PYTHONPATH=. ./.venv/bin/python scripts/preview_rechunk.py \
 ```
 
 rechunk preview 是 dry-run，只返回当前 chunk 与候选 chunk 的质量对比，
-不会写 SQLite，也不会重建 Chroma。当前 catalog 尚未保存完整原文，所以历史
-文档会通过已有 chunks 近似重建文本，响应里的 `source_mode` 会标记为
-`reconstructed_from_chunks`。
+不会写 SQLite，也不会重建 Chroma。新导入文档会优先使用 catalog 保存的完整
+原文，响应里的 `source_mode` 为 `document_content`。旧 catalog 数据如果没有
+完整原文，会回退为通过已有 chunks 近似重建文本，并标记
+`source_mode=reconstructed_from_chunks`。
 
 ### 删除文档
 

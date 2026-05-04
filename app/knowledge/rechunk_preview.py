@@ -18,7 +18,9 @@ from app.constants.knowledge import (
     RECHUNK_PREVIEW_MIN_CHUNK_SIZE_CHARS,
     RECHUNK_PREVIEW_MIN_MIN_CHUNK_CHARS,
     RECHUNK_PREVIEW_MIN_OVERLAP_CHARS,
+    RECHUNK_SOURCE_MODE_DOCUMENT_CONTENT,
     RECHUNK_SOURCE_MODE_RECONSTRUCTED_FROM_CHUNKS,
+    RECHUNK_WARNING_PREVIEW_GENERATED_NO_CHUNKS,
     RECHUNK_WARNING_SOURCE_RECONSTRUCTED,
 )
 from app.knowledge.catalog import KnowledgeCatalog
@@ -103,9 +105,9 @@ def _chunk_to_report_item(chunk: DocumentChunk) -> dict:
 def _reconstruct_text_from_chunks(chunks: list[dict]) -> str:
     """从现有 chunks 近似重建文档文本。
 
-    当前 catalog 没有保存完整原文。dry-run 为了兼容历史导入文档，先按 chunk
-    顺序拼接内容。这个模式会在 report.source_mode 中明确标出，避免调用方把
-    它误认为严格原文。
+    这个 fallback 只服务于旧 catalog 数据：老文档没有保存完整原文，只能按
+    chunk 顺序拼接内容。report.source_mode 会明确标记，避免调用方把它误认为
+    严格原文。
     """
 
     ordered_chunks = sorted(chunks, key=lambda item: int(item.get("chunk_index", 0)))
@@ -149,7 +151,17 @@ def preview_rechunk_document(
         raise ValueError("document not found")
 
     current_chunks = active_catalog.list_chunks(doc_id=doc_id)
-    source_text = _reconstruct_text_from_chunks(current_chunks)
+    document_content = active_catalog.get_document_content(doc_id) or {}
+    stored_source_text = str(document_content.get("content_text") or "")
+    if stored_source_text.strip():
+        source_text = stored_source_text
+        source_mode = RECHUNK_SOURCE_MODE_DOCUMENT_CONTENT
+        warnings: list[str] = []
+    else:
+        source_text = _reconstruct_text_from_chunks(current_chunks)
+        source_mode = RECHUNK_SOURCE_MODE_RECONSTRUCTED_FROM_CHUNKS
+        warnings = [RECHUNK_WARNING_SOURCE_RECONSTRUCTED]
+
     if not source_text.strip():
         raise ValueError("document has no chunks to preview")
 
@@ -178,9 +190,8 @@ def preview_rechunk_document(
         sample_limit=active_params.sample_limit,
     )
 
-    warnings = [RECHUNK_WARNING_SOURCE_RECONSTRUCTED]
     if preview_report.chunk_count == 0:
-        warnings.append("preview_generated_no_chunks")
+        warnings.append(RECHUNK_WARNING_PREVIEW_GENERATED_NO_CHUNKS)
 
     return RechunkPreviewReport(
         doc_id=doc_id,
@@ -188,7 +199,7 @@ def preview_rechunk_document(
         source=str(document.get("source", "")),
         source_type=str(document.get("source_type", "")),
         applied=False,
-        source_mode=RECHUNK_SOURCE_MODE_RECONSTRUCTED_FROM_CHUNKS,
+        source_mode=source_mode,
         params={
             "chunk_size_chars": active_params.chunk_size_chars,
             "chunk_overlap_chars": active_params.chunk_overlap_chars,

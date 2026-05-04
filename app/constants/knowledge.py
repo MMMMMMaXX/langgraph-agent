@@ -37,3 +37,24 @@ RECHUNK_SOURCE_MODE_DOCUMENT_CONTENT = "document_content"
 
 # Rechunk preview warning：使用 chunk 拼接文本，不是严格原文。
 RECHUNK_WARNING_SOURCE_RECONSTRUCTED = "source_reconstructed_from_chunks"
+
+# Rechunk preview warning：候选参数没有切出任何 chunk，通常说明 min_chunk/chunk_size 不合理。
+RECHUNK_WARNING_PREVIEW_GENERATED_NO_CHUNKS = "preview_generated_no_chunks"
+
+# Knowledge catalog documents 表：保存导入后规范化原文的列名。
+DOCUMENT_CONTENT_TEXT_COLUMN = "content_text"
+
+# Knowledge catalog documents 表：保存规范化原文字符数，列表/详情默认只暴露这个轻量指标。
+DOCUMENT_CONTENT_CHAR_LEN_COLUMN = "content_char_len"
+
+# Knowledge catalog documents 表：记录解析器名称，为后续 PDF/DOCX/HTML parser 版本化预留。
+DOCUMENT_PARSER_NAME_COLUMN = "parser_name"
+
+# Knowledge catalog documents 表：记录解析器版本，方便未来排查“同一文档不同解析结果”。
+DOCUMENT_PARSER_VERSION_COLUMN = "parser_version"
+
+# 默认 parser：当前导入链路接收的已经是纯文本/Markdown/JSON 抽取后的正文。
+DEFAULT_DOCUMENT_PARSER_NAME = "raw_text"
+
+# 默认 parser 版本：后续解析规则变化时递增，便于判断是否需要重新导入或重建索引。
+DEFAULT_DOCUMENT_PARSER_VERSION = "v1"

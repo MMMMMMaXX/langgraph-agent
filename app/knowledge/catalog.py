@@ -15,6 +15,14 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.config import KNOWLEDGE_BASE_CONFIG
+from app.constants.knowledge import (
+    DEFAULT_DOCUMENT_PARSER_NAME,
+    DEFAULT_DOCUMENT_PARSER_VERSION,
+    DOCUMENT_CONTENT_CHAR_LEN_COLUMN,
+    DOCUMENT_CONTENT_TEXT_COLUMN,
+    DOCUMENT_PARSER_NAME_COLUMN,
+    DOCUMENT_PARSER_VERSION_COLUMN,
+)
 from app.constants.keywords import DEFINITION_QUERY_KEYWORDS
 from app.retrieval.lexical.tokenizer import (
     build_fts_index_text,
@@ -35,6 +43,12 @@ FTS_CONTENT_SCORE_WEIGHT = 0.65
 # 定义型正文信号词（通用语义，不含领域词）
 DEFINITION_CONTENT_TERMS = ("是", "指", "用于", "定义", "概念")
 LOW_VALUE_QUERY_TERMS = {"什么", "是什", "么"}
+DOCUMENT_CONTENT_COLUMN_DEFINITIONS = {
+    DOCUMENT_CONTENT_TEXT_COLUMN: "TEXT NOT NULL DEFAULT ''",
+    DOCUMENT_CONTENT_CHAR_LEN_COLUMN: "INTEGER NOT NULL DEFAULT 0",
+    DOCUMENT_PARSER_NAME_COLUMN: f"TEXT NOT NULL DEFAULT '{DEFAULT_DOCUMENT_PARSER_NAME}'",
+    DOCUMENT_PARSER_VERSION_COLUMN: f"TEXT NOT NULL DEFAULT '{DEFAULT_DOCUMENT_PARSER_VERSION}'",
+}
 
 
 @dataclass(frozen=True)
@@ -67,6 +81,22 @@ def _connect(path: str | Path | None = None) -> sqlite3.Connection:
     conn.execute("PRAGMA synchronous=NORMAL")
     conn.execute("PRAGMA busy_timeout=5000")
     return conn
+
+
+def _ensure_document_content_columns(conn: sqlite3.Connection) -> None:
+    """给旧 SQLite catalog 补齐原文字段。
+
+    CREATE TABLE IF NOT EXISTS 只能照顾新库，已经存在的库需要显式 migration。
+    这里保持轻量、幂等：老数据补默认空原文，rechunk preview 会继续回退到 chunks。
+    """
+
+    existing_columns = {
+        str(row["name"])
+        for row in conn.execute("PRAGMA table_info(documents)").fetchall()
+    }
+    for column, definition in DOCUMENT_CONTENT_COLUMN_DEFINITIONS.items():
+        if column not in existing_columns:
+            conn.execute(f"ALTER TABLE documents ADD COLUMN {column} {definition}")
 
 
 def normalize_bm25_scores(rows: list[sqlite3.Row]) -> list[float]:
@@ -149,6 +179,10 @@ class KnowledgeCatalog:
                     source TEXT NOT NULL,
                     source_type TEXT NOT NULL DEFAULT 'unknown',
                     content_hash TEXT NOT NULL,
+                    {DOCUMENT_CONTENT_TEXT_COLUMN} TEXT NOT NULL DEFAULT '',
+                    {DOCUMENT_CONTENT_CHAR_LEN_COLUMN} INTEGER NOT NULL DEFAULT 0,
+                    {DOCUMENT_PARSER_NAME_COLUMN} TEXT NOT NULL DEFAULT '{DEFAULT_DOCUMENT_PARSER_NAME}',
+                    {DOCUMENT_PARSER_VERSION_COLUMN} TEXT NOT NULL DEFAULT '{DEFAULT_DOCUMENT_PARSER_VERSION}',
                     metadata_json TEXT NOT NULL DEFAULT '{{}}',
                     created_at REAL NOT NULL,
                     updated_at REAL NOT NULL
@@ -183,6 +217,7 @@ class KnowledgeCatalog:
                 CREATE INDEX IF NOT EXISTS idx_document_chunks_doc_id
                 ON document_chunks(doc_id);
                 """)
+            _ensure_document_content_columns(conn)
 
     def reset(self) -> None:
         self.init_schema()
@@ -197,13 +232,16 @@ class KnowledgeCatalog:
         self.init_schema()
         with _connect(self.path) as conn:
             rows = conn.execute(
-                """
+                f"""
                 SELECT
                     d.doc_id,
                     d.title,
                     d.source,
                     d.source_type,
                     d.content_hash,
+                    d.{DOCUMENT_CONTENT_CHAR_LEN_COLUMN},
+                    d.{DOCUMENT_PARSER_NAME_COLUMN},
+                    d.{DOCUMENT_PARSER_VERSION_COLUMN},
                     d.created_at,
                     d.updated_at,
                     COUNT(c.chunk_id) AS chunk_count
@@ -223,6 +261,9 @@ class KnowledgeCatalog:
                 "source": row["source"],
                 "source_type": row["source_type"],
                 "content_hash": row["content_hash"],
+                "content_char_len": int(row[DOCUMENT_CONTENT_CHAR_LEN_COLUMN]),
+                "parser_name": row[DOCUMENT_PARSER_NAME_COLUMN],
+                "parser_version": row[DOCUMENT_PARSER_VERSION_COLUMN],
                 "created_at": float(row["created_at"]),
                 "updated_at": float(row["updated_at"]),
                 "chunk_count": int(row["chunk_count"]),
@@ -236,9 +277,12 @@ class KnowledgeCatalog:
         self.init_schema()
         with _connect(self.path) as conn:
             row = conn.execute(
-                """
+                f"""
                 SELECT
                     doc_id, title, source, source_type, content_hash,
+                    {DOCUMENT_CONTENT_CHAR_LEN_COLUMN},
+                    {DOCUMENT_PARSER_NAME_COLUMN},
+                    {DOCUMENT_PARSER_VERSION_COLUMN},
                     metadata_json, created_at, updated_at
                 FROM documents
                 WHERE doc_id = ?
@@ -266,6 +310,9 @@ class KnowledgeCatalog:
             "source": row["source"],
             "source_type": row["source_type"],
             "content_hash": row["content_hash"],
+            "content_char_len": int(row[DOCUMENT_CONTENT_CHAR_LEN_COLUMN]),
+            "parser_name": row[DOCUMENT_PARSER_NAME_COLUMN],
+            "parser_version": row[DOCUMENT_PARSER_VERSION_COLUMN],
             "metadata": json.loads(row["metadata_json"] or "{}"),
             "created_at": float(row["created_at"]),
             "updated_at": float(row["updated_at"]),
@@ -281,6 +328,43 @@ class KnowledgeCatalog:
                 }
                 for chunk in chunk_rows
             ],
+        }
+
+    def get_document_content(self, doc_id: str) -> dict | None:
+        """读取单个文档的规范化原文。
+
+        这个方法给内部 re-chunk / re-index 流程使用。API 详情默认不返回完整原文，
+        避免大文档把响应撑得过重；需要展示全文时可以单独做 content endpoint。
+        """
+
+        self.init_schema()
+        with _connect(self.path) as conn:
+            row = conn.execute(
+                f"""
+                SELECT
+                    doc_id, title, source, source_type, content_hash,
+                    {DOCUMENT_CONTENT_TEXT_COLUMN},
+                    {DOCUMENT_CONTENT_CHAR_LEN_COLUMN},
+                    {DOCUMENT_PARSER_NAME_COLUMN},
+                    {DOCUMENT_PARSER_VERSION_COLUMN}
+                FROM documents
+                WHERE doc_id = ?
+                """,
+                (doc_id,),
+            ).fetchone()
+            if row is None:
+                return None
+
+        return {
+            "doc_id": row["doc_id"],
+            "title": row["title"],
+            "source": row["source"],
+            "source_type": row["source_type"],
+            "content_hash": row["content_hash"],
+            "content_text": row[DOCUMENT_CONTENT_TEXT_COLUMN],
+            "content_char_len": int(row[DOCUMENT_CONTENT_CHAR_LEN_COLUMN]),
+            "parser_name": row[DOCUMENT_PARSER_NAME_COLUMN],
+            "parser_version": row[DOCUMENT_PARSER_VERSION_COLUMN],
         }
 
     def list_chunks(self, doc_id: str | None = None) -> list[dict]:
@@ -353,6 +437,8 @@ class KnowledgeCatalog:
         content: str,
         source_type: str = "json",
         metadata: dict | None = None,
+        parser_name: str = DEFAULT_DOCUMENT_PARSER_NAME,
+        parser_version: str = DEFAULT_DOCUMENT_PARSER_VERSION,
     ) -> None:
         self.init_schema()
         now = time.time()
@@ -364,12 +450,16 @@ class KnowledgeCatalog:
             ).fetchone()
             created_at = float(existing["created_at"]) if existing else now
             conn.execute(
-                """
+                f"""
                 INSERT OR REPLACE INTO documents (
                     doc_id, title, source, source_type, content_hash,
+                    {DOCUMENT_CONTENT_TEXT_COLUMN},
+                    {DOCUMENT_CONTENT_CHAR_LEN_COLUMN},
+                    {DOCUMENT_PARSER_NAME_COLUMN},
+                    {DOCUMENT_PARSER_VERSION_COLUMN},
                     metadata_json, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     doc_id,
@@ -377,6 +467,10 @@ class KnowledgeCatalog:
                     source,
                     source_type,
                     content_hash(content),
+                    content,
+                    len(content),
+                    parser_name,
+                    parser_version,
                     metadata_json,
                     created_at,
                     now,

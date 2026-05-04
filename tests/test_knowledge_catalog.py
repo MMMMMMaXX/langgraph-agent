@@ -1,3 +1,7 @@
+from app.constants.knowledge import (
+    DEFAULT_DOCUMENT_PARSER_NAME,
+    DEFAULT_DOCUMENT_PARSER_VERSION,
+)
 from app.knowledge import KnowledgeCatalog, KnowledgeChunkRecord
 
 
@@ -34,6 +38,32 @@ def test_knowledge_catalog_fts_search_returns_chunk(tmp_path) -> None:
     assert hits[0]["id"] == "doc1::chunk::0"
     assert hits[0]["keyword_score_norm"] == 1.0
     assert hits[0]["section_title"] == "WAI-ARIA"
+
+
+def test_knowledge_catalog_persists_normalized_document_content(tmp_path) -> None:
+    db_path = tmp_path / "knowledge.sqlite3"
+    catalog = KnowledgeCatalog(db_path)
+    catalog.reset()
+    content = "WAI-ARIA 是无障碍技术规范。"
+
+    catalog.upsert_document(
+        doc_id="doc-content",
+        title="网络无障碍",
+        source="unit-test.md",
+        source_type="md",
+        content=content,
+    )
+
+    document = catalog.get_document("doc-content")
+    document_content = catalog.get_document_content("doc-content")
+
+    assert document is not None
+    assert document["content_char_len"] == len(content)
+    assert document["parser_name"] == DEFAULT_DOCUMENT_PARSER_NAME
+    assert document["parser_version"] == DEFAULT_DOCUMENT_PARSER_VERSION
+    assert document_content is not None
+    assert document_content["content_text"] == content
+    assert document_content["content_char_len"] == len(content)
 
 
 def test_knowledge_catalog_fts_search_supports_chinese_bigram(tmp_path) -> None:

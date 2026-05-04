@@ -76,6 +76,7 @@ class KnowledgeImportResponse(BaseModel):
     source: str
     source_type: str
     content_hash: str
+    content_char_len: int
     chunk_count: int
     indexed_to_sqlite: bool
     indexed_to_chroma: bool
