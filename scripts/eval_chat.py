@@ -26,6 +26,17 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import app.api as api
+from app.constants.eval import (
+    EVAL_BOOL_FALSE,
+    EVAL_BOOL_TRUE,
+    EVAL_CASE_SETUP_IMPORTS_KEY,
+    EVAL_CATEGORY_FALLBACK,
+    EVAL_EXPECTED_FALLBACK_KEY,
+    EVAL_FIELD_NOT_APPLICABLE,
+    EVAL_IMPORT_ALIAS_KEY,
+    EVAL_IMPORT_CONTENT_KEY,
+    EVAL_IMPORT_CONTENT_PATH_KEY,
+)
 from app.constants.policies import INSUFFICIENT_KNOWLEDGE_ANSWER
 
 CASES_PATH = Path(__file__).resolve().parent / "eval_cases.json"
@@ -148,6 +159,45 @@ def collect_hit_identifiers(hit: dict) -> set[str]:
     return identifiers
 
 
+def ordered_unique(values: list[str]) -> list[str]:
+    """保留顺序去重，便于 eval 输出稳定且可读。"""
+
+    seen = set()
+    result = []
+    for value in values:
+        if value in (None, "", EVAL_FIELD_NOT_APPLICABLE) or value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+    return result
+
+
+def collect_stage_doc_ids(hits: list[dict]) -> list[str]:
+    """收集某个检索阶段返回过的 doc_id。"""
+
+    return ordered_unique(
+        [str(hit.get("doc_id", "")) for hit in hits if hit.get("doc_id")]
+    )
+
+
+def collect_stage_chunk_ids(hits: list[dict]) -> list[str]:
+    """收集某个检索阶段返回过的 chunk id，兼容 merged_chunk_ids。"""
+
+    chunk_ids: list[str] = []
+    for hit in hits:
+        value = hit.get("chunk_id") or hit.get("id")
+        if value not in (None, ""):
+            chunk_ids.append(str(value))
+        for merged_chunk_id in hit.get("merged_chunk_ids") or []:
+            if merged_chunk_id not in (None, ""):
+                chunk_ids.append(str(merged_chunk_id))
+    return ordered_unique(chunk_ids)
+
+
+def join_ids(values: list[str]) -> str:
+    return ",".join(ordered_unique(values)) or EVAL_FIELD_NOT_APPLICABLE
+
+
 def hits_contain_expected(
     hits: list[dict],
     *,
@@ -170,9 +220,9 @@ def hits_contain_expected(
 
 
 def bool_metric(value: bool | str) -> str:
-    if value == "-":
-        return "-"
-    return "true" if value else "false"
+    if value == EVAL_FIELD_NOT_APPLICABLE:
+        return EVAL_FIELD_NOT_APPLICABLE
+    return EVAL_BOOL_TRUE if value else EVAL_BOOL_FALSE
 
 
 def extract_answer_citation_refs(answer: str) -> list[str]:
@@ -210,14 +260,14 @@ def build_answer_citation_eval(answer: str, rag_debug: dict) -> dict:
     doc_used = bool(rag_debug.get("doc_used"))
 
     return {
-        "answer_citation_refs": ",".join(answer_refs) or "-",
+        "answer_citation_refs": ",".join(answer_refs) or EVAL_FIELD_NOT_APPLICABLE,
         "answer_citation_count": len(answer_refs),
         "answer_has_citation": bool_metric(bool(answer_refs)) if doc_used else "-",
         "citation_refs_valid": (
             bool_metric(not invalid_refs) if answer_refs or available_refs else "-"
         ),
-        "invalid_citation_refs": ",".join(invalid_refs) or "-",
-        "unused_citation_refs": ",".join(missing_refs) or "-",
+        "invalid_citation_refs": ",".join(invalid_refs) or EVAL_FIELD_NOT_APPLICABLE,
+        "unused_citation_refs": ",".join(missing_refs) or EVAL_FIELD_NOT_APPLICABLE,
     }
 
 
@@ -261,22 +311,33 @@ def build_retrieval_eval(case: dict, debug_nodes: dict, answer: str = "") -> dic
     expected_chunk_ids = normalize_expected_ids(case.get("expected_chunk_ids"))
     rag_debug = debug_nodes.get("rag_agent", {})
     doc_debug = (rag_debug.get("retrieval_debug") or {}).get("doc", {})
+    top_docs = rag_debug.get("top_docs") or []
+    filtered_docs = rag_debug.get("filtered_docs") or []
+    post_rerank_docs = rag_debug.get("post_rerank_docs") or []
+    merged_docs = rag_debug.get("merged_docs") or []
     citations = rag_debug.get("citations") or []
     citation_doc_ids = [
         str(citation.get("doc_id", ""))
         for citation in citations
         if citation.get("doc_id")
     ]
+    citation_chunk_ids = collect_stage_chunk_ids(citations)
     citation_coverage, citation_all_hit = calculate_expected_doc_coverage(
         expected_doc_ids=expected_doc_ids,
         citation_doc_ids=citation_doc_ids,
     )
+    expected_fallback = bool(case.get(EVAL_EXPECTED_FALLBACK_KEY)) or (
+        case.get("category") == EVAL_CATEGORY_FALLBACK
+    )
 
     metrics = {
-        "expected_doc_ids": ",".join(expected_doc_ids) or "-",
-        "expected_chunk_ids": ",".join(expected_chunk_ids) or "-",
+        "expected_doc_ids": join_ids(expected_doc_ids),
+        "expected_chunk_ids": join_ids(expected_chunk_ids),
         "citation_count": len(citations),
-        "citation_doc_ids": ",".join(citation_doc_ids) or "-",
+        "citation_doc_ids": join_ids(citation_doc_ids),
+        "citation_chunk_ids": join_ids(citation_chunk_ids),
+        "source_doc_ids": join_ids(citation_doc_ids),
+        "used_chunk_ids": join_ids(citation_chunk_ids),
         "citation_expected_doc_coverage": citation_coverage,
         "citation_all_expected_docs_hit": citation_all_hit,
         "citation_hit": (
@@ -289,24 +350,37 @@ def build_retrieval_eval(case: dict, debug_nodes: dict, answer: str = "") -> dic
             )
         ),
         "top_k_hit": hits_contain_expected(
-            rag_debug.get("top_docs") or [],
+            top_docs,
             expected_doc_ids=expected_doc_ids,
             expected_chunk_ids=expected_chunk_ids,
         ),
         "filtered_hit": hits_contain_expected(
-            rag_debug.get("filtered_docs") or [],
+            filtered_docs,
             expected_doc_ids=expected_doc_ids,
             expected_chunk_ids=expected_chunk_ids,
         ),
         "rerank_hit": hits_contain_expected(
-            rag_debug.get("post_rerank_docs") or [],
+            post_rerank_docs,
             expected_doc_ids=expected_doc_ids,
             expected_chunk_ids=expected_chunk_ids,
         ),
         "merged_hit": hits_contain_expected(
-            rag_debug.get("merged_docs") or [],
+            merged_docs,
             expected_doc_ids=expected_doc_ids,
             expected_chunk_ids=expected_chunk_ids,
+        ),
+        "top_k_doc_ids": join_ids(collect_stage_doc_ids(top_docs)),
+        "filtered_doc_ids": join_ids(collect_stage_doc_ids(filtered_docs)),
+        "rerank_doc_ids": join_ids(collect_stage_doc_ids(post_rerank_docs)),
+        "merged_doc_ids": join_ids(collect_stage_doc_ids(merged_docs)),
+        "top_k_chunk_ids": join_ids(collect_stage_chunk_ids(top_docs)),
+        "filtered_chunk_ids": join_ids(collect_stage_chunk_ids(filtered_docs)),
+        "rerank_chunk_ids": join_ids(collect_stage_chunk_ids(post_rerank_docs)),
+        "merged_chunk_ids": join_ids(collect_stage_chunk_ids(merged_docs)),
+        "fallback_accuracy": (
+            bool_metric(answer == INSUFFICIENT_KNOWLEDGE_ANSWER)
+            if expected_fallback
+            else EVAL_FIELD_NOT_APPLICABLE
         ),
         "dense_count": doc_debug.get("dense_count", "-"),
         "lexical_count": doc_debug.get("lexical_count", "-"),
@@ -389,6 +463,34 @@ def post_knowledge_import(client, import_payload: dict) -> dict:
     return payload
 
 
+def resolve_import_content_path(raw_path: str) -> Path:
+    """解析 eval fixture 路径。
+
+    相对路径以仓库根目录为基准，便于 eval_cases.json 在任意 cwd 下运行。
+    """
+
+    path = Path(raw_path)
+    if path.is_absolute():
+        return path
+    return ROOT / path
+
+
+def build_knowledge_import_payload(import_config: dict) -> dict:
+    """把 eval setup 配置转换成 /knowledge/import 请求体。"""
+
+    payload = {
+        key: value
+        for key, value in import_config.items()
+        if key not in {EVAL_IMPORT_ALIAS_KEY, EVAL_IMPORT_CONTENT_PATH_KEY}
+    }
+    content_path = str(import_config.get(EVAL_IMPORT_CONTENT_PATH_KEY) or "").strip()
+    if content_path:
+        payload[EVAL_IMPORT_CONTENT_KEY] = resolve_import_content_path(
+            content_path
+        ).read_text(encoding="utf-8")
+    return payload
+
+
 def setup_knowledge_imports(client, case: dict) -> dict[str, str]:
     """执行 case 级知识导入，并返回 import alias -> doc_id 映射。
 
@@ -396,9 +498,10 @@ def setup_knowledge_imports(client, case: dict) -> dict[str, str]:
     """
 
     alias_to_doc_id: dict[str, str] = {}
-    for index, import_payload in enumerate(case.get("setup_knowledge_imports", [])):
+    for index, import_config in enumerate(case.get(EVAL_CASE_SETUP_IMPORTS_KEY, [])):
+        import_payload = build_knowledge_import_payload(import_config)
         payload = post_knowledge_import(client, import_payload)
-        alias = str(import_payload.get("alias") or f"import_{index}")
+        alias = str(import_config.get(EVAL_IMPORT_ALIAS_KEY) or f"import_{index}")
         alias_to_doc_id[alias] = str(payload.get("doc_id", ""))
     return alias_to_doc_id
 
@@ -585,6 +688,12 @@ def summarize_results(results: list[dict]) -> dict:
             "total": total_with_expected,
             "rate": (hits / total_with_expected * 100) if total_with_expected else 0.0,
         }
+    fallback_cases = [
+        item for item in results if item.get("fallback_accuracy") not in (None, "-")
+    ]
+    fallback_hits = sum(
+        1 for item in fallback_cases if item.get("fallback_accuracy") == "true"
+    )
 
     return {
         "total": total,
@@ -595,6 +704,13 @@ def summarize_results(results: list[dict]) -> dict:
         "category_stats": category_stats,
         "slowest_cases": slowest_cases,
         "retrieval_stats": retrieval_stats,
+        "fallback_stats": {
+            "hits": fallback_hits,
+            "total": len(fallback_cases),
+            "rate": (
+                fallback_hits / len(fallback_cases) * 100 if fallback_cases else 0.0
+            ),
+        },
     }
 
 
@@ -637,6 +753,12 @@ def print_summary(results: list[dict]) -> None:
             print(
                 f"{field}={stats['rate']:.1f}% " f"({stats['hits']}/{stats['total']})"
             )
+    fallback_stats = summary["fallback_stats"]
+    if fallback_stats["total"]:
+        print(
+            f"fallback_accuracy={fallback_stats['rate']:.1f}% "
+            f"({fallback_stats['hits']}/{fallback_stats['total']})"
+        )
 
     print("\nFailures")
     print("--------")
@@ -679,6 +801,9 @@ def write_csv_output(results: list[dict], path: Path) -> None:
         "expected_chunk_ids",
         "citation_count",
         "citation_doc_ids",
+        "citation_chunk_ids",
+        "source_doc_ids",
+        "used_chunk_ids",
         "citation_expected_doc_coverage",
         "citation_all_expected_docs_hit",
         "citation_hit",
@@ -693,6 +818,15 @@ def write_csv_output(results: list[dict], path: Path) -> None:
         "rerank_hit",
         "merged_hit",
         "retrieval_failure_stage",
+        "top_k_doc_ids",
+        "filtered_doc_ids",
+        "rerank_doc_ids",
+        "merged_doc_ids",
+        "top_k_chunk_ids",
+        "filtered_chunk_ids",
+        "rerank_chunk_ids",
+        "merged_chunk_ids",
+        "fallback_accuracy",
         "dense_count",
         "lexical_count",
         "hybrid_count",

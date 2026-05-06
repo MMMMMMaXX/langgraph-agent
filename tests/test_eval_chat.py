@@ -1,4 +1,5 @@
 from scripts.eval_chat import (
+    build_knowledge_import_payload,
     build_retrieval_eval,
     load_cases,
     resolve_expected_doc_ids,
@@ -11,10 +12,10 @@ def test_build_retrieval_eval_marks_stage_hits() -> None:
     debug_nodes = {
         "rag_agent": {
             "doc_used": True,
-            "top_docs": [{"doc_id": "0"}],
-            "filtered_docs": [{"doc_id": "0"}],
-            "post_rerank_docs": [{"doc_id": "0"}],
-            "merged_docs": [{"doc_id": "0"}],
+            "top_docs": [{"id": "0::chunk::1", "doc_id": "0"}],
+            "filtered_docs": [{"id": "0::chunk::1", "doc_id": "0"}],
+            "post_rerank_docs": [{"id": "0::chunk::1", "doc_id": "0"}],
+            "merged_docs": [{"id": "0::chunk::1", "doc_id": "0"}],
             "citations": [
                 {"index": 1, "ref": "[1]", "doc_id": "0", "chunk_id": "0::chunk::1"}
             ],
@@ -38,6 +39,10 @@ def test_build_retrieval_eval_marks_stage_hits() -> None:
     assert metrics["rerank_hit"] == "true"
     assert metrics["merged_hit"] == "true"
     assert metrics["citation_count"] == 1
+    assert metrics["source_doc_ids"] == "0"
+    assert metrics["used_chunk_ids"] == "0::chunk::1"
+    assert metrics["top_k_doc_ids"] == "0"
+    assert metrics["top_k_chunk_ids"] == "0::chunk::1"
     assert metrics["citation_hit"] == "true"
     assert metrics["citation_expected_doc_coverage"] == "1/1"
     assert metrics["citation_all_expected_docs_hit"] == "true"
@@ -46,6 +51,14 @@ def test_build_retrieval_eval_marks_stage_hits() -> None:
     assert metrics["citation_refs_valid"] == "true"
     assert metrics["dense_count"] == 2
     assert metrics["retrieval_failure_stage"] == ""
+
+
+def test_build_retrieval_eval_reports_fallback_accuracy() -> None:
+    case = {"category": "fallback", "expected_fallback": True}
+
+    metrics = build_retrieval_eval(case, {"rag_agent": {}}, "资料不足")
+
+    assert metrics["fallback_accuracy"] == "true"
 
 
 def test_build_retrieval_eval_reports_threshold_miss() -> None:
@@ -145,6 +158,8 @@ def test_eval_cases_include_skills_real_doc_questions() -> None:
         "skill_md_authoring_real_doc",
         "progressive_disclosure_definition_real_doc",
         "when_to_use_skill_real_doc",
+        "skill_script_usage_real_doc",
+        "skill_success_criteria_real_doc",
     }.issubset(case_ids)
 
 
@@ -179,6 +194,24 @@ def test_setup_knowledge_imports_returns_alias_to_doc_id() -> None:
     assert alias_to_doc_id == {"skill_doc": "doc-imported"}
     assert client.posts[0]["path"] == "/knowledge/import"
     assert client.posts[0]["json"]["title"] == "Skill 文档"
+    assert "alias" not in client.posts[0]["json"]
+
+
+def test_build_knowledge_import_payload_reads_content_path() -> None:
+    payload = build_knowledge_import_payload(
+        {
+            "alias": "skills_doc",
+            "title": "Skills 文档",
+            "source_type": "md",
+            "content_path": "scripts/eval_fixtures/how_to_use_skills.md",
+        }
+    )
+
+    assert payload["title"] == "Skills 文档"
+    assert payload["source_type"] == "md"
+    assert "Agent Skills" in payload["content"]
+    assert "alias" not in payload
+    assert "content_path" not in payload
 
 
 def test_build_retrieval_eval_reports_rerank_miss() -> None:

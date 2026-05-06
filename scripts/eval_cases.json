@@ -142,7 +142,7 @@
         "title": "how_to_use_skills.md",
         "source": "how_to_use_skills.md",
         "source_type": "md",
-        "content": "# how_to_use_skills.md\n\nAgent Skills 是把专门工作流、领域知识和工具使用说明封装成可复用能力的模块。\n\n## SKILL.md 怎么写\n\n每个 skill 目录必须包含 SKILL.md，SKILL.md 应说明触发条件、输入要求、执行步骤、工具依赖和验证方式。\n\n## Progressive Disclosure\n\nProgressive Disclosure 是指先只向模型暴露最关键的说明，再按需读取补充文件，避免一次性塞入过多上下文。\n\n## 什么时候用 Skill\n\n当任务重复出现、需要稳定流程、依赖特定工具或包含领域知识时，应该把流程沉淀为 skill。"
+        "content_path": "scripts/eval_fixtures/how_to_use_skills.md"
       }
     ],
     "message": "Skills 是什么？",
@@ -164,7 +164,7 @@
         "title": "how_to_use_skills.md",
         "source": "how_to_use_skills.md",
         "source_type": "md",
-        "content": "# how_to_use_skills.md\n\nAgent Skills 是把专门工作流、领域知识和工具使用说明封装成可复用能力的模块。\n\n## SKILL.md 怎么写\n\n每个 skill 目录必须包含 SKILL.md，SKILL.md 应说明触发条件、输入要求、执行步骤、工具依赖和验证方式。\n\n## Progressive Disclosure\n\nProgressive Disclosure 是指先只向模型暴露最关键的说明，再按需读取补充文件，避免一次性塞入过多上下文。\n\n## 什么时候用 Skill\n\n当任务重复出现、需要稳定流程、依赖特定工具或包含领域知识时，应该把流程沉淀为 skill。"
+        "content_path": "scripts/eval_fixtures/how_to_use_skills.md"
       }
     ],
     "message": "SKILL.md 应该怎么写？",
@@ -186,7 +186,7 @@
         "title": "how_to_use_skills.md",
         "source": "how_to_use_skills.md",
         "source_type": "md",
-        "content": "# how_to_use_skills.md\n\nAgent Skills 是把专门工作流、领域知识和工具使用说明封装成可复用能力的模块。\n\n## SKILL.md 怎么写\n\n每个 skill 目录必须包含 SKILL.md，SKILL.md 应说明触发条件、输入要求、执行步骤、工具依赖和验证方式。\n\n## Progressive Disclosure\n\nProgressive Disclosure 是指先只向模型暴露最关键的说明，再按需读取补充文件，避免一次性塞入过多上下文。\n\n## 什么时候用 Skill\n\n当任务重复出现、需要稳定流程、依赖特定工具或包含领域知识时，应该把流程沉淀为 skill。"
+        "content_path": "scripts/eval_fixtures/how_to_use_skills.md"
       }
     ],
     "message": "Progressive Disclosure 是什么？",
@@ -208,10 +208,48 @@
         "title": "how_to_use_skills.md",
         "source": "how_to_use_skills.md",
         "source_type": "md",
-        "content": "# how_to_use_skills.md\n\nAgent Skills 是把专门工作流、领域知识和工具使用说明封装成可复用能力的模块。\n\n## SKILL.md 怎么写\n\n每个 skill 目录必须包含 SKILL.md，SKILL.md 应说明触发条件、输入要求、执行步骤、工具依赖和验证方式。\n\n## Progressive Disclosure\n\nProgressive Disclosure 是指先只向模型暴露最关键的说明，再按需读取补充文件，避免一次性塞入过多上下文。\n\n## 什么时候用 Skill\n\n当任务重复出现、需要稳定流程、依赖特定工具或包含领域知识时，应该把流程沉淀为 skill。"
+        "content_path": "scripts/eval_fixtures/how_to_use_skills.md"
       }
     ],
     "message": "什么时候应该用 Skill？",
+    "expected_route": "rag_agent",
+    "expected_import_aliases": ["skills_doc"],
+    "must_include": ["Skill", "[1]"],
+    "must_not_include": ["资料不足", "工具暂时无法处理"]
+  },
+  {
+    "id": "skill_script_usage_real_doc",
+    "category": "skills_eval",
+    "session_id": "eval-skill-script-usage-real-doc",
+    "setup_knowledge_imports": [
+      {
+        "alias": "skills_doc",
+        "title": "how_to_use_skills.md",
+        "source": "how_to_use_skills.md",
+        "source_type": "md",
+        "content_path": "scripts/eval_fixtures/how_to_use_skills.md"
+      }
+    ],
+    "message": "Skill 里什么时候应该使用脚本？",
+    "expected_route": "rag_agent",
+    "expected_import_aliases": ["skills_doc"],
+    "must_include": ["脚本", "[1]"],
+    "must_not_include": ["资料不足", "工具暂时无法处理"]
+  },
+  {
+    "id": "skill_success_criteria_real_doc",
+    "category": "skills_eval",
+    "session_id": "eval-skill-success-criteria-real-doc",
+    "setup_knowledge_imports": [
+      {
+        "alias": "skills_doc",
+        "title": "how_to_use_skills.md",
+        "source": "how_to_use_skills.md",
+        "source_type": "md",
+        "content_path": "scripts/eval_fixtures/how_to_use_skills.md"
+      }
+    ],
+    "message": "一个好的 Skill 成功标准是什么？",
     "expected_route": "rag_agent",
     "expected_import_aliases": ["skills_doc"],
     "must_include": ["Skill", "[1]"],
@@ -223,6 +261,7 @@
     "session_id": "eval-unknown-concept",
     "message": "量子果冻协议是什么",
     "expected_route": "rag_agent",
+    "expected_fallback": true,
     "must_include": ["资料不足"]
   },
   {
