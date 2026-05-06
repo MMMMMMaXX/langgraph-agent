@@ -9,21 +9,12 @@ from __future__ import annotations
 
 import re
 
+from app.constants.retrieval import LEXICAL_QUERY_STOPWORDS
+
 FTS_SPECIAL_CHARS = re.compile(r'["]')
 ASCII_TOKEN_RE = re.compile(r"[A-Za-z0-9_\-]+")
 CJK_CHAR_RE = re.compile(r"[\u4e00-\u9fff]")
 MIN_SEGMENT_TERM_CHARS = 2
-
-QUERY_STOPWORDS = {
-    "是什么",
-    "什么是",
-    "为什么",
-    "怎么",
-    "如何",
-    "一下",
-    "这个",
-    "那个",
-}
 
 
 def _escape_fts_phrase(value: str) -> str:
@@ -35,7 +26,7 @@ def _dedupe_terms(terms: list[str]) -> list[str]:
     seen: set[str] = set()
     for term in terms:
         cleaned = _escape_fts_phrase(term)
-        if not cleaned or cleaned in QUERY_STOPWORDS or cleaned in seen:
+        if not cleaned or cleaned in LEXICAL_QUERY_STOPWORDS or cleaned in seen:
             continue
         seen.add(cleaned)
         result.append(cleaned)

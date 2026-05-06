@@ -289,6 +289,63 @@ def test_doc_pipeline_soft_match_keeps_top_one(doc_pipeline_io: dict) -> None:
     assert result.filtered_docs[0]["doc_id"] == "d1"
 
 
+def test_doc_pipeline_rescues_exact_lexical_term_below_threshold(
+    doc_pipeline_io: dict,
+) -> None:
+    """命中关键中文词的候选低于硬阈值时，应保留给 rerank 判断。"""
+    doc_pipeline_io["docs"] = [
+        _doc(
+            score=0.7,
+            doc_id="when",
+            content="## 什么时候用 Skill 当任务重复出现时使用 Skill。",
+            keyword_score=1.0,
+        ),
+        _doc(
+            score=0.4,
+            doc_id="script",
+            content="脚本适合承载可重复、容易出错或需要稳定执行的操作。",
+            keyword_score=0.35,
+        ),
+    ]
+
+    result = retrieve_docs_for_rag(
+        "Skill 里什么时候应该使用脚本？",
+        query_type=QUERY_TYPE_DEFINITION,
+    )
+
+    assert [doc["doc_id"] for doc in result.filtered_docs] == ["when", "script"]
+    assert result.retrieval_debug["lexical_rescue_count"] == 1
+
+
+def test_doc_pipeline_preserves_exact_lexical_term_after_rerank(
+    doc_pipeline_io: dict,
+) -> None:
+    """rerank 漏掉关键中文词 chunk 时，应兜回给回答上下文。"""
+    doc_pipeline_io["docs"] = [
+        _doc(
+            score=0.7,
+            doc_id="when",
+            content="## 什么时候用 Skill 当任务重复出现时使用 Skill。",
+            keyword_score=1.0,
+        ),
+        _doc(
+            score=0.65,
+            doc_id="script",
+            content="脚本适合承载可重复、容易出错或需要稳定执行的操作。",
+            keyword_score=0.8,
+        ),
+    ]
+    doc_pipeline_io["rerank_fn"] = lambda query, hits, top_k: hits[:1]
+
+    result = retrieve_docs_for_rag(
+        "Skill 里什么时候应该使用脚本？",
+        query_type=QUERY_TYPE_DEFINITION,
+    )
+
+    assert [doc["doc_id"] for doc in result.doc_hits] == ["when", "script"]
+    assert result.retrieval_debug["rerank_lexical_focus_count"] == 1
+
+
 def test_doc_pipeline_fallback_query_disables_soft_match(
     doc_pipeline_io: dict,
 ) -> None:

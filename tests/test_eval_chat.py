@@ -138,6 +138,31 @@ def test_build_retrieval_eval_reports_partial_expected_doc_coverage() -> None:
     assert metrics["citation_all_expected_docs_hit"] == "false"
 
 
+def test_build_retrieval_eval_prefers_expected_chunk_over_doc_match() -> None:
+    case = {
+        "expected_doc_ids": ["doc-1"],
+        "expected_chunk_ids": ["doc-1::chunk::2"],
+    }
+    debug_nodes = {
+        "rag_agent": {
+            "top_docs": [{"doc_id": "doc-1", "id": "doc-1::chunk::4"}],
+            "filtered_docs": [{"doc_id": "doc-1", "id": "doc-1::chunk::2"}],
+            "post_rerank_docs": [{"doc_id": "doc-1", "id": "doc-1::chunk::4"}],
+            "merged_docs": [{"doc_id": "doc-1", "id": "doc-1::chunk::4"}],
+            "citations": [{"doc_id": "doc-1", "chunk_id": "doc-1::chunk::4"}],
+            "retrieval_debug": {"doc": {}},
+        }
+    }
+
+    metrics = build_retrieval_eval(case, debug_nodes, "引用了同文档的错误段落[1]")
+
+    assert metrics["top_k_hit"] == "false"
+    assert metrics["filtered_hit"] == "true"
+    assert metrics["rerank_hit"] == "false"
+    assert metrics["citation_hit"] == "false"
+    assert metrics["citation_all_expected_docs_hit"] == "true"
+
+
 def test_resolve_expected_doc_ids_adds_import_alias_doc_ids() -> None:
     case = {
         "expected_doc_ids": ["0"],
@@ -148,6 +173,21 @@ def test_resolve_expected_doc_ids_adds_import_alias_doc_ids() -> None:
 
     assert resolved["expected_doc_ids"] == ["0", "doc-imported"]
     assert case["expected_doc_ids"] == ["0"]
+
+
+def test_resolve_expected_doc_ids_adds_import_alias_chunk_ids() -> None:
+    case = {
+        "expected_chunk_ids": ["0::chunk::1"],
+        "expected_import_chunks": [{"alias": "skill_doc", "chunk_index": 2}],
+    }
+
+    resolved = resolve_expected_doc_ids(case, {"skill_doc": "doc-imported"})
+
+    assert resolved["expected_chunk_ids"] == [
+        "0::chunk::1",
+        "doc-imported::chunk::2",
+    ]
+    assert case["expected_chunk_ids"] == ["0::chunk::1"]
 
 
 def test_eval_cases_include_skills_real_doc_questions() -> None:

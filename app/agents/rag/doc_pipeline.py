@@ -25,7 +25,10 @@ from app.constants.retrieval import (
     DEFAULT_HYBRID_ALPHA,
     DEFAULT_HYBRID_BETA,
     DOC_CANDIDATE_MULTIPLIER,
+    LEXICAL_RESCUE_MAX_DOCS,
+    LEXICAL_RESCUE_MIN_KEYWORD_SCORE,
 )
+from app.retrieval.lexical.tokenizer import lexical_terms
 from app.retrieval.doc_retrieval import (
     apply_keyword_scores,
     dense_retrieve_docs,
@@ -270,7 +273,69 @@ def run_threshold_step(state: DocRetrievalPipelineState) -> DocRetrievalPipeline
             return state
         state.filtered_docs = state.docs[:1]
 
+    rescue_docs = select_lexical_rescue_docs(state)
+    if rescue_docs:
+        existing_ids = {doc.get("id") for doc in state.filtered_docs}
+        state.filtered_docs.extend(
+            doc for doc in rescue_docs if doc.get("id") not in existing_ids
+        )
+    state.retrieval_debug["lexical_rescue_count"] = len(rescue_docs)
+
     return state
+
+
+def select_lexical_focus_docs(
+    state: DocRetrievalPipelineState,
+    docs: list[dict],
+    *,
+    require_below_threshold: bool,
+) -> list[dict]:
+    """选择命中查询关键中文词的 lexical focus 候选。"""
+
+    rescue_terms = [
+        term for term in lexical_terms(state.query) if _contains_cjk(term)
+    ]
+    if not rescue_terms:
+        return []
+
+    selected: list[dict] = []
+    for doc in docs:
+        if (
+            require_below_threshold
+            and doc.get("score", 0.0) >= state.config.score_threshold
+        ):
+            continue
+        if doc.get("keyword_score_norm", 0.0) < LEXICAL_RESCUE_MIN_KEYWORD_SCORE:
+            continue
+        content = str(doc.get("content", ""))
+        if not any(term in content for term in rescue_terms):
+            continue
+        selected.append(doc)
+        if len(selected) >= LEXICAL_RESCUE_MAX_DOCS:
+            break
+    return selected
+
+
+def select_lexical_rescue_docs(state: DocRetrievalPipelineState) -> list[dict]:
+    """保留低 hybrid 分但命中查询关键中文词的候选。
+
+    hybrid 阈值适合过滤大多数噪声，但在中文问句里，"什么时候/应该/使用"
+    这类泛词可能把精确实体词（如"脚本"）所在 chunk 压低。rescue 只看
+    当前 top-k 候选，并要求：
+    1. 低于硬阈值，避免重复保留已经高置信的候选。
+    2. keyword_score_norm 足够高，说明 lexical 至少有一定证据。
+    3. chunk 正文包含查询中的中文关键词，避免只因常见英文词 Skill 命中。
+    """
+
+    return select_lexical_focus_docs(
+        state,
+        state.docs,
+        require_below_threshold=True,
+    )
+
+
+def _contains_cjk(value: str) -> bool:
+    return any("\u4e00" <= char <= "\u9fff" for char in value)
 
 
 def run_rerank_step(state: DocRetrievalPipelineState) -> DocRetrievalPipelineState:
@@ -310,6 +375,37 @@ def run_rerank_step(state: DocRetrievalPipelineState) -> DocRetrievalPipelineSta
             )
         )
     state.timings_ms["docRerank"] = round(now_ms() - started_at_ms, 2)
+    state = preserve_lexical_focus_after_rerank(state)
+    return state
+
+
+def preserve_lexical_focus_after_rerank(
+    state: DocRetrievalPipelineState,
+) -> DocRetrievalPipelineState:
+    """rerank 后保留精确中文词命中的候选。
+
+    LLM rerank 偶尔会被"什么时候/怎么用"这类问法带偏，把真正包含关键实体
+    的段落排出去。这里不跳过 rerank，只在 rerank 之后把 lexical focus 候选
+    兜回结果集，确保回答阶段至少看得到精确证据。
+    """
+
+    focus_docs = select_lexical_focus_docs(
+        state,
+        state.filtered_docs,
+        require_below_threshold=False,
+    )
+    existing_ids = {doc.get("id") for doc in state.doc_hits}
+    added = 0
+    for doc in focus_docs:
+        if doc.get("id") in existing_ids:
+            continue
+        if len(state.doc_hits) < state.config.doc_rerank_top_k:
+            state.doc_hits.append(doc)
+        else:
+            state.doc_hits[-1] = doc
+        existing_ids.add(doc.get("id"))
+        added += 1
+    state.retrieval_debug["rerank_lexical_focus_count"] = added
     return state
 
 

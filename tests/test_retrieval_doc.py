@@ -25,6 +25,7 @@ from app.retrieval.doc_retrieval import (
     normalize_keyword_scores,
     rank_hybrid,
 )
+from app.retrieval.lexical.tokenizer import lexical_terms
 
 # ----------------------------- distance → semantic -----------------------------
 
@@ -52,6 +53,18 @@ def test_keyword_score_tag_match_hits_weight() -> None:
 def test_keyword_score_no_match_returns_zero() -> None:
     # 既没有标签命中，也没有字面子串命中
     assert keyword_score("XYZ", "完全无关的内容") == 0.0
+
+
+def test_lexical_terms_drop_question_stopwords_but_keep_domain_terms() -> None:
+    terms = lexical_terms("Skill 里什么时候应该使用脚本？")
+
+    assert "脚本" in terms
+    assert "Skill" in terms
+    assert "什么时候" not in terms
+    assert "什么" not in terms
+    assert "时候" not in terms
+    assert "应该" not in terms
+    assert "使用" not in terms
 
 
 def test_keyword_score_literal_substring_adds_boost() -> None:

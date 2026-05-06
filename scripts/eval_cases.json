@@ -233,7 +233,10 @@
     "message": "Skill 里什么时候应该使用脚本？",
     "expected_route": "rag_agent",
     "expected_import_aliases": ["skills_doc"],
-    "must_include": ["脚本", "[1]"],
+    "expected_import_chunks": [
+      {"alias": "skills_doc", "chunk_index": 2}
+    ],
+    "must_include": ["脚本"],
     "must_not_include": ["资料不足", "工具暂时无法处理"]
   },
   {

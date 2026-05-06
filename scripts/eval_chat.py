@@ -31,16 +31,25 @@ from app.constants.eval import (
     EVAL_BOOL_TRUE,
     EVAL_CASE_SETUP_IMPORTS_KEY,
     EVAL_CATEGORY_FALLBACK,
+    EVAL_BASE_URL_ENV,
+    EVAL_CASE_IDS_ENV,
+    EVAL_CONVERSATION_HISTORY_PATH_ENV,
     EVAL_EXPECTED_FALLBACK_KEY,
+    EVAL_EXPECTED_IMPORT_CHUNK_ALIAS_KEY,
+    EVAL_EXPECTED_IMPORT_CHUNK_INDEX_KEY,
+    EVAL_EXPECTED_IMPORT_CHUNKS_KEY,
     EVAL_FIELD_NOT_APPLICABLE,
+    EVAL_HTTP_TIMEOUT_ENV,
+    EVAL_HTTP_TIMEOUT_SECONDS,
     EVAL_IMPORT_ALIAS_KEY,
     EVAL_IMPORT_CONTENT_KEY,
     EVAL_IMPORT_CONTENT_PATH_KEY,
+    EVAL_OUTPUT_CSV_ENV,
+    EVAL_OUTPUT_JSON_ENV,
 )
 from app.constants.policies import INSUFFICIENT_KNOWLEDGE_ANSWER
 
 CASES_PATH = Path(__file__).resolve().parent / "eval_cases.json"
-EVAL_CONVERSATION_HISTORY_PATH = "EVAL_CONVERSATION_HISTORY_PATH"
 CITATION_REF_PATTERN = re.compile(r"\[(\d+)\]")
 
 
@@ -49,7 +58,7 @@ def load_cases() -> list[dict]:
 
 
 def filter_cases(cases: list[dict]) -> list[dict]:
-    case_ids = os.getenv("EVAL_CASE_IDS", "").strip()
+    case_ids = os.getenv(EVAL_CASE_IDS_ENV, "").strip()
     if not case_ids:
         return cases
 
@@ -207,9 +216,11 @@ def hits_contain_expected(
     """判断某个检索阶段是否命中预期文档/切片。
 
     没有配置 expected_* 时返回 "-"，表示该 case 不参与 retrieval hit 统计。
+    如果配置了 expected_chunk_ids，则优先按精确 chunk 判断；这样不会因为同一
+    doc_id 命中而掩盖“引用了错误段落”的问题。
     """
 
-    expected_ids = set(expected_doc_ids + expected_chunk_ids)
+    expected_ids = set(expected_chunk_ids or expected_doc_ids)
     if not expected_ids:
         return "-"
 
@@ -439,7 +450,7 @@ def post_chat(client, session_id: str, message: str) -> dict:
         "message": message,
         "debug": True,
     }
-    conversation_history_path = os.getenv(EVAL_CONVERSATION_HISTORY_PATH, "").strip()
+    conversation_history_path = os.getenv(EVAL_CONVERSATION_HISTORY_PATH_ENV, "").strip()
     if conversation_history_path:
         payload["conversation_history_path"] = conversation_history_path
 
@@ -507,7 +518,14 @@ def setup_knowledge_imports(client, case: dict) -> dict[str, str]:
 
 
 def resolve_expected_doc_ids(case: dict, alias_to_doc_id: dict[str, str]) -> dict:
-    """把 expected_import_aliases 解析成实际 doc_id，返回 case 副本。"""
+    """把导入 alias 解析成实际 doc/chunk id，返回 case 副本。
+
+    eval 运行时导入文档的 doc_id 由内容 hash 生成，不能在 eval_cases.json
+    里写死。这里支持两层解析：
+    1. expected_import_aliases -> expected_doc_ids，用于“命中文档即可”的 case。
+    2. expected_import_chunks -> expected_chunk_ids，用于要求命中特定章节/chunk
+       的 case，避免只命中文档但引用了错误段落也被误判通过。
+    """
 
     if not alias_to_doc_id:
         return case
@@ -521,6 +539,20 @@ def resolve_expected_doc_ids(case: dict, alias_to_doc_id: dict[str, str]) -> dic
 
     if expected_doc_ids:
         resolved["expected_doc_ids"] = expected_doc_ids
+
+    expected_chunk_ids = normalize_expected_ids(case.get("expected_chunk_ids"))
+    for chunk_ref in case.get(EVAL_EXPECTED_IMPORT_CHUNKS_KEY, []):
+        alias = str(chunk_ref.get(EVAL_EXPECTED_IMPORT_CHUNK_ALIAS_KEY, ""))
+        doc_id = alias_to_doc_id.get(alias, "")
+        if not doc_id:
+            continue
+        chunk_index = chunk_ref.get(EVAL_EXPECTED_IMPORT_CHUNK_INDEX_KEY)
+        if chunk_index is None:
+            continue
+        expected_chunk_ids.append(f"{doc_id}::chunk::{chunk_index}")
+
+    if expected_chunk_ids:
+        resolved["expected_chunk_ids"] = expected_chunk_ids
     return resolved
 
 
@@ -847,8 +879,8 @@ def write_csv_output(results: list[dict], path: Path) -> None:
 
 
 def maybe_write_outputs(results: list[dict]) -> None:
-    json_path = os.getenv("EVAL_OUTPUT_JSON", "").strip()
-    csv_path = os.getenv("EVAL_OUTPUT_CSV", "").strip()
+    json_path = os.getenv(EVAL_OUTPUT_JSON_ENV, "").strip()
+    csv_path = os.getenv(EVAL_OUTPUT_CSV_ENV, "").strip()
 
     # 结果落盘是实验沉淀的基础，默认不强制输出文件，需要时用环境变量开启。
     if json_path:
@@ -858,14 +890,14 @@ def maybe_write_outputs(results: list[dict]) -> None:
 
 
 def get_http_timeout() -> float:
-    value = os.getenv("EVAL_HTTP_TIMEOUT", "").strip()
+    value = os.getenv(EVAL_HTTP_TIMEOUT_ENV, "").strip()
     if not value:
-        return 120.0
+        return EVAL_HTTP_TIMEOUT_SECONDS
     return float(value)
 
 
 def build_client():
-    base_url = os.getenv("EVAL_BASE_URL", "").strip()
+    base_url = os.getenv(EVAL_BASE_URL_ENV, "").strip()
     if base_url:
         # 优先支持直接请求已启动的本地服务，适合长时评测和观察真实日志。
         # 创作型/长文本 case 往往明显慢于普通 QA，因此把超时做成可配置项。

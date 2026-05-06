@@ -17,6 +17,26 @@ from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from app.constants.eval import (
+    CHROMA_PERSIST_DIR_ENV,
+    CONVERSATION_HISTORY_BACKEND_ENV,
+    CONVERSATION_HISTORY_BACKEND_SQLITE,
+    CONVERSATION_HISTORY_PATH_ENV,
+    CONVERSATION_HISTORY_SQLITE_PATH_ENV,
+    EVAL_BASE_URL_ENV,
+    EVAL_CASE_IDS_ENV,
+    EVAL_CHROMA_DIR_SUFFIX,
+    EVAL_CONVERSATION_HISTORY_PATH_ENV,
+    EVAL_CONVERSATION_HISTORY_SUFFIX,
+    EVAL_KNOWLEDGE_SQLITE_SUFFIX,
+    EVAL_OUTPUT_CSV_ENV,
+    EVAL_OUTPUT_JSON_ENV,
+    KNOWLEDGE_BASE_SQLITE_PATH_ENV,
+)
+
 PROFILES_PATH = Path(__file__).resolve().parent / "eval_profiles.json"
 DEFAULT_OUTPUT_DIR = ROOT / "outputs" / "eval_runs"
 
@@ -44,7 +64,15 @@ def build_manifest_path(json_path: Path) -> Path:
 
 
 def build_history_path(json_path: Path) -> Path:
-    return json_path.with_name(f"{json_path.stem}.conversation_history.sqlite3")
+    return json_path.with_name(f"{json_path.stem}{EVAL_CONVERSATION_HISTORY_SUFFIX}")
+
+
+def build_knowledge_sqlite_path(json_path: Path) -> Path:
+    return json_path.with_name(f"{json_path.stem}{EVAL_KNOWLEDGE_SQLITE_SUFFIX}")
+
+
+def build_chroma_dir(json_path: Path) -> Path:
+    return json_path.with_name(f"{json_path.stem}{EVAL_CHROMA_DIR_SUFFIX}")
 
 
 def build_env(profile: dict, args: argparse.Namespace) -> dict[str, str]:
@@ -56,9 +84,9 @@ def build_env(profile: dict, args: argparse.Namespace) -> dict[str, str]:
         env[key] = str(value)
 
     if args.base_url:
-        env["EVAL_BASE_URL"] = args.base_url
+        env[EVAL_BASE_URL_ENV] = args.base_url
     if args.case_ids:
-        env["EVAL_CASE_IDS"] = args.case_ids
+        env[EVAL_CASE_IDS_ENV] = args.case_ids
 
     return env
 
@@ -74,12 +102,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--base-url",
-        default=os.getenv("EVAL_BASE_URL", "").strip(),
+        default=os.getenv(EVAL_BASE_URL_ENV, "").strip(),
         help="optional live API base url, e.g. http://127.0.0.1:8000",
     )
     parser.add_argument(
         "--case-ids",
-        default=os.getenv("EVAL_CASE_IDS", "").strip(),
+        default=os.getenv(EVAL_CASE_IDS_ENV, "").strip(),
         help="optional comma-separated case ids",
     )
     parser.add_argument(
@@ -98,14 +126,24 @@ def main() -> None:
     json_path, csv_path = build_output_paths(args.profile, output_dir)
     manifest_path = build_manifest_path(json_path)
     history_path = build_history_path(json_path)
+    knowledge_sqlite_path = build_knowledge_sqlite_path(json_path)
+    chroma_dir = build_chroma_dir(json_path)
+    knowledge_isolated = not bool(args.base_url)
 
     env = build_env(profile, args)
-    env["EVAL_OUTPUT_JSON"] = str(json_path)
-    env["EVAL_OUTPUT_CSV"] = str(csv_path)
-    env["EVAL_CONVERSATION_HISTORY_PATH"] = str(history_path)
-    env["CONVERSATION_HISTORY_PATH"] = str(history_path)
-    env["CONVERSATION_HISTORY_BACKEND"] = "sqlite"
-    env["CONVERSATION_HISTORY_SQLITE_PATH"] = str(history_path)
+    env[EVAL_OUTPUT_JSON_ENV] = str(json_path)
+    env[EVAL_OUTPUT_CSV_ENV] = str(csv_path)
+    env[EVAL_CONVERSATION_HISTORY_PATH_ENV] = str(history_path)
+    env[CONVERSATION_HISTORY_PATH_ENV] = str(history_path)
+    env[CONVERSATION_HISTORY_BACKEND_ENV] = CONVERSATION_HISTORY_BACKEND_SQLITE
+    env[CONVERSATION_HISTORY_SQLITE_PATH_ENV] = str(history_path)
+
+    if knowledge_isolated:
+        # 只在进程内 eval 模式注入隔离知识库路径。若连接已启动 API，
+        # 子进程环境变量无法改变那个服务已加载的知识库配置，强行打印
+        # “已隔离”反而会误导排查。
+        env[KNOWLEDGE_BASE_SQLITE_PATH_ENV] = str(knowledge_sqlite_path)
+        env[CHROMA_PERSIST_DIR_ENV] = str(chroma_dir)
 
     manifest = {
         "profile": profile["name"],
@@ -116,6 +154,14 @@ def main() -> None:
         "json_output": str(json_path),
         "csv_output": str(csv_path),
         "conversation_history_output": str(history_path),
+        "knowledge_isolated": knowledge_isolated,
+        "knowledge_sqlite_output": str(knowledge_sqlite_path) if knowledge_isolated else "",
+        "chroma_output": str(chroma_dir) if knowledge_isolated else "",
+        "knowledge_isolation_note": (
+            "enabled for in-process eval"
+            if knowledge_isolated
+            else "disabled because base_url mode uses an already running API process"
+        ),
         "started_at": datetime.now().isoformat(timespec="seconds"),
     }
     manifest_path.write_text(
@@ -135,6 +181,11 @@ def main() -> None:
     print(f"JSON output: {json_path}")
     print(f"CSV output: {csv_path}")
     print(f"Conversation history: {history_path}")
+    if knowledge_isolated:
+        print(f"Knowledge SQLite: {knowledge_sqlite_path}")
+        print(f"Chroma dir: {chroma_dir}")
+    else:
+        print("Knowledge isolation: disabled for base-url mode")
     print(f"Manifest: {manifest_path}")
     print("", flush=True)
 
