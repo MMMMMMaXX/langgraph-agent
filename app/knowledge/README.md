@@ -156,6 +156,37 @@ rechunk preview 是 dry-run，只返回当前 chunk 与候选 chunk 的质量对
 完整原文，会回退为通过已有 chunks 近似重建文本，并标记
 `source_mode=reconstructed_from_chunks`。
 
+确认 preview 结果符合预期后，可以应用重新切片：
+
+```bash
+curl -X POST http://127.0.0.1:8000/knowledge/docs/<doc_id>/rechunk/apply \
+  -H "Content-Type: application/json" \
+  -d '{
+    "chunk_size_chars": 360,
+    "chunk_overlap_chars": 80,
+    "min_chunk_chars": 40,
+    "sample_limit": 3
+  }'
+```
+
+apply 会使用 catalog 保存的完整原文重新生成 chunks，写回 SQLite `document_chunks`
+和 FTS5，然后重建该文档的 Chroma dense index。为了避免把 chunks 拼接出的近似
+文本当成真原文写回索引，旧数据如果没有 `content_text`，apply 会要求重新导入
+文档。
+
+本地 CLI 也支持 apply。因为它会真实修改 SQLite/FTS5 和 Chroma，必须显式传
+`--yes`：
+
+```bash
+PYTHONPATH=. ./.venv/bin/python scripts/apply_rechunk.py \
+  --doc-id <doc_id> \
+  --chunk-size 360 \
+  --overlap 80 \
+  --min-chars 40 \
+  --sample-limit 3 \
+  --yes
+```
+
 ### 删除文档
 
 ```bash

@@ -3,6 +3,7 @@ import sqlite3
 from app.constants.knowledge import (
     DOCUMENT_CONTENT_CHAR_LEN_COLUMN,
     DOCUMENT_CONTENT_TEXT_COLUMN,
+    RECHUNK_ERROR_DOCUMENT_NOT_FOUND,
     RECHUNK_SOURCE_MODE_DOCUMENT_CONTENT,
     RECHUNK_SOURCE_MODE_RECONSTRUCTED_FROM_CHUNKS,
     RECHUNK_WARNING_SOURCE_RECONSTRUCTED,
@@ -136,6 +137,6 @@ def test_preview_rechunk_document_missing_doc(tmp_path) -> None:
     try:
         preview_rechunk_document("missing", catalog=catalog)
     except ValueError as exc:
-        assert str(exc) == "document not found"
+        assert str(exc) == RECHUNK_ERROR_DOCUMENT_NOT_FOUND
     else:
         raise AssertionError("expected ValueError")

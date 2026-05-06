@@ -149,6 +149,16 @@ class KnowledgeRechunkPreviewResponse(BaseModel):
     report: dict[str, Any]
 
 
+class KnowledgeRechunkApplyRequest(KnowledgeRechunkPreviewRequest):
+    """POST /knowledge/docs/{doc_id}/rechunk/apply 的请求体。"""
+
+
+class KnowledgeRechunkApplyResponse(BaseModel):
+    """Rechunk apply 响应。"""
+
+    report: dict[str, Any]
+
+
 class KnowledgeDeleteResponse(BaseModel):
     """DELETE /knowledge/docs/{doc_id} 的响应。"""
 

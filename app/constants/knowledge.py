@@ -41,6 +41,15 @@ RECHUNK_WARNING_SOURCE_RECONSTRUCTED = "source_reconstructed_from_chunks"
 # Rechunk preview warning：候选参数没有切出任何 chunk，通常说明 min_chunk/chunk_size 不合理。
 RECHUNK_WARNING_PREVIEW_GENERATED_NO_CHUNKS = "preview_generated_no_chunks"
 
+# Rechunk 错误：指定文档不存在，路由层会映射为 404。
+RECHUNK_ERROR_DOCUMENT_NOT_FOUND = "document not found"
+
+# Rechunk apply 错误：旧数据没有完整原文，不能安全地执行真实重切片。
+RECHUNK_ERROR_DOCUMENT_CONTENT_MISSING = "document content not available; reimport document before apply"
+
+# Rechunk apply 日志 stage：新 Chroma 重建失败后，已经尝试恢复旧 SQLite/FTS5。
+RECHUNK_APPLY_ROLLBACK_STAGE = "knowledge.rechunk.apply.rollback"
+
 # Knowledge catalog documents 表：保存导入后规范化原文的列名。
 DOCUMENT_CONTENT_TEXT_COLUMN = "content_text"
 

@@ -16,8 +16,12 @@ from app.knowledge.management import (
     reindex_all_knowledge_documents,
     reindex_knowledge_document,
 )
+from app.knowledge.rechunk_apply import (
+    RechunkApplyReport,
+    apply_rechunk_document,
+)
+from app.knowledge.rechunk_common import RechunkPreviewParams
 from app.knowledge.rechunk_preview import (
-    RechunkPreviewParams,
     RechunkPreviewReport,
     preview_rechunk_document,
 )
@@ -46,11 +50,13 @@ __all__ = [
     "KnowledgeImportResult",
     "KnowledgeDeleteResult",
     "KnowledgeReindexResult",
+    "RechunkApplyReport",
     "RechunkPreviewParams",
     "RechunkPreviewReport",
     "SearchInspectReport",
     "inspect_document_chunks",
     "inspect_retrieval",
+    "apply_rechunk_document",
     "preview_rechunk_document",
     "import_knowledge_document",
     "delete_knowledge_document",

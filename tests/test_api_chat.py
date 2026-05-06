@@ -19,9 +19,14 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api import app, clear_session_store, session_store
+from app.constants.knowledge import (
+    RECHUNK_ERROR_DOCUMENT_CONTENT_MISSING,
+    RECHUNK_SOURCE_MODE_DOCUMENT_CONTENT,
+)
 from app.knowledge.chunk_inspector import ChunkQualityReport
 from app.knowledge.ingestion import KnowledgeImportResult
 from app.knowledge.management import KnowledgeDeleteResult, KnowledgeReindexResult
+from app.knowledge.rechunk_apply import RechunkApplyReport
 from app.knowledge.rechunk_preview import RechunkPreviewReport
 from app.knowledge.search_inspector import SearchInspectReport
 
@@ -622,6 +627,98 @@ def test_preview_knowledge_doc_rechunk_endpoint_returns_404(
 
     assert resp.status_code == 404
     assert resp.json()["detail"] == "document not found"
+
+
+def test_apply_knowledge_doc_rechunk_endpoint(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.api.routes as routes_mod
+
+    current = ChunkQualityReport(
+        doc_id="doc-api",
+        chunk_count=2,
+        total_chars=180,
+        min_chars=80,
+        max_chars=100,
+        avg_chars=90.0,
+        median_chars=90.0,
+        short_chunk_count=0,
+        long_chunk_count=0,
+        section_count=1,
+        top_sections=[],
+        samples=[],
+        warnings=[],
+    )
+    preview = ChunkQualityReport(
+        doc_id="doc-api",
+        chunk_count=3,
+        total_chars=180,
+        min_chars=50,
+        max_chars=70,
+        avg_chars=60.0,
+        median_chars=60.0,
+        short_chunk_count=0,
+        long_chunk_count=0,
+        section_count=1,
+        top_sections=[],
+        samples=[],
+        warnings=[],
+    )
+
+    def fake_apply(doc_id: str, **kwargs):
+        assert doc_id == "doc-api"
+        return RechunkApplyReport(
+            doc_id=doc_id,
+            title="API 文档",
+            source="api.md",
+            source_type="md",
+            applied=True,
+            source_mode=RECHUNK_SOURCE_MODE_DOCUMENT_CONTENT,
+            params={"chunk_size_chars": 120},
+            current=current,
+            preview=preview,
+            delta={"chunk_count": 1},
+            old_chunk_count=2,
+            new_chunk_count=3,
+            reindexed_to_chroma=True,
+            warnings=[],
+        )
+
+    monkeypatch.setattr(routes_mod, "apply_rechunk_document", fake_apply)
+
+    resp = client.post(
+        "/knowledge/docs/doc-api/rechunk/apply",
+        json={
+            "chunk_size_chars": 120,
+            "chunk_overlap_chars": 20,
+            "min_chunk_chars": 20,
+        },
+    )
+
+    assert resp.status_code == 200, resp.text
+    report = resp.json()["report"]
+    assert report["doc_id"] == "doc-api"
+    assert report["applied"] is True
+    assert report["new_chunk_count"] == 3
+    assert report["reindexed_to_chroma"] is True
+
+
+def test_apply_knowledge_doc_rechunk_endpoint_returns_400(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.api.routes as routes_mod
+
+    def fake_apply(doc_id: str, **kwargs):
+        raise ValueError(RECHUNK_ERROR_DOCUMENT_CONTENT_MISSING)
+
+    monkeypatch.setattr(routes_mod, "apply_rechunk_document", fake_apply)
+
+    resp = client.post("/knowledge/docs/doc-api/rechunk/apply", json={})
+
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == RECHUNK_ERROR_DOCUMENT_CONTENT_MISSING
 
 
 def test_chat_persists_session_state_across_turns(

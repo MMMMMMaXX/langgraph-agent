@@ -17,11 +17,13 @@ from typing import Annotated
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 
+from app.constants.knowledge import RECHUNK_ERROR_DOCUMENT_NOT_FOUND
 from app.knowledge import (
     ChunkQualityThresholds,
     KnowledgeCatalog,
     KnowledgeImportInput,
     RechunkPreviewParams,
+    apply_rechunk_document,
     delete_knowledge_document,
     import_knowledge_document,
     inspect_document_chunks,
@@ -42,6 +44,8 @@ from .schemas import (
     KnowledgeImportRequest,
     KnowledgeImportResponse,
     KnowledgeReindexResponse,
+    KnowledgeRechunkApplyRequest,
+    KnowledgeRechunkApplyResponse,
     KnowledgeRechunkPreviewRequest,
     KnowledgeRechunkPreviewResponse,
     KnowledgeSearchInspectRequest,
@@ -307,9 +311,36 @@ def preview_knowledge_doc_rechunk(
         )
     except ValueError as exc:
         detail = str(exc)
-        status_code = 404 if detail == "document not found" else 400
+        status_code = 404 if detail == RECHUNK_ERROR_DOCUMENT_NOT_FOUND else 400
         raise HTTPException(status_code=status_code, detail=detail) from exc
     return KnowledgeRechunkPreviewResponse(report=asdict(report))
+
+
+@router.post(
+    "/knowledge/docs/{doc_id}/rechunk/apply",
+    response_model=KnowledgeRechunkApplyResponse,
+)
+def apply_knowledge_doc_rechunk(
+    doc_id: str,
+    request: KnowledgeRechunkApplyRequest,
+) -> KnowledgeRechunkApplyResponse:
+    """应用重新切片结果，并同步重建单篇文档的 Chroma dense index。"""
+
+    try:
+        report = apply_rechunk_document(
+            doc_id,
+            params=RechunkPreviewParams(
+                chunk_size_chars=request.chunk_size_chars,
+                chunk_overlap_chars=request.chunk_overlap_chars,
+                min_chunk_chars=request.min_chunk_chars,
+                sample_limit=request.sample_limit,
+            ),
+        )
+    except ValueError as exc:
+        detail = str(exc)
+        status_code = 404 if detail == RECHUNK_ERROR_DOCUMENT_NOT_FOUND else 400
+        raise HTTPException(status_code=status_code, detail=detail) from exc
+    return KnowledgeRechunkApplyResponse(report=asdict(report))
 
 
 @router.delete("/knowledge/docs/{doc_id}", response_model=KnowledgeDeleteResponse)
