@@ -17,7 +17,16 @@ from typing import Annotated
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 
-from app.constants.knowledge import RECHUNK_ERROR_DOCUMENT_NOT_FOUND
+from app.constants.knowledge import (
+    KNOWLEDGE_CHUNK_LIST_DEFAULT_LIMIT,
+    KNOWLEDGE_CHUNK_LIST_MAX_LIMIT,
+    KNOWLEDGE_CHUNK_PREVIEW_DEFAULT_CHARS,
+    KNOWLEDGE_CHUNK_PREVIEW_MAX_CHARS,
+    KNOWLEDGE_DOC_LIST_DEFAULT_LIMIT,
+    KNOWLEDGE_DOC_LIST_MAX_LIMIT,
+    KNOWLEDGE_ERROR_DOCUMENT_NOT_FOUND,
+    RECHUNK_ERROR_DOCUMENT_NOT_FOUND,
+)
 from app.knowledge import (
     ChunkQualityThresholds,
     KnowledgeCatalog,
@@ -27,6 +36,7 @@ from app.knowledge import (
     delete_knowledge_document,
     import_knowledge_document,
     inspect_document_chunks,
+    inspect_knowledge_health,
     inspect_retrieval,
     preview_rechunk_document,
     reindex_all_knowledge_documents,
@@ -37,10 +47,12 @@ from .chat_runner import build_chat_result
 from .schemas import (
     ChatRequest,
     ChatResponse,
+    KnowledgeChunkListResponse,
     KnowledgeChunkInspectResponse,
     KnowledgeDeleteResponse,
     KnowledgeDocumentDetailResponse,
     KnowledgeDocumentListResponse,
+    KnowledgeHealthResponse,
     KnowledgeImportRequest,
     KnowledgeImportResponse,
     KnowledgeReindexResponse,
@@ -177,7 +189,11 @@ async def import_knowledge_file(
 
 @router.get("/knowledge/docs", response_model=KnowledgeDocumentListResponse)
 def list_knowledge_docs(
-    limit: int = Query(default=50, ge=0, le=200),
+    limit: int = Query(
+        default=KNOWLEDGE_DOC_LIST_DEFAULT_LIMIT,
+        ge=0,
+        le=KNOWLEDGE_DOC_LIST_MAX_LIMIT,
+    ),
     offset: int = Query(default=0, ge=0),
 ) -> KnowledgeDocumentListResponse:
     """查看已导入文档列表。"""
@@ -195,8 +211,68 @@ def get_knowledge_doc(doc_id: str) -> KnowledgeDocumentDetailResponse:
     catalog = KnowledgeCatalog()
     document = catalog.get_document(doc_id)
     if document is None:
-        raise HTTPException(status_code=404, detail="document not found")
+        raise HTTPException(status_code=404, detail=KNOWLEDGE_ERROR_DOCUMENT_NOT_FOUND)
     return KnowledgeDocumentDetailResponse(document=document)
+
+
+def _summarize_chunk_for_api(chunk: dict, *, preview_chars: int) -> dict:
+    """把 catalog chunk 转成 API 响应字段，默认只返回内容预览。"""
+
+    return {
+        "chunk_id": chunk["chunk_id"],
+        "doc_id": chunk["doc_id"],
+        "doc_title": chunk["doc_title"],
+        "source": chunk["source"],
+        "section_title": chunk.get("section_title", ""),
+        "chunk_index": chunk["chunk_index"],
+        "start_char": chunk["start_char"],
+        "end_char": chunk["end_char"],
+        "chunk_char_len": chunk["chunk_char_len"],
+        "metadata": chunk.get("metadata") or {},
+        "preview": str(chunk.get("content", ""))[: max(preview_chars, 0)],
+    }
+
+
+@router.get(
+    "/knowledge/docs/{doc_id}/chunks",
+    response_model=KnowledgeChunkListResponse,
+)
+def list_knowledge_doc_chunks(
+    doc_id: str,
+    limit: int = Query(
+        default=KNOWLEDGE_CHUNK_LIST_DEFAULT_LIMIT,
+        ge=0,
+        le=KNOWLEDGE_CHUNK_LIST_MAX_LIMIT,
+    ),
+    offset: int = Query(default=0, ge=0),
+    preview_chars: int = Query(
+        default=KNOWLEDGE_CHUNK_PREVIEW_DEFAULT_CHARS,
+        ge=0,
+        le=KNOWLEDGE_CHUNK_PREVIEW_MAX_CHARS,
+    ),
+) -> KnowledgeChunkListResponse:
+    """分页查看单篇文档的 chunk 列表。
+
+    与 /chunks/inspect 不同，这个接口返回每个 chunk 的基础定位信息和内容预览，
+    用于前端知识库详情页或人工排查“某段内容有没有被切进去”。
+    """
+
+    catalog = KnowledgeCatalog()
+    document = catalog.get_document(doc_id)
+    if document is None:
+        raise HTTPException(status_code=404, detail=KNOWLEDGE_ERROR_DOCUMENT_NOT_FOUND)
+
+    chunks = catalog.list_chunks(doc_id=doc_id, limit=limit, offset=offset)
+    return KnowledgeChunkListResponse(
+        doc_id=doc_id,
+        total=len(document.get("chunks", [])),
+        limit=limit,
+        offset=offset,
+        chunks=[
+            _summarize_chunk_for_api(chunk, preview_chars=preview_chars)
+            for chunk in chunks
+        ],
+    )
 
 
 def _build_chunk_quality_thresholds(
@@ -233,7 +309,7 @@ def inspect_knowledge_doc_chunks(
 
     catalog = KnowledgeCatalog()
     if catalog.get_document(doc_id) is None:
-        raise HTTPException(status_code=404, detail="document not found")
+        raise HTTPException(status_code=404, detail=KNOWLEDGE_ERROR_DOCUMENT_NOT_FOUND)
 
     report = inspect_document_chunks(
         doc_id,
@@ -349,7 +425,7 @@ def delete_knowledge_doc(doc_id: str) -> KnowledgeDeleteResponse:
 
     result = delete_knowledge_document(doc_id)
     if not result.deleted:
-        raise HTTPException(status_code=404, detail="document not found")
+        raise HTTPException(status_code=404, detail=KNOWLEDGE_ERROR_DOCUMENT_NOT_FOUND)
     return KnowledgeDeleteResponse(**result.__dict__)
 
 
@@ -362,7 +438,7 @@ def reindex_knowledge_doc(doc_id: str) -> KnowledgeReindexResponse:
 
     result = reindex_knowledge_document(doc_id)
     if not result.reindexed_to_chroma:
-        raise HTTPException(status_code=404, detail="document not found")
+        raise HTTPException(status_code=404, detail=KNOWLEDGE_ERROR_DOCUMENT_NOT_FOUND)
     return KnowledgeReindexResponse(**result.__dict__)
 
 
@@ -372,3 +448,11 @@ def reindex_knowledge_all() -> KnowledgeReindexResponse:
 
     result = reindex_all_knowledge_documents()
     return KnowledgeReindexResponse(**result.__dict__)
+
+
+@router.get("/knowledge/health", response_model=KnowledgeHealthResponse)
+def get_knowledge_health() -> KnowledgeHealthResponse:
+    """查看知识库 SQLite/FTS5/Chroma 的只读健康检查报告。"""
+
+    report = inspect_knowledge_health()
+    return KnowledgeHealthResponse(report=asdict(report))

@@ -9,6 +9,7 @@ from app.knowledge.ingestion import (
     KnowledgeImportResult,
     import_knowledge_document,
 )
+from app.knowledge.health import KnowledgeHealthReport, inspect_knowledge_health
 from app.knowledge.management import (
     KnowledgeDeleteResult,
     KnowledgeReindexResult,
@@ -48,6 +49,7 @@ __all__ = [
     "ChunkQualityThresholds",
     "KnowledgeImportInput",
     "KnowledgeImportResult",
+    "KnowledgeHealthReport",
     "KnowledgeDeleteResult",
     "KnowledgeReindexResult",
     "RechunkApplyReport",
@@ -55,6 +57,7 @@ __all__ = [
     "RechunkPreviewReport",
     "SearchInspectReport",
     "inspect_document_chunks",
+    "inspect_knowledge_health",
     "inspect_retrieval",
     "apply_rechunk_document",
     "preview_rechunk_document",

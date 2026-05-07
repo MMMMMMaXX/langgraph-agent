@@ -24,6 +24,7 @@ from app.constants.knowledge import (
     RECHUNK_SOURCE_MODE_DOCUMENT_CONTENT,
 )
 from app.knowledge.chunk_inspector import ChunkQualityReport
+from app.knowledge.health import KnowledgeHealthReport
 from app.knowledge.ingestion import KnowledgeImportResult
 from app.knowledge.management import KnowledgeDeleteResult, KnowledgeReindexResult
 from app.knowledge.rechunk_apply import RechunkApplyReport
@@ -396,6 +397,34 @@ def test_reindex_all_knowledge_endpoint(
     assert body["chunk_count"] == 10
 
 
+def test_knowledge_health_endpoint(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.api.routes as routes_mod
+
+    monkeypatch.setattr(
+        routes_mod,
+        "inspect_knowledge_health",
+        lambda: KnowledgeHealthReport(
+            status="ok",
+            sqlite={"ready": True, "chunk_count": 1},
+            fts={"ready": True, "chunk_count": 1},
+            chroma={"ready": True, "chunk_count": 1},
+            consistency={"exact_checked": True},
+            warnings=[],
+            errors=[],
+        ),
+    )
+
+    resp = client.get("/knowledge/health")
+
+    assert resp.status_code == 200
+    report = resp.json()["report"]
+    assert report["status"] == "ok"
+    assert report["sqlite"]["chunk_count"] == 1
+
+
 def test_inspect_knowledge_doc_chunks_endpoint(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
@@ -451,6 +480,75 @@ def test_inspect_knowledge_doc_chunks_endpoint_returns_404(
     monkeypatch.setattr(routes_mod, "KnowledgeCatalog", lambda: FakeCatalog())
 
     resp = client.get("/knowledge/docs/missing/chunks/inspect")
+
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "document not found"
+
+
+def test_list_knowledge_doc_chunks_endpoint(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.api.routes as routes_mod
+
+    class FakeCatalog:
+        def get_document(self, doc_id: str) -> dict:
+            assert doc_id == "doc-api"
+            return {
+                "doc_id": doc_id,
+                "chunks": [
+                    {"chunk_id": "doc-api::chunk::0"},
+                    {"chunk_id": "doc-api::chunk::1"},
+                ],
+            }
+
+        def list_chunks(self, doc_id: str, *, limit: int, offset: int) -> list[dict]:
+            assert doc_id == "doc-api"
+            assert limit == 1
+            assert offset == 1
+            return [
+                {
+                    "chunk_id": "doc-api::chunk::1",
+                    "doc_id": doc_id,
+                    "doc_title": "API 文档",
+                    "source": "api.md",
+                    "section_title": "脚本",
+                    "chunk_index": 1,
+                    "content": "脚本适合承载稳定执行流程。",
+                    "start_char": 10,
+                    "end_char": 24,
+                    "chunk_char_len": 14,
+                    "metadata": {"topic": "skills"},
+                }
+            ]
+
+    monkeypatch.setattr(routes_mod, "KnowledgeCatalog", lambda: FakeCatalog())
+
+    resp = client.get(
+        "/knowledge/docs/doc-api/chunks?limit=1&offset=1&preview_chars=4"
+    )
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["doc_id"] == "doc-api"
+    assert body["total"] == 2
+    assert body["chunks"][0]["chunk_id"] == "doc-api::chunk::1"
+    assert body["chunks"][0]["preview"] == "脚本适合"
+
+
+def test_list_knowledge_doc_chunks_endpoint_returns_404(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.api.routes as routes_mod
+
+    class FakeCatalog:
+        def get_document(self, doc_id: str) -> None:
+            return None
+
+    monkeypatch.setattr(routes_mod, "KnowledgeCatalog", lambda: FakeCatalog())
+
+    resp = client.get("/knowledge/docs/missing/chunks")
 
     assert resp.status_code == 404
     assert resp.json()["detail"] == "document not found"

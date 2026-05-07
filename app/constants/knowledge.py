@@ -67,3 +67,51 @@ DEFAULT_DOCUMENT_PARSER_NAME = "raw_text"
 
 # 默认 parser 版本：后续解析规则变化时递增，便于判断是否需要重新导入或重建索引。
 DEFAULT_DOCUMENT_PARSER_VERSION = "v1"
+
+# Knowledge API：文档列表默认返回数量。
+KNOWLEDGE_DOC_LIST_DEFAULT_LIMIT = 50
+
+# Knowledge API：文档列表最大返回数量，避免管理页面误拉过多数据。
+KNOWLEDGE_DOC_LIST_MAX_LIMIT = 200
+
+# Knowledge API：chunk 列表默认返回数量，适合普通文档的首屏调试。
+KNOWLEDGE_CHUNK_LIST_DEFAULT_LIMIT = 50
+
+# Knowledge API：chunk 列表最大返回数量，避免长文档一次性撑爆响应。
+KNOWLEDGE_CHUNK_LIST_MAX_LIMIT = 500
+
+# Knowledge API：chunk 内容预览默认字符数，只展示片段，不返回完整大文本。
+KNOWLEDGE_CHUNK_PREVIEW_DEFAULT_CHARS = 220
+
+# Knowledge API：chunk 内容预览最大字符数，上限用于保护接口响应体积。
+KNOWLEDGE_CHUNK_PREVIEW_MAX_CHARS = 2000
+
+# Knowledge health：最多精确对比多少条 Chroma chunk id；超过后只做数量级检查。
+KNOWLEDGE_HEALTH_MAX_EXACT_CHROMA_CHECK = 5000
+
+# Knowledge health 状态：SQLite/FTS/Chroma 都可用且精确一致。
+KNOWLEDGE_HEALTH_STATUS_OK = "ok"
+
+# Knowledge health 状态：核心可用，但存在数量不一致或检查降级。
+KNOWLEDGE_HEALTH_STATUS_WARN = "warn"
+
+# Knowledge health 状态：核心检查异常，知识库需要人工处理。
+KNOWLEDGE_HEALTH_STATUS_ERROR = "error"
+
+# Knowledge health warning：Chroma 与 SQLite chunk 数量不一致。
+KNOWLEDGE_HEALTH_WARNING_CHROMA_COUNT_MISMATCH = "chroma_count_mismatch"
+
+# Knowledge health warning：FTS5 与 SQLite chunk 数量不一致。
+KNOWLEDGE_HEALTH_WARNING_FTS_COUNT_MISMATCH = "fts_count_mismatch"
+
+# Knowledge health warning：Chroma 数量超过精确 id 对比上限。
+KNOWLEDGE_HEALTH_WARNING_EXACT_CHECK_SKIPPED = "exact_chroma_id_check_skipped"
+
+# Knowledge health warning：Chroma 中存在 SQLite catalog 没有的 chunk id。
+KNOWLEDGE_HEALTH_WARNING_ORPHAN_CHROMA_CHUNKS = "orphan_chroma_chunks"
+
+# Knowledge health warning：SQLite catalog 中存在没有写入 Chroma 的 chunk id。
+KNOWLEDGE_HEALTH_WARNING_MISSING_CHROMA_CHUNKS = "missing_chroma_chunks"
+
+# Knowledge API 错误：指定文档不存在，路由层统一复用。
+KNOWLEDGE_ERROR_DOCUMENT_NOT_FOUND = "document not found"

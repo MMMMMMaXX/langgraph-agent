@@ -367,12 +367,26 @@ class KnowledgeCatalog:
             "parser_version": row[DOCUMENT_PARSER_VERSION_COLUMN],
         }
 
-    def list_chunks(self, doc_id: str | None = None) -> list[dict]:
-        """读取 catalog 中的 chunk 全量信息，用于重建 Chroma dense index。"""
+    def list_chunks(
+        self,
+        doc_id: str | None = None,
+        *,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[dict]:
+        """读取 catalog 中的 chunk 信息。
+
+        limit=None 时返回全量 chunk，供 reindex 等内部维护流程使用；
+        API 调试场景应传 limit/offset，避免长文档一次性返回过多内容。
+        """
 
         self.init_schema()
         where_sql = "WHERE doc_id = ?" if doc_id else ""
-        params = (doc_id,) if doc_id else ()
+        params: list[object] = [doc_id] if doc_id else []
+        limit_sql = ""
+        if limit is not None:
+            limit_sql = "LIMIT ? OFFSET ?"
+            params.extend([max(limit, 0), max(offset, 0)])
         with _connect(self.path) as conn:
             rows = conn.execute(
                 f"""
@@ -383,8 +397,9 @@ class KnowledgeCatalog:
                 FROM document_chunks
                 {where_sql}
                 ORDER BY doc_id ASC, chunk_index ASC
+                {limit_sql}
                 """,
-                params,
+                tuple(params),
             ).fetchall()
 
         return [
@@ -403,6 +418,35 @@ class KnowledgeCatalog:
             }
             for row in rows
         ]
+
+    def get_index_stats(self) -> dict:
+        """读取 SQLite catalog / FTS5 的轻量统计，用于 health 和管理页。"""
+
+        self.init_schema()
+        with _connect(self.path) as conn:
+            document_count = int(
+                conn.execute("SELECT COUNT(*) AS count FROM documents").fetchone()[
+                    "count"
+                ]
+            )
+            chunk_count = int(
+                conn.execute(
+                    "SELECT COUNT(*) AS count FROM document_chunks"
+                ).fetchone()["count"]
+            )
+            fts_chunk_count = int(
+                conn.execute(
+                    f"SELECT COUNT(*) AS count FROM {FTS_TABLE}"
+                ).fetchone()["count"]
+            )
+
+        return {
+            "sqlite_path": str(self.path),
+            "document_count": document_count,
+            "chunk_count": chunk_count,
+            "fts_chunk_count": fts_chunk_count,
+            "fts_ready": fts_chunk_count == chunk_count,
+        }
 
     def delete_document(self, doc_id: str) -> dict:
         """删除单篇文档及其 SQLite chunk / FTS5 记录。"""

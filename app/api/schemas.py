@@ -94,6 +94,16 @@ class KnowledgeDocumentDetailResponse(BaseModel):
     document: dict[str, Any]
 
 
+class KnowledgeChunkListResponse(BaseModel):
+    """GET /knowledge/docs/{doc_id}/chunks 的响应。"""
+
+    doc_id: str
+    total: int
+    limit: int
+    offset: int
+    chunks: list[dict[str, Any]]
+
+
 class KnowledgeChunkInspectResponse(BaseModel):
     """GET /knowledge/docs/{doc_id}/chunks/inspect 的响应。
 
@@ -176,3 +186,9 @@ class KnowledgeReindexResponse(BaseModel):
     doc_count: int
     chunk_count: int
     reindexed_to_chroma: bool
+
+
+class KnowledgeHealthResponse(BaseModel):
+    """GET /knowledge/health 的响应。"""
+
+    report: dict[str, Any]

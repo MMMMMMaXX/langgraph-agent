@@ -66,6 +66,72 @@ def test_knowledge_catalog_persists_normalized_document_content(tmp_path) -> Non
     assert document_content["content_char_len"] == len(content)
 
 
+def test_knowledge_catalog_list_chunks_supports_pagination(tmp_path) -> None:
+    db_path = tmp_path / "knowledge.sqlite3"
+    catalog = KnowledgeCatalog(db_path)
+    catalog.reset()
+    catalog.upsert_document(
+        doc_id="doc-paged",
+        title="分页文档",
+        source="unit-test.md",
+        content="第一段\n第二段",
+    )
+    catalog.replace_chunks(
+        [
+            KnowledgeChunkRecord(
+                chunk_id=f"doc-paged::chunk::{index}",
+                doc_id="doc-paged",
+                doc_title="分页文档",
+                source="unit-test.md",
+                chunk_index=index,
+                content=f"第 {index} 段",
+                start_char=index * 10,
+                end_char=index * 10 + 5,
+                chunk_char_len=5,
+            )
+            for index in range(3)
+        ]
+    )
+
+    chunks = catalog.list_chunks(doc_id="doc-paged", limit=1, offset=1)
+
+    assert [chunk["chunk_id"] for chunk in chunks] == ["doc-paged::chunk::1"]
+
+
+def test_knowledge_catalog_index_stats_tracks_fts_count(tmp_path) -> None:
+    db_path = tmp_path / "knowledge.sqlite3"
+    catalog = KnowledgeCatalog(db_path)
+    catalog.reset()
+    catalog.upsert_document(
+        doc_id="doc-stats",
+        title="统计文档",
+        source="unit-test.md",
+        content="Skill 是能力模块。",
+    )
+    catalog.replace_chunks(
+        [
+            KnowledgeChunkRecord(
+                chunk_id="doc-stats::chunk::0",
+                doc_id="doc-stats",
+                doc_title="统计文档",
+                source="unit-test.md",
+                chunk_index=0,
+                content="Skill 是能力模块。",
+                start_char=0,
+                end_char=12,
+                chunk_char_len=12,
+            )
+        ]
+    )
+
+    stats = catalog.get_index_stats()
+
+    assert stats["document_count"] == 1
+    assert stats["chunk_count"] == 1
+    assert stats["fts_chunk_count"] == 1
+    assert stats["fts_ready"] is True
+
+
 def test_knowledge_catalog_fts_search_supports_chinese_bigram(tmp_path) -> None:
     db_path = tmp_path / "knowledge.sqlite3"
     catalog = KnowledgeCatalog(db_path)

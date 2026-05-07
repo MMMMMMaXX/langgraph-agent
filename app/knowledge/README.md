@@ -78,6 +78,15 @@ curl http://127.0.0.1:8000/knowledge/docs
 curl http://127.0.0.1:8000/knowledge/docs/<doc_id>
 ```
 
+分页查看文档 chunks：
+
+```bash
+curl "http://127.0.0.1:8000/knowledge/docs/<doc_id>/chunks?limit=20&offset=0"
+```
+
+这个接口返回 chunk 定位信息、metadata 和内容预览，不返回完整大文本。它适合
+前端知识库详情页，也适合人工排查“某段内容是否真的进入了知识库”。
+
 ### 查看 chunk 质量
 
 API：
@@ -216,6 +225,22 @@ curl -X POST http://127.0.0.1:8000/knowledge/reindex
 
 reindex 以 SQLite catalog 为真相源，不重新切片，只重新计算 embedding 并写入
 Chroma。适合 Chroma 数据损坏、迁移目录、或后续升级 embedding 模型后使用。
+
+### 知识库健康检查
+
+```bash
+curl http://127.0.0.1:8000/knowledge/health
+```
+
+health 会只读检查：
+
+- SQLite `documents` / `document_chunks` 数量；
+- SQLite FTS5 chunk 数量是否和 catalog 一致；
+- Chroma docs collection 数量是否和 SQLite chunk 数一致；
+- 小型知识库会额外精确对比 chunk id，找出 missing/orphan chunk。
+
+如果返回 `status=warn`，通常可以先执行 `/knowledge/reindex`，因为 Chroma 是可由
+SQLite catalog 重建的索引层。如果返回 `status=error`，优先查看 `errors` 字段。
 
 ## 当前边界
 
