@@ -204,6 +204,78 @@ def test_chat_missing_required_field_returns_422(client: TestClient) -> None:
     assert resp.status_code == 422
 
 
+def test_chat_with_auth_propagates_context_to_state(
+    client: TestClient, patch_run_chat_turn: dict
+) -> None:
+    """显式带 auth 时，state 里应拿到同一份身份（非匿名）。"""
+    resp = client.post(
+        "/chat",
+        json={
+            "session_id": "u1",
+            "message": "hi",
+            "auth": {
+                "tenant_id": "tenant-a",
+                "user_id": "user-1",
+                "groups": ["eng"],
+                "role": "admin",
+            },
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    call_state = patch_run_chat_turn["calls"][0]["state"]
+    auth = call_state["auth"]
+    assert auth.tenant_id == "tenant-a"
+    assert auth.user_id == "user-1"
+    assert auth.role == "admin"
+    assert auth.groups == ("eng",)
+    assert auth.anonymous is False
+
+
+def test_chat_anonymous_fallback_when_env_enabled(
+    client: TestClient, patch_run_chat_turn: dict
+) -> None:
+    """conftest 默认 ALLOW_ANONYMOUS_AUTH=true，未带 auth 的请求走匿名。"""
+    resp = client.post("/chat", json={"session_id": "u1", "message": "hi"})
+    assert resp.status_code == 200
+
+    auth = patch_run_chat_turn["calls"][0]["state"]["auth"]
+    assert auth.anonymous is True
+    assert auth.role == "anonymous"
+
+
+def test_chat_missing_auth_returns_401_when_anonymous_disabled(
+    client: TestClient,
+    patch_run_chat_turn: dict,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """生产模式（ALLOW_ANONYMOUS_AUTH=false）未带 auth 直接 401。"""
+    monkeypatch.setenv("ALLOW_ANONYMOUS_AUTH", "false")
+
+    resp = client.post("/chat", json={"session_id": "u1", "message": "hi"})
+    assert resp.status_code == 401
+    assert resp.json()["detail"] == "unauthorized"
+    # 401 在进锁之前拦截，不应触发 run_chat_turn
+    assert patch_run_chat_turn["calls"] == []
+
+
+def test_chat_invalid_role_returns_400(
+    client: TestClient, patch_run_chat_turn: dict
+) -> None:
+    """auth.role 不在白名单 → 400，不进锁。"""
+    resp = client.post(
+        "/chat",
+        json={
+            "session_id": "u1",
+            "message": "hi",
+            "auth": {"tenant_id": "t1", "user_id": "u1", "role": "root"},
+        },
+    )
+    assert resp.status_code == 400
+    assert "invalid auth role" in resp.json()["detail"]
+    assert patch_run_chat_turn["calls"] == []
+
+
 def test_import_knowledge_endpoint_returns_index_summary(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
@@ -524,9 +596,7 @@ def test_list_knowledge_doc_chunks_endpoint(
 
     monkeypatch.setattr(routes_mod, "KnowledgeCatalog", lambda: FakeCatalog())
 
-    resp = client.get(
-        "/knowledge/docs/doc-api/chunks?limit=1&offset=1&preview_chars=4"
-    )
+    resp = client.get("/knowledge/docs/doc-api/chunks?limit=1&offset=1&preview_chars=4")
 
     assert resp.status_code == 200, resp.text
     body = resp.json()

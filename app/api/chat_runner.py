@@ -12,7 +12,9 @@ from typing import Any
 
 from fastapi import HTTPException
 
+from app.auth import AnonymousAuthDisabled, AuthContext, build_auth_context
 from app.chat_service import run_chat_turn
+from app.constants.auth import ERR_UNAUTHORIZED
 from app.runtime import SessionRuntime
 from app.tracing import get_langsmith_runtime_info
 from app.utils.logger import log_request, now_ms
@@ -57,12 +59,18 @@ def _build_response_payload(
         "routes": result.get("routes", []),
         "summary": result.get("summary", ""),
     }
+    pending_confirmation = result.get("pending_confirmation") or {}
+    if pending_confirmation:
+        # 只有真有待确认动作才加上这个字段；正常 read_only 路径保持响应干净。
+        payload["pending_confirmation"] = pending_confirmation
     if request.debug:
         payload["debug"] = DebugPayload(
             node_timings=result.get("node_timings", {}),
             nodes=result.get("debug_info", {}),
             tracing={"langsmith": get_langsmith_runtime_info()},
         ).model_dump()
+        # tool_executions 只在 debug 打开时暴露，避免生产响应携带内部状态。
+        payload["tool_executions"] = list(result.get("tool_executions") or [])
     return payload
 
 
@@ -71,6 +79,7 @@ def _invoke_with_session_lock(
     request: ChatRequest,
     request_id: str,
     stream_callback: StreamCallback | None,
+    auth: AuthContext,
 ) -> dict[str, Any]:
     """在 session_lock 保护下完成一次 turn。
 
@@ -88,6 +97,8 @@ def _invoke_with_session_lock(
             debug=request.debug,
             conversation_history_path=request.conversation_history_path.strip(),
             stream_callback=stream_callback,
+            auth=auth,
+            confirmation_token=request.confirmation_token.strip(),
         )
         # 长时间操作：跑完整 graph，不持有任何全局锁。
         # stream_callback 可能被回调，但不会再触发 guard，安全。
@@ -122,9 +133,20 @@ def build_chat_result(
         # 提前报错，避免进入锁流程
         raise HTTPException(status_code=400, detail="session_id must not be empty")
 
+    # 身份注入：有 auth 按值构造；无 auth 受 ALLOW_ANONYMOUS_AUTH 控制，
+    # 未启用时抛 401。注入失败不进锁，不动 session_store。
+    try:
+        auth_context = build_auth_context(request.auth)
+    except AnonymousAuthDisabled as exc:
+        _log_failure(request, request_id, started_at_ms, str(exc))
+        raise HTTPException(status_code=401, detail=ERR_UNAUTHORIZED) from exc
+    except ValueError as exc:
+        _log_failure(request, request_id, started_at_ms, str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     try:
         result = _invoke_with_session_lock(
-            normalized_session_id, request, request_id, stream_callback
+            normalized_session_id, request, request_id, stream_callback, auth_context
         )
     except ValueError as exc:
         _log_failure(request, request_id, started_at_ms, str(exc))

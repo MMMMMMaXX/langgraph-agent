@@ -15,6 +15,12 @@ from typing import Any
 import pytest
 
 from app.api import clear_session_store
+from app.auth.context import AuthContext
+from app.constants.auth import (
+    ANONYMOUS_TENANT_ID,
+    ANONYMOUS_USER_ID,
+    ROLE_ANONYMOUS,
+)
 from app.constants.runtime import (
     RUNTIME_RESTORE_FROM_CACHE,
     RUNTIME_RESTORE_FROM_CHECKPOINT,
@@ -22,6 +28,16 @@ from app.constants.runtime import (
 from app.runtime.initial_state import create_initial_state
 from app.runtime.session_cache import get_session_state, set_session_state
 from app.runtime.session_runtime import SessionRuntime
+
+
+def _anonymous_auth() -> AuthContext:
+    return AuthContext(
+        tenant_id=ANONYMOUS_TENANT_ID,
+        user_id=ANONYMOUS_USER_ID,
+        groups=(),
+        role=ROLE_ANONYMOUS,
+        anonymous=True,
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -139,6 +155,7 @@ def test_build_request_state_initializes_empty_cache_on_first_access() -> None:
         debug=True,
         conversation_history_path="data/history.sqlite3",
         stream_callback=None,
+        auth=_anonymous_auth(),
     )
 
     assert state["session_id"] == "u1"
@@ -147,12 +164,55 @@ def test_build_request_state_initializes_empty_cache_on_first_access() -> None:
     assert state["conversation_history_path"] == "data/history.sqlite3"
     assert state["messages"] == []
     assert state["summary"] == ""
+    assert state["auth"].anonymous is True
+    # 默认不带 token，pending / executions 留空，tool_agent 按首次请求处理。
+    assert state["confirmation_token"] == ""
+    assert state["pending_confirmation"] == {}
+    assert state["tool_executions"] == []
 
     cached = get_session_state("u1")
     assert cached is not None
     assert cached["session_id"] == "u1"
     assert cached["messages"] == []
     assert cached["summary"] == ""
+
+
+def test_build_request_state_resets_tool_safety_fields_each_turn() -> None:
+    """上一轮的 pending_confirmation / tool_executions 不能跨请求延续。
+
+    通过在 cache 里塞陈旧数据模拟"上一轮漏清"，验证 build_request_state 每次
+    都会把这些字段重新初始化，避免状态污染。
+    """
+
+    runtime = SessionRuntime()
+    # 先写一个带脏数据的 cache 进去。
+    from app.runtime.session_cache import set_session_state
+
+    set_session_state(
+        "u2",
+        {
+            "session_id": "u2",
+            "messages": [],
+            "summary": "",
+            "pending_confirmation": {"tool_name": "ticket_create", "token": "stale"},
+            "tool_executions": [{"status": "succeeded"}],
+            "confirmation_token": "stale-token",
+        },
+    )
+
+    state = runtime.build_request_state(
+        session_id="u2",
+        request_id="req-2",
+        debug=False,
+        conversation_history_path="",
+        stream_callback=None,
+        auth=_anonymous_auth(),
+        confirmation_token="fresh-token",
+    )
+
+    assert state["confirmation_token"] == "fresh-token"
+    assert state["pending_confirmation"] == {}
+    assert state["tool_executions"] == []
 
 
 def test_cache_turn_result_only_persists_cross_turn_fields() -> None:

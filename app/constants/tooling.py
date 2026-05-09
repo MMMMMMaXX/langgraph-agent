@@ -6,6 +6,11 @@ TOOL_NAME_GET_WEATHER = "get_weather"
 # 计算工具名称，必须和 function calling schema 中的 name 一致。
 TOOL_NAME_CALCULATE = "calculate"
 
+# 创建工单工具名称（side_effect 类）；下游 mock 表 `mock_tickets`。
+# 用下划线而非点号：OpenAI function-calling 要求 name 匹配
+# `^[a-zA-Z0-9_-]+$`，有点号会被 API 直接拒绝。
+TOOL_NAME_TICKET_CREATE = "ticket_create"
+
 # 无工具调用时的 debug 占位值。
 TOOL_TYPE_NONE = "none"
 

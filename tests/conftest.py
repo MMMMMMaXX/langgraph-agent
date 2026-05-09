@@ -23,6 +23,9 @@ os.environ.setdefault("OPENAI_API_KEY", "test-key-not-real")
 # E2E 测试会触发 graph.compile()，如果用 SQLite checkpointer 就会真写
 # data/langgraph_checkpoints.sqlite3。这里强制走 InMemorySaver，保持测试 hermetic。
 os.environ.setdefault("LANGGRAPH_CHECKPOINT_ENABLED", "false")
+# Phase 1 Auth：测试环境默认启用匿名 fallback，让不关心身份的旧用例无需带 auth
+# 就能跑通；明确身份校验/401 行为的测试会在用例内 monkeypatch.setenv 覆盖。
+os.environ.setdefault("ALLOW_ANONYMOUS_AUTH", "true")
 
 from collections.abc import Callable, Iterator  # noqa: E402
 from types import SimpleNamespace  # noqa: E402

@@ -2,6 +2,8 @@ from typing import Annotated, Any, Literal
 
 from typing_extensions import TypedDict
 
+from app.auth.context import AuthContext
+
 
 def merge_dict(left: dict | None, right: dict | None) -> dict:
     """合并 LangGraph state 中的字典字段。
@@ -23,6 +25,24 @@ class AgentState(TypedDict, total=False):
     streamed_answer: bool
     messages: list[dict]
     summary: str
+
+    # Phase 1：身份上下文，Supervisor / 各 agent / tool_agent 都按需消费。
+    # 非 Optional：API 层会在构造 state 前完成注入（匿名 fallback 或 401），
+    # 下游节点默认认为它一定存在；测试路径可直接传匿名 AuthContext。
+    auth: AuthContext
+
+    # Phase 1：side_effect 工具返回 need_confirmation 时填充，下一次请求
+    # 带 confirmation_token 进来后由 tool_agent 验证并清空。
+    # 结构：{tool_name, args, idempotency_key, expires_at, token}
+    pending_confirmation: dict
+
+    # Phase 1：本次请求执行过的 side_effect 工具记录，便于 eval / debug
+    # 观察抢占、幂等、超时行为。不做跨请求累积，graph 每轮新建。
+    tool_executions: list[dict]
+
+    # Phase 1：二次请求携带的 confirmation_token（chat_runner 注入），
+    # tool_agent 校验通过后开始执行实际工具。
+    confirmation_token: str
 
     # supervisor 决策
     routes: list[Literal["rag_agent", "tool_agent", "chat_agent", "novel_script_agent"]]

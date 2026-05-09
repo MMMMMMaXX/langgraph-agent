@@ -54,6 +54,33 @@ def get_langsmith_runtime_info() -> dict:
     }
 
 
+def build_auth_trace_metadata(auth: Any) -> dict[str, Any]:
+    """从 AuthContext 里抽取可安全暴露到 trace 的身份元数据。
+
+    - 只写 tenant_id / user_id / role / groups_count / anonymous 标记；
+      不写 token、不写明文 groups（groups 仅记数量，避免 DLS 信息被反查）。
+    - `auth` 为 None（异常路径）时退化为匿名标记，保证 trace 字段齐全。
+    """
+
+    if auth is None:
+        return {
+            "auth.tenant_id": "",
+            "auth.user_id": "",
+            "auth.role": "",
+            "auth.anonymous": True,
+            "auth.groups_count": 0,
+        }
+
+    groups = getattr(auth, "groups", ()) or ()
+    return {
+        "auth.tenant_id": getattr(auth, "tenant_id", "") or "",
+        "auth.user_id": getattr(auth, "user_id", "") or "",
+        "auth.role": getattr(auth, "role", "") or "",
+        "auth.anonymous": bool(getattr(auth, "anonymous", False)),
+        "auth.groups_count": len(tuple(groups)),
+    }
+
+
 def build_graph_trace_config(state: dict, message: str) -> dict:
     """构造 LangGraph invoke 的 tracing config。
 
@@ -63,9 +90,14 @@ def build_graph_trace_config(state: dict, message: str) -> dict:
 
     request_id = state.get("request_id", "")
     session_id = state.get("session_id", "default")
+    auth_metadata = build_auth_trace_metadata(state.get("auth"))
+    tags = ["api_chat", f"session:{session_id}"]
+    if auth_metadata.get("auth.anonymous"):
+        # 匿名请求单独打 tag，方便在 LangSmith 里一眼筛出"未鉴权流量"做审计。
+        tags.append("auth:anonymous")
     return {
         "run_name": "chat_turn",
-        "tags": ["api_chat", f"session:{session_id}"],
+        "tags": tags,
         "metadata": {
             "request_id": request_id,
             "session_id": session_id,
@@ -74,6 +106,7 @@ def build_graph_trace_config(state: dict, message: str) -> dict:
             "conversation_history_path_set": bool(
                 state.get("conversation_history_path", "")
             ),
+            **auth_metadata,
         },
         # thread_id 让 LangGraph/LangSmith 更容易把同一 session 的运行串起来。
         "configurable": {

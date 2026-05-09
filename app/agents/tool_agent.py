@@ -4,12 +4,21 @@ from app.constants.tooling import (
     TOOL_MULTI_INTENT_KEYWORDS,
     TOOL_NAME_CALCULATE,
     TOOL_NAME_GET_WEATHER,
+    TOOL_NAME_TICKET_CREATE,
     TOOL_TYPE_NONE,
 )
 from app.llm import chat_with_tools, get_profile_runtime_info
 from app.prompts.tooling import TOOL_AGENT_SYSTEM_PROMPT
 from app.state import AgentState
 from app.streaming import build_answer_streamer
+from app.tools.confirmation import (
+    ConfirmationSecretMissing,
+    ConfirmationTokenError,
+    decode_signed_payload,
+)
+from app.tools.metadata import filter_tools_for_auth, get_tool_metadata
+from app.tools.pipeline import SideEffectContext, prepare_side_effect_impls
+from app.tools.ticket import ticket_create_tool
 from app.tools.tools import calculate, get_weather
 from app.utils.errors import build_error_info
 from app.utils.logger import log_node
@@ -51,11 +60,37 @@ TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": TOOL_NAME_TICKET_CREATE,
+            "description": (
+                "创建工单。副作用工具：首次调用会返回需要确认的提示，"
+                "客户端携带 confirmation_token 再次请求后才会真正落地。"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "description": "工单标题，简述用户诉求。",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "工单详细描述，可留空。",
+                    },
+                },
+                "required": ["title"],
+                "additionalProperties": False,
+            },
+        },
+    },
 ]
 
 TOOL_IMPLS = {
     TOOL_NAME_GET_WEATHER: get_weather,
     TOOL_NAME_CALCULATE: calculate,
+    TOOL_NAME_TICKET_CREATE: ticket_create_tool,
 }
 
 
@@ -79,24 +114,88 @@ def tool_agent_node(state: AgentState) -> AgentState:
     on_delta, stream_state = build_answer_streamer(state, ROUTE_TOOL_AGENT)
     error_message = ""
 
+    # Phase 1：基于 AuthContext.anonymous 过滤 side_effect 工具（第一层：匿名
+    # 直接看不到这些工具）。然后再用 SideEffectContext 把 side_effect 工具的
+    # impl 包装成"确认 + 幂等 + 超时 + 终态写入"的 pipeline（第二层）。
+    auth = state["auth"]
+    filtered_tools, filtered_impls = filter_tools_for_auth(
+        TOOLS, TOOL_IMPLS, anonymous=auth.anonymous
+    )
+
+    side_ctx = SideEffectContext(
+        auth=auth,
+        session_id=state.get("session_id", "default"),
+        request_id=state.get("request_id", ""),
+        confirmation_token=state.get("confirmation_token", "") or "",
+    )
+    pipelined_impls = prepare_side_effect_impls(
+        filtered_tools, filtered_impls, get_tool_metadata, side_ctx
+    )
+
     try:
-        tool_run = chat_with_tools(
-            messages=[
+        tool_run: dict = {}
+        replay_payload = None
+        replay_error_code = ""
+        confirmation_token = state.get("confirmation_token", "") or ""
+        # Scheme A：有 token 时优先做"确定性重放"——从 token 解出 tool_name+args，
+        # 直接调 pipeline 包装后的 impl，绕开 LLM。这样 step-2 不会因为 LLM 重
+        # 述提示导致 args_hash 不匹配，idempotency 幂等闭环可以稳定成立。
+        # 签名/过期失败：短路成与 pipeline 一致的错误文案，避免 LLM 自主改口。
+        # secret 未配置：fall through 到 LLM 路径让原有提示文案（工具暂时不可用）
+        # 生效，保持和 pipeline 对齐。
+        if confirmation_token:
+            try:
+                replay_payload = decode_signed_payload(confirmation_token)
+            except ConfirmationTokenError as exc:
+                replay_error_code = exc.code
+            except ConfirmationSecretMissing:
+                replay_payload = None
+
+        if replay_error_code:
+            tool_run = {
+                "tool_calls": [],
+                "tool_results": [],
+                "answer": f"确认 token 无效: {replay_error_code}",
+            }
+        elif replay_payload and replay_payload.tool_name in pipelined_impls:
+            impl = pipelined_impls[replay_payload.tool_name]
+            tool_output = impl(**replay_payload.args)
+            tool_calls = [
                 {
-                    "role": "system",
-                    "content": TOOL_AGENT_SYSTEM_PROMPT,
-                },
+                    "id": "call_confirmation_replay",
+                    "name": replay_payload.tool_name,
+                    "arguments": dict(replay_payload.args),
+                }
+            ]
+            tool_results = [
                 {
-                    "role": "user",
-                    "content": message,
-                },
-            ],
-            tools=TOOLS,
-            tool_impls=TOOL_IMPLS,
-            finalize_with_llm=finalize_with_llm,
-            on_delta=on_delta,
-            profile=PROFILE_TOOL_CHAT,
-        )
+                    "name": replay_payload.tool_name,
+                    "output": tool_output,
+                }
+            ]
+            tool_run = {
+                "tool_calls": tool_calls,
+                "tool_results": tool_results,
+                "answer": "",
+            }
+        else:
+            tool_run = chat_with_tools(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": TOOL_AGENT_SYSTEM_PROMPT,
+                    },
+                    {
+                        "role": "user",
+                        "content": message,
+                    },
+                ],
+                tools=filtered_tools,
+                tool_impls=pipelined_impls,
+                finalize_with_llm=finalize_with_llm,
+                on_delta=on_delta,
+                profile=PROFILE_TOOL_CHAT,
+            )
     except Exception as exc:
         tool_run = {}
         error_message = build_error_info(
@@ -131,10 +230,20 @@ def tool_agent_node(state: AgentState) -> AgentState:
     if not answer:
         answer = "工具暂时无法处理这个问题。"
 
+    # 若本轮出现 need_confirmation，pipeline 已经填好 pending_confirmation。
+    # 覆盖 answer 为 pipeline 返回的提示文本，让客户端看到明确需求。
+    pending_confirmation: dict = {}
+    if side_ctx.pending_confirmation:
+        pending_confirmation = dict(side_ctx.pending_confirmation)
+        # answer 沿用 tool_result（pipeline 写入的提示），不再让兜底覆盖。
+        # chat_with_tools 在 tool_results[0]["output"] 里就是提示文案。
+
     next_state: AgentState = {
         "tool_result": answer,
         "agent_outputs": {ROUTE_TOOL_AGENT: answer},
         "answer": answer,
+        "tool_executions": list(side_ctx.executions),
+        "pending_confirmation": pending_confirmation,
         "debug_info": {
             ROUTE_TOOL_AGENT: {
                 "llm_profiles": {
@@ -148,8 +257,10 @@ def tool_agent_node(state: AgentState) -> AgentState:
                 "streamed_answer": stream_state["used"],
                 "error": error_message,
                 "tool_result": answer,
+                "tool_executions": list(side_ctx.executions),
+                "pending_confirmation": pending_confirmation,
             }
-        }
+        },
     }
     if stream_state["used"]:
         next_state["streamed_answer"] = True
@@ -166,6 +277,8 @@ def tool_agent_node(state: AgentState) -> AgentState:
             "finalizeWithLlm": finalize_with_llm,
             "error": error_message,
             "toolResult": answer,
+            "toolExecutions": list(side_ctx.executions),
+            "pendingConfirmation": pending_confirmation,
         },
     )
     return next_state

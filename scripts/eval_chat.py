@@ -25,6 +25,22 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+# Phase 1 Auth：eval 既有 case 不带 auth，需要显式启用匿名 fallback 才能走通；
+# 使用 setdefault 不覆盖外部显式配置，方便想测 401 行为时从命令行关掉。
+os.environ.setdefault("ALLOW_ANONYMOUS_AUTH", "true")
+# tool_safety 用例需要 confirmation 签发/校验；给 eval 一个固定默认 secret，
+# 便于多步 case 签发的 token 在同一个进程内再次被校验通过。
+os.environ.setdefault("CONFIRMATION_SECRET", "eval-confirmation-secret")
+# tool_executions / mock_tickets 默认写入 data/operations.sqlite3；eval 每次运行
+# 使用独立临时路径，避免历史 idempotency_key 污染 dedup 判定。
+if "OPERATIONS_SQLITE_PATH" not in os.environ:
+    import tempfile as _tempfile
+
+    _eval_ops_dir = _tempfile.mkdtemp(prefix="eval-ops-")
+    os.environ["OPERATIONS_SQLITE_PATH"] = str(
+        Path(_eval_ops_dir) / "operations.sqlite3"
+    )
+
 import app.api as api
 from app.constants.eval import (
     EVAL_BOOL_FALSE,
@@ -444,13 +460,26 @@ def evaluate_case_assertions(
     return "pass", ""
 
 
-def post_chat(client, session_id: str, message: str) -> dict:
+def post_chat(
+    client,
+    session_id: str,
+    message: str,
+    *,
+    auth: dict | None = None,
+    confirmation_token: str = "",
+) -> dict:
     payload = {
         "session_id": session_id,
         "message": message,
         "debug": True,
     }
-    conversation_history_path = os.getenv(EVAL_CONVERSATION_HISTORY_PATH_ENV, "").strip()
+    if auth:
+        payload["auth"] = auth
+    if confirmation_token:
+        payload["confirmation_token"] = confirmation_token
+    conversation_history_path = os.getenv(
+        EVAL_CONVERSATION_HISTORY_PATH_ENV, ""
+    ).strip()
     if conversation_history_path:
         payload["conversation_history_path"] = conversation_history_path
 
@@ -556,7 +585,252 @@ def resolve_expected_doc_ids(case: dict, alias_to_doc_id: dict[str, str]) -> dic
     return resolved
 
 
+def get_payload_value(payload: dict, dotted_path: str):
+    """按 dotted path 从响应 payload 读值。
+
+    支持顺序遍历 dict / list，适合 eval step 之间 capture 跨步骤字段，
+    例如 `pending_confirmation.token` 或
+    `debug.nodes.tool_agent.pending_confirmation.token`。
+    """
+
+    current: Any = payload
+    for part in dotted_path.split("."):
+        if isinstance(current, list):
+            try:
+                current = current[int(part)]
+            except (ValueError, IndexError):
+                return None
+        elif isinstance(current, dict):
+            if part not in current:
+                return None
+            current = current[part]
+        else:
+            return None
+    return current
+
+
+def substitute_variables(value, context: dict):
+    """在字符串 / dict / list 中把 `${name}` 替换为 context 里捕获的值。"""
+
+    if isinstance(value, str):
+        if value.startswith("${") and value.endswith("}"):
+            return context.get(value[2:-1], "")
+        return value
+    if isinstance(value, dict):
+        return {k: substitute_variables(v, context) for k, v in value.items()}
+    if isinstance(value, list):
+        return [substitute_variables(v, context) for v in value]
+    return value
+
+
 def run_case(client, case: dict) -> dict:
+    if case.get("steps"):
+        return run_multistep_case(client, case)
+    return run_single_step_case(client, case)
+
+
+def run_multistep_case(client, case: dict) -> dict:
+    """跑多步 case：前后步骤之间共享 session_id 和 capture 变量。"""
+
+    capture_context: dict[str, Any] = {}
+    step_results: list[dict] = []
+    aggregated_problems: list[str] = []
+    last_payload: dict = {}
+    last_response: dict = {"status_code": 0, "payload": {}}
+    total_duration_ms = 0.0
+    captured_stdout = io.StringIO()
+    session_id = case["session_id"]
+
+    with contextlib.redirect_stdout(captured_stdout):
+        alias_to_doc_id = setup_knowledge_imports(client, case)
+
+        for index, raw_step in enumerate(case["steps"]):
+            step = substitute_variables(raw_step, capture_context)
+            message = step.get("message", "")
+            auth = step.get("auth")
+            token = step.get("confirmation_token", "") or ""
+            started = time.perf_counter()
+            response = post_chat(
+                client,
+                session_id,
+                message,
+                auth=auth,
+                confirmation_token=token,
+            )
+            step_ms = (time.perf_counter() - started) * 1000
+            total_duration_ms += step_ms
+            last_response = response
+            last_payload = response["payload"]
+
+            expect = step.get("expect", {}) or {}
+            # capture：pull values out of payload for later steps.
+            for name, path in (expect.get("capture") or {}).items():
+                capture_context[name] = get_payload_value(last_payload, path)
+
+            problems = evaluate_step_expectations(step, last_payload)
+            if problems:
+                aggregated_problems.append(f"step[{index}]: " + "; ".join(problems))
+            step_results.append(
+                {
+                    "index": index,
+                    "message": message,
+                    "status_code": response["status_code"],
+                    "answer": last_payload.get("answer", ""),
+                    "pending_confirmation": bool(
+                        last_payload.get("pending_confirmation")
+                    ),
+                    "tool_executions": list(last_payload.get("tool_executions") or []),
+                    "duration_ms": step_ms,
+                    "problems": problems,
+                }
+            )
+
+    case = resolve_expected_doc_ids(case, alias_to_doc_id)
+    debug_payload = get_debug_payload(last_payload)
+    debug_nodes = debug_payload.get("nodes") or {}
+    answer = last_payload.get("answer", "")
+    routes = last_payload.get("routes", [])
+    actual_route = ",".join(routes) if routes else "-"
+
+    # 顶层 must_include/must_not_include/debug_must_equal 作用于"最后一步"。
+    final_problems = evaluate_case_assertions(case, answer, actual_route, debug_nodes)[
+        1
+    ]
+    if final_problems:
+        aggregated_problems.append(final_problems)
+    assertion_status = "pass" if not aggregated_problems else "fail"
+
+    tool_safety_metrics = collect_tool_safety_metrics(case, step_results, last_payload)
+    retrieval_eval = build_retrieval_eval(case, debug_nodes, answer)
+
+    return {
+        "id": case["id"],
+        "category": case.get("category", "-"),
+        "status_code": last_response["status_code"],
+        "expected_route": case.get("expected_route", ""),
+        "actual_route": actual_route,
+        "doc_used": "-",
+        "memory_used": "-",
+        "request_ms": format_ms(total_duration_ms),
+        "rag_ms": "-",
+        "memory_ms": "-",
+        "answer_len": len(answer),
+        "quality": answer_quality(answer),
+        "assertion": assertion_status,
+        "assertion_detail": "; ".join(aggregated_problems),
+        "steps": step_results,
+        **retrieval_eval,
+        **tool_safety_metrics,
+        "debug_nodes": debug_nodes,
+        "answer": answer,
+        "detail": last_payload.get("detail", ""),
+    }
+
+
+def evaluate_step_expectations(step: dict, payload: dict) -> list[str]:
+    """校验 step-level 期望；返回失败原因列表，空列表表示通过。
+
+    expect 支持：
+    - must_include / must_not_include：作用于 answer
+    - debug_must_equal：dotted path 基于 payload["debug"]["nodes"]
+    - status_code：等值校验
+    - pending_confirmation_present：bool，断言响应顶层 pending_confirmation 是否存在
+    - payload_must_equal：dotted path 基于完整 payload
+    """
+
+    expect = step.get("expect", {}) or {}
+    problems: list[str] = []
+
+    answer = payload.get("answer", "")
+    must_include = expect.get("must_include", [])
+    if must_include and not contains_all(answer, must_include):
+        problems.append(f"missing expected text: {must_include}")
+    must_not_include = expect.get("must_not_include", [])
+    if must_not_include and contains_any(answer, must_not_include):
+        problems.append(f"contains blocked text: {must_not_include}")
+
+    if "pending_confirmation_present" in expect:
+        expected = bool(expect["pending_confirmation_present"])
+        actual = bool(payload.get("pending_confirmation"))
+        if expected != actual:
+            problems.append(
+                f"pending_confirmation presence mismatch: "
+                f"expected {expected}, got {actual}"
+            )
+
+    debug_nodes = (payload.get("debug") or {}).get("nodes") or {}
+    for dotted, expected in (expect.get("debug_must_equal") or {}).items():
+        actual = get_nested_value(debug_nodes, dotted)
+        if actual != expected:
+            problems.append(
+                f"debug mismatch: {dotted} expected {expected!r}, got {actual!r}"
+            )
+    for dotted, expected in (expect.get("payload_must_equal") or {}).items():
+        actual = get_payload_value(payload, dotted)
+        if actual != expected:
+            problems.append(
+                f"payload mismatch: {dotted} expected {expected!r}, got {actual!r}"
+            )
+    return problems
+
+
+def _tool_executions_from_payload(payload: dict) -> list[dict]:
+    """tool_executions 在 debug=True 场景下出现在响应顶层。"""
+
+    return list(payload.get("tool_executions") or [])
+
+
+def _step_debug_nodes(payload: dict) -> dict:
+    return (payload.get("debug") or {}).get("nodes") or {}
+
+
+def collect_tool_safety_metrics(
+    case: dict,
+    step_results: list[dict],
+    last_payload: dict,
+) -> dict[str, str]:
+    """为 tool_safety 类 case 计算聚合指标。"""
+
+    check = case.get("tool_safety_check", "")
+    if not check:
+        return {}
+
+    # 聚合所有 step 的 tool_executions；单步 case 时 step_results 为空，退回到 last_payload。
+    executions: list[dict] = []
+    for sr in step_results:
+        executions.extend(sr.get("tool_executions") or [])
+    if not executions:
+        executions = _tool_executions_from_payload(last_payload)
+    statuses = [ex.get("status") for ex in executions]
+    metrics: dict[str, str] = {"tool_safety_check": check}
+
+    if check == "side_effect_requires_confirmation":
+        metrics["side_effect_executed_without_confirmation"] = bool_metric(
+            "succeeded" in statuses
+        )
+    elif check == "anonymous_side_effect_blocked":
+        rejected = any(s == "rejected_anonymous" for s in statuses)
+        # 匿名情况下 LLM 看不到 side_effect 工具；没执行也算"被阻止"。
+        no_succeeded_side_effect = all(s != "succeeded" for s in statuses)
+        metrics["anonymous_side_effect_blocked"] = bool_metric(
+            rejected or no_succeeded_side_effect
+        )
+    elif check == "idempotency_dedup":
+        # 同一个 idempotency_key 最多只有一条 succeeded 落库；重复调用应命中
+        # EXISTING 分支（status 仍是 succeeded，但 tool_executions 里每条都
+        # 共享同一 key）。规则：按 idempotency_key 去重后，succeeded 记录 ≤1。
+        succeeded_keys = {
+            ex.get("idempotency_key", "")
+            for ex in executions
+            if ex.get("status") == "succeeded"
+        }
+        # 至少要有一次 succeeded，否则说明根本没跑成功，不算"去重"。
+        ok = bool(succeeded_keys) and len(succeeded_keys) == 1
+        metrics["idempotency_dedup_rate"] = bool_metric(ok)
+    return metrics
+
+
+def run_single_step_case(client, case: dict) -> dict:
     capture = io.StringIO()
     started_at = time.perf_counter()
     alias_to_doc_id: dict[str, str] = {}
@@ -568,7 +842,13 @@ def run_case(client, case: dict) -> dict:
         for setup_message in case.get("setup", []):
             post_chat(client, case["session_id"], setup_message)
 
-        response_data = post_chat(client, case["session_id"], case["message"])
+        response_data = post_chat(
+            client,
+            case["session_id"],
+            case["message"],
+            auth=case.get("auth"),
+            confirmation_token=case.get("confirmation_token", "") or "",
+        )
     duration_ms = (time.perf_counter() - started_at) * 1000
     payload = response_data["payload"]
     log_text = capture.getvalue()
@@ -584,13 +864,29 @@ def run_case(client, case: dict) -> dict:
         actual_route,
         debug_nodes,
     )
+    # 兼容 tool_safety 单步 case：顶层可直接声明 pending_confirmation_present。
+    extra_problems: list[str] = []
+    if "pending_confirmation_present" in case:
+        expected = bool(case["pending_confirmation_present"])
+        actual = bool(payload.get("pending_confirmation"))
+        if expected != actual:
+            extra_problems.append(
+                "pending_confirmation presence mismatch: "
+                f"expected {expected}, got {actual}"
+            )
+    if extra_problems:
+        assertion_status = "fail"
+        assertion_detail = "; ".join(
+            [assertion_detail, *extra_problems] if assertion_detail else extra_problems
+        )
     retrieval_eval = build_retrieval_eval(case, debug_nodes, answer)
+    tool_safety_metrics = collect_tool_safety_metrics(case, [], payload)
 
     return {
         "id": case["id"],
         "category": case.get("category", "-"),
         "status_code": response_data["status_code"],
-        "expected_route": case["expected_route"],
+        "expected_route": case.get("expected_route", ""),
         "actual_route": actual_route,
         "doc_used": (
             str(debug_nodes.get("rag_agent", {}).get("doc_used"))
@@ -614,6 +910,7 @@ def run_case(client, case: dict) -> dict:
         "assertion": assertion_status,
         "assertion_detail": assertion_detail,
         **retrieval_eval,
+        **tool_safety_metrics,
         "debug_nodes": debug_nodes,
         "answer": answer,
         "detail": payload.get("detail", ""),
@@ -727,6 +1024,30 @@ def summarize_results(results: list[dict]) -> dict:
         1 for item in fallback_cases if item.get("fallback_accuracy") == "true"
     )
 
+    # Phase 1 tool_safety 指标：只聚合明确声明了 tool_safety_check 的 case。
+    # 多步 end-to-end confirmation 闭环由 Scheme A（tool_agent 确定性重放）
+    # 兜底，args_hash 必然匹配，因此 idempotency_dedup_rate 可以进入 eval 聚合。
+    tool_safety_fields = (
+        "side_effect_executed_without_confirmation",
+        "anonymous_side_effect_blocked",
+        "idempotency_dedup_rate",
+    )
+    tool_safety_stats: dict[str, dict] = {}
+    for field in tool_safety_fields:
+        field_cases = [item for item in results if item.get(field) not in (None, "-")]
+        # side_effect_executed_without_confirmation：越低越好（true 代表异常执行）；
+        # 这里统计"被正确拦截"的比例，所以取 false 命中。其余指标 true 是期望结果。
+        if field == "side_effect_executed_without_confirmation":
+            hits = sum(1 for item in field_cases if item.get(field) == "false")
+        else:
+            hits = sum(1 for item in field_cases if item.get(field) == "true")
+        total_field = len(field_cases)
+        tool_safety_stats[field] = {
+            "hits": hits,
+            "total": total_field,
+            "rate": (hits / total_field * 100) if total_field else 0.0,
+        }
+
     return {
         "total": total,
         "passed": passed,
@@ -743,6 +1064,7 @@ def summarize_results(results: list[dict]) -> dict:
                 fallback_hits / len(fallback_cases) * 100 if fallback_cases else 0.0
             ),
         },
+        "tool_safety_stats": tool_safety_stats,
     }
 
 
@@ -791,6 +1113,17 @@ def print_summary(results: list[dict]) -> None:
             f"fallback_accuracy={fallback_stats['rate']:.1f}% "
             f"({fallback_stats['hits']}/{fallback_stats['total']})"
         )
+
+    tool_safety_stats = summary.get("tool_safety_stats") or {}
+    if any(stats["total"] for stats in tool_safety_stats.values()):
+        print("\nTool safety")
+        print("-----------")
+        for field, stats in tool_safety_stats.items():
+            if not stats["total"]:
+                continue
+            print(
+                f"{field}={stats['rate']:.1f}% " f"({stats['hits']}/{stats['total']})"
+            )
 
     print("\nFailures")
     print("--------")

@@ -13,6 +13,7 @@ import threading
 from collections.abc import Callable
 from typing import Any
 
+from app.auth.context import AuthContext
 from app.constants.runtime import (
     RUNTIME_RESTORE_FROM_CACHE,
 )
@@ -53,12 +54,22 @@ class SessionRuntime:
         debug: bool,
         conversation_history_path: str,
         stream_callback: StreamCallback | None,
+        auth: AuthContext,
+        confirmation_token: str = "",
     ) -> AgentState:
         """构造一次 turn 的请求态。
 
         这一步只从进程内 cache 拿“热状态”，不触发 checkpoint 恢复。
         冷恢复仍由 chat_service 在真正执行 graph 前处理，避免 API 层同时知道
         cache 和 checkpoint 两套状态源。
+
+        `auth` 是必填参数：API 层（chat_runner）在进入本函数前已完成注入
+        （包括匿名 fallback / 401 拒绝），下游节点默认可以直接读
+        `state["auth"]`，不需要再处理 None。
+
+        `confirmation_token` 走每轮重置：上一轮返回的 pending_confirmation 不
+        自动携带到下一轮，避免"客户端忘了清"导致的串扰。tool_agent 拿到空串
+        会按"首次请求"处理，拿到非空串会走校验 + 执行流程。
         """
 
         cached_state = get_session_state(session_id)
@@ -76,11 +87,16 @@ class SessionRuntime:
             "conversation_history_path": conversation_history_path,
             "stream_callback": stream_callback,
             "streamed_answer": False,
+            # 每轮请求重新注入，覆盖 cache / initial_state 里的默认匿名身份。
+            "auth": auth,
+            # 每轮请求都新起 tool_safety 状态；上一轮的 pending_confirmation /
+            # tool_executions 不跨请求延续，避免陈旧态污染。
+            "confirmation_token": confirmation_token,
+            "pending_confirmation": {},
+            "tool_executions": [],
         }
 
-    def cache_turn_result(
-        self, session_id: str, result: dict[str, Any]
-    ) -> AgentState:
+    def cache_turn_result(self, session_id: str, result: dict[str, Any]) -> AgentState:
         """把本轮结果裁成精简状态后写回进程内 cache。
 
         这里故意只保留跨 turn 真正需要继续带下去的字段，避免把 request 级噪声

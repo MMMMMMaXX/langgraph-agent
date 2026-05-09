@@ -12,6 +12,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from app.config import CHUNKING_CONFIG
+from app.constants.auth import DEFAULT_ROLE
 from app.constants.knowledge import (
     RECHUNK_PREVIEW_DEFAULT_SAMPLE_LIMIT,
     RECHUNK_PREVIEW_MAX_CHUNK_SIZE_CHARS,
@@ -24,6 +25,19 @@ from app.constants.knowledge import (
 )
 
 
+class AuthRequest(BaseModel):
+    """请求体内的身份透传字段。
+
+    Phase 1 不做 JWT 验签，由上游网关 / BFF 鉴权后透传；后续 middleware
+    可在此模型基础上加验签逻辑。
+    """
+
+    tenant_id: str = Field(..., min_length=1)
+    user_id: str = Field(..., min_length=1)
+    groups: list[str] = Field(default_factory=list)
+    role: str = DEFAULT_ROLE
+
+
 class ChatRequest(BaseModel):
     """POST /chat 和 POST /chat/stream 的请求体。"""
 
@@ -32,6 +46,11 @@ class ChatRequest(BaseModel):
     debug: bool = False
     # 请求级 history 文件覆盖，主要给 eval 隔离不同 case 用。
     conversation_history_path: str = ""
+    # Phase 1：身份注入。None 时走 ALLOW_ANONYMOUS_AUTH 兼容分支。
+    auth: AuthRequest | None = None
+    # Phase 1：side_effect 工具二次确认 token。第一次请求返回
+    # pending_confirmation（内含 token），客户端确认后回填本字段再次请求。
+    confirmation_token: str = ""
 
 
 class DebugPayload(BaseModel):
@@ -50,6 +69,12 @@ class ChatResponse(BaseModel):
     answer: str
     routes: list[str] = []
     summary: str = ""
+    # side_effect 工具触发了"需要二次确认"时，本字段存签发好的 token 与意图摘要；
+    # 客户端下次请求回填 `confirmation_token` 即可真正执行。没有待确认则为 None。
+    pending_confirmation: dict[str, Any] | None = None
+    # Phase 1：本轮 side_effect 工具执行记录。仅 debug=True 时填充，生产
+    # 默认空列表；eval 依赖它聚合 idempotency / tool_safety 指标。
+    tool_executions: list[dict[str, Any]] = Field(default_factory=list)
     debug: DebugPayload | None = None
 
 

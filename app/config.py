@@ -144,6 +144,21 @@ class CheckpointConfig:
     path: str = "data/langgraph_checkpoints.sqlite3"
 
 
+@dataclass(frozen=True)
+class OperationsConfig:
+    """Tool operations（execution record / mock 下游表）共用 SQLite 配置。
+
+    之所以单独放一个 DB 文件，是因为 tool_executions 与 mock_tickets 属于
+    "工具副作用层"，和 catalog / checkpoint / history 的读写模式差异较大：
+    - 写路径短且必须 winner-takes-all（UNIQUE 抢占）
+    - 未来切换到 Postgres 时，这几个表最先走真实事务 DB
+
+    单独的数据库也让测试更容易用 tmp_path 做隔离。
+    """
+
+    path: str = "data/operations.sqlite3"
+
+
 def load_rag_config() -> RagConfig:
     # 配置优先从环境变量读取，方便做对照实验时不改代码。
     return RagConfig(
@@ -240,6 +255,12 @@ def load_checkpoint_config() -> CheckpointConfig:
     )
 
 
+def load_operations_config() -> OperationsConfig:
+    return OperationsConfig(
+        path=get_env_str("OPERATIONS_SQLITE_PATH", "data/operations.sqlite3"),
+    )
+
+
 # 先收敛最常调的实验参数，后续再逐步扩大配置覆盖面。
 RAG_CONFIG = load_rag_config()
 MEMORY_CONFIG = load_memory_config()
@@ -249,3 +270,4 @@ KNOWLEDGE_BASE_CONFIG = load_knowledge_base_config()
 LEXICAL_RETRIEVAL_CONFIG = load_lexical_retrieval_config()
 CHUNKING_CONFIG = load_chunking_config()
 CHECKPOINT_CONFIG = load_checkpoint_config()
+OPERATIONS_CONFIG = load_operations_config()
