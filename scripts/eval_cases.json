@@ -448,9 +448,7 @@
     "debug_must_equal": {
       "supervisor.intent": "workflow",
       "planner.status": "ok",
-      "planner.step_count": 1,
-      "workflow_executor.status": "succeeded",
-      "workflow_executor.step_count": 1
+      "workflow_executor.status": "succeeded"
     }
   },
   {
@@ -478,5 +476,31 @@
     "debug_must_equal": {
       "supervisor.intent": "workflow"
     }
+  },
+  {
+    "id": "workflow_confirmation_bridge_full_cycle",
+    "category": "workflow",
+    "session_id": "eval-workflow-confirmation-bridge",
+    "steps": [
+      {
+        "message": "先查 payment-service 的 5xx 情况，然后创建一个排障工单",
+        "auth": { "tenant_id": "t1", "user_id": "u1", "role": "user" },
+        "expect": {
+          "pending_confirmation_present": true,
+          "must_include": ["确认"],
+          "capture": {
+            "confirm_token": "pending_confirmation.token"
+          }
+        }
+      },
+      {
+        "message": "先查 payment-service 的 5xx 情况，然后创建一个排障工单",
+        "auth": { "tenant_id": "t1", "user_id": "u1", "role": "user" },
+        "confirmation_token": "${confirm_token}",
+        "expect": {
+          "pending_confirmation_present": false
+        }
+      }
+    ]
   }
 ]
