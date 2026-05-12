@@ -328,6 +328,57 @@ def test_executor_short_circuits_on_need_confirmation(ops_db: Path) -> None:
     assert result["pending_confirmation"]["tool_name"] == TOOL_NAME_TICKET_CREATE
 
 
+def test_executor_anonymous_rejects_side_effect_in_plan() -> None:
+    """防御纵深：即便 Planner 被绕过（eval/注入场景），产出了含 side_effect 的 plan，
+    `workflow_executor_node` 在匿名上下文里也必须在 s2 阶段拒掉 ticket.create。
+
+    校验点：
+    - s1（read_only 查询）成功，确认 Executor 不会误伤合法 step；
+    - s2（ticket.create）status=failed、error=tool_not_resolvable，不创建工单；
+    - 之后的 chat step 被标记 skipped，与 fail-fast 短路一致；
+    - 最终 workflow_status=failed（不是 need_confirmation），避免 API 层误吊起确认流。
+
+    这个用例是对 eval `workflow_anonymous_side_effect_blocked` 的补充：真实 eval 里
+    Planner 已按 visible_tools 过滤掉 side_effect 工具，step_count=1 即通过；这里
+    直接注入伪造 plan，锁住第二层防线（Executor）的行为合同。
+    """
+
+    plan = _plan_multi(
+        [
+            {
+                "id": "s1",
+                "agent": "tool_agent",
+                "purpose": "check errors",
+                "tool": "monitor.query.errors",
+                "args": {"service": "payment-service"},
+            },
+            {
+                "id": "s2",
+                "agent": "tool_agent",
+                "purpose": "create ticket (should be rejected)",
+                "tool": "ticket.create",
+                "args": {"title": "bug"},
+                "depends_on": ["s1"],
+            },
+            {
+                "id": "s3",
+                "agent": "chat_agent",
+                "purpose": "告诉用户",
+                "depends_on": ["s2"],
+            },
+        ]
+    )
+    result = workflow_executor_node(_state(plan=plan, anonymous=True))
+
+    assert result["step_results"]["s1"]["status"] == STEP_STATUS_SUCCEEDED
+    assert result["step_results"]["s2"]["status"] == STEP_STATUS_FAILED
+    assert result["step_results"]["s2"]["error"] == "tool_not_resolvable"
+    assert result["step_results"]["s3"]["status"] == STEP_STATUS_SKIPPED
+    assert result["workflow_status"] == WORKFLOW_STATUS_FAILED
+    # 没有落到 pending_confirmation：确保 API 层不会错误地吊起确认流程。
+    assert not result.get("pending_confirmation")
+
+
 def test_executor_short_circuits_on_failure() -> None:
     plan = _plan_multi(
         [

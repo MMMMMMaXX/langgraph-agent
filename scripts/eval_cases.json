@@ -446,7 +446,11 @@
     "must_not_include": ["ticket_id", "工单已创建"],
     "pending_confirmation_present": false,
     "debug_must_equal": {
-      "supervisor.intent": "workflow"
+      "supervisor.intent": "workflow",
+      "planner.status": "ok",
+      "planner.step_count": 1,
+      "workflow_executor.status": "succeeded",
+      "workflow_executor.step_count": 1
     }
   },
   {
