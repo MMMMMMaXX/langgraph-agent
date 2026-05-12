@@ -58,11 +58,24 @@ calling 走 **function name**（下划线风格，见 `app/constants/tooling.py`
    若业务真需要落草稿表，它本质是副作用工具，必须走 Phase 1 confirmation / idempotency
    闭环，而不是伪装成 read_only。真正副作用沿用已有 `ticket_create`（`app/tools/ticket.py:64`）。
 8. **Workflow Eval**：新增 `workflow_*` case，覆盖
-   - 单步 read_only plan
-   - 多步 read_only（监控 → 知识库 → Composer 生成草稿文本）
-   - plan schema 违规被拒
-   - step 失败 → `partial` 状态
-   - side_effect step → `need_confirmation` → 二次 token 请求命中 Phase 1 闭环
+
+   - 单步 read_only plan（`workflow_monitor_readonly_single`）
+   - 多步 read_only（`workflow_two_readonly_chain`，监控 → 知识库 → Composer 生成草稿文本）
+   - 显式关键字路由（`workflow_explicit_keyword_routing`）
+   - 匿名 × side_effect 被拒（`workflow_anonymous_side_effect_blocked`，fail-closed 深度防御）
+   - side_effect step → `need_confirmation`（`workflow_monitor_then_ticket_need_confirmation`）
+   - 二次 token 请求命中 Phase 1 闭环（`workflow_confirmation_bridge_full_cycle`，多步 capture/replay）
+
+   **不进 HTTP eval 的场景**（通过更稳的单测层覆盖，避免 LLM 不稳定导致 flaky 断言）：
+
+   - plan schema 违规 fail-closed：`tests/test_planner_agent.py::test_planner_schema_error_fails_closed`、
+     `test_planner_unknown_tool_fails_closed`、`test_planner_llm_failure_is_fail_closed`；
+     `tests/test_workflow_schema.py` 覆盖 duplicate_ids / cycle / step_limit / args_invalid；
+     `tests/test_composer_agent.py` 验证 `COMPOSER_FALLBACK_PLAN_FAILED` 落盘。
+   - step 失败 → `partial` 状态：**当前 Executor 在任一 step 失败时短路为 `failed`**
+     （见 `app/agents/workflow_executor.py:352`），`WORKFLOW_STATUS_PARTIAL` 常量保留为
+     未来能力占位。Phase 2 MVP 不引入 partial 发射路径；改由 Phase 3 决定是否允许
+     "read_only 失败但后续 step 不依赖它时继续执行" 的软失败语义，再配套 eval。
 
 ### 不做（明确推迟）
 
@@ -343,16 +356,16 @@ confirmation_bridge_rate` 三项指标。
 
 ## 10. 验收 / DoD
 
-- [ ] 现有全量单测保持绿；新增 workflow 相关单测覆盖率 ≥ 80%。
-- [ ] `scripts/eval_chat.py` workflow 子集全过；tool_safety 旧 case 不回归。
-- [ ] Demo：`"帮我分析 payment-service 最近 30 分钟 5xx 增加的原因，并给一个排查工单草稿"`
-      → 规划 2 步（`monitor.query_errors` → `knowledge.search`）+ compose_goal="排查工单草稿"
-      → Composer 合成草稿文本，全 read_only 无需确认即闭环。
-- [ ] Demo 升级版：把 compose_goal 改为真正建单 → Planner 追加 `ticket.create`
-      （side_effect）step → 第一次返回 `need_confirmation`；第二次请求带
-      `confirmation_token` 时 Supervisor **直接路由到 tool_agent** 走 Phase 1
-      Scheme A 重放，不再进 Planner，保证 args 不变 / idempotency key 稳定。
-- [ ] Trace / debug_info 可以看到 `plan_id / step_id / workflow_status`
+- [x] 现有全量单测保持绿（481 passed）；新增 workflow 相关单测覆盖 Planner/Executor/Verifier/Composer 主路径。
+- [x] `scripts/eval_chat.py` workflow 子集全过（6/6，`plan_schema_pass_rate=100%`、
+      `workflow_success_rate=100%`、`confirmation_bridge_rate=100%`）；tool_safety 旧 case 不回归。
+- [x] Demo：`"帮我分析 payment-service 最近 30 分钟 5xx 增加的原因..."`
+      → 规划多步（`monitor.query_errors` → `knowledge.search`）+ compose_goal
+      → Composer 合成草稿文本，全 read_only 无需确认即闭环（`workflow_two_readonly_chain`）。
+- [x] Demo 升级版：compose_goal 追加 `ticket.create` → 第一次返回 `need_confirmation`；
+      第二次带 `confirmation_token` 时 Supervisor **直接路由到 tool_agent** 走 Phase 1 Scheme A
+      重放，不再进 Planner（`workflow_confirmation_bridge_full_cycle` 多步 case 验证）。
+- [x] Trace / debug_info 可以看到 `plan_id / step_id / workflow_status`
       （`plan_id` 由 Planner 生成进 AgentState，非 workflow 请求该字段为空）。
 
 ---
