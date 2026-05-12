@@ -10,7 +10,9 @@ from app.constants.keywords import (
     META_HISTORY_QUERY_MAX_CHARS,
     REPEAT_QUERY_KEYWORDS,
     SUMMARY_QUERY_KEYWORDS,
+    TICKET_QUERY_KEYWORDS,
     WEATHER_QUERY_KEYWORDS,
+    WORKFLOW_QUERY_KEYWORDS,
     contains_any,
 )
 from app.constants.routes import (
@@ -18,7 +20,9 @@ from app.constants.routes import (
     ROUTE_NOVEL_SCRIPT_AGENT,
     ROUTE_RAG_AGENT,
     ROUTE_TOOL_AGENT,
+    ROUTE_WORKFLOW,
 )
+from app.constants.workflow import INTENT_WORKFLOW
 from app.llm import plan_routes
 from app.state import AgentState
 from app.utils.logger import log_node, preview
@@ -72,12 +76,66 @@ def is_meta_history_query(message: str) -> bool:
     return contains_any(message, META_HISTORY_QUERY_KEYWORDS)
 
 
+def looks_like_workflow_task(message: str) -> bool:
+    """识别多步 workflow 请求。
+
+    判定口径（命中任一即可）：
+    - 显式 workflow 连接词/动作词（`WORKFLOW_QUERY_KEYWORDS`）：用户明确在
+      表达"先 X 再 Y"的顺序。
+    - 同一句里同时出现"查询类"关键词 + "副作用类"关键词：典型"先查后操作"
+      模式（如"查一下北京天气，如果太热就提个工单"）。
+
+    只看本轮消息，不做跨轮累加——避免把"历史提过单"这种上下文误升级成
+    workflow。
+    """
+
+    if contains_any(message, WORKFLOW_QUERY_KEYWORDS):
+        return True
+
+    has_query_intent = contains_any(
+        message, (*WEATHER_QUERY_KEYWORDS, *KNOWLEDGE_QUERY_KEYWORDS)
+    )
+    has_side_effect_intent = contains_any(message, TICKET_QUERY_KEYWORDS)
+    return has_query_intent and has_side_effect_intent
+
+
 def supervisor_node(state: AgentState) -> AgentState:
     message = state["messages"][-1]["content"].strip()
 
     routes = []
     route_reason = ""
     intent = ""
+
+    # Safety-First Routing（Phase 2）：
+    # 二次请求携带 confirmation_token 时短路回 tool_agent，绕开 Planner。
+    # 若让 Planner 重新解析 user 文案会产生 args drift（例如第一次
+    # "开个标题是改 bug 的工单"、第二次"确认一下刚才的请求"——Planner 会
+    # 产出完全不同的 args），而 token 已经冻住了 tool_name + args 的哈希。
+    # 交给 tool_agent 的 Scheme A 直接重放 pipeline，幂等闭环才成立。
+    confirmation_token = (state.get("confirmation_token") or "").strip()
+    if confirmation_token:
+        routes = [ROUTE_TOOL_AGENT]
+        route_reason = "confirmation_token short-circuit"
+        intent = "tool"
+        log_node(
+            "supervisor",
+            state,
+            extra={
+                "routeReason": route_reason,
+                "summaryPreview": preview(state.get("summary", ""), 120),
+            },
+        )
+        return {
+            "routes": routes,
+            "intent": intent,
+            "debug_info": {
+                "supervisor": {
+                    "route_reason": route_reason,
+                    "intent": intent,
+                    "routes": routes,
+                }
+            },
+        }
 
     # 纯 LLM Supervisor 有两个问题：
     # 稳定性不如规则
@@ -102,13 +160,19 @@ def supervisor_node(state: AgentState) -> AgentState:
     elif contains_any(message, (*SUMMARY_QUERY_KEYWORDS, *REPEAT_QUERY_KEYWORDS)):
         routes = [ROUTE_CHAT_AGENT]
         route_reason = "summary query"
+    elif looks_like_workflow_task(message):
+        # 多步编排请求：交给 Planner → Executor。放在创作/历史/总结之后
+        # 是因为这些是"单一清晰意图"，不该被 workflow 关键词偷走；但要
+        # 早于单 agent 的规则路由，避免"查天气再提工单"被误拆成单 tool。
+        routes = [ROUTE_WORKFLOW]
+        route_reason = "multi-step workflow query"
     else:
         weather_query = is_weather_query(message)
         knowledge_query = is_knowledge_query(message)
         followup_query = is_short_followup_query(message, state["messages"])
-        math_query = contains_any(message, MATH_QUERY_KEYWORDS) or looks_like_math_query(
-            message
-        )
+        math_query = contains_any(
+            message, MATH_QUERY_KEYWORDS
+        ) or looks_like_math_query(message)
 
         if weather_query or math_query:
             routes.append(ROUTE_TOOL_AGENT)
@@ -129,6 +193,8 @@ def supervisor_node(state: AgentState) -> AgentState:
         intent = "chat"
     elif routes == [ROUTE_NOVEL_SCRIPT_AGENT]:
         intent = "creative"
+    elif routes == [ROUTE_WORKFLOW]:
+        intent = INTENT_WORKFLOW
     elif ROUTE_TOOL_AGENT in routes and ROUTE_RAG_AGENT in routes:
         intent = "hybrid"
     elif ROUTE_TOOL_AGENT in routes:

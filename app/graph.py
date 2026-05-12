@@ -3,11 +3,15 @@ from collections.abc import Callable
 from langgraph.graph import END, START, StateGraph
 
 from app.agents.chat_agent import chat_agent_node
+from app.agents.composer_agent import composer_node
 from app.agents.merge import merge_node
 from app.agents.novel_script_agent import novel_script_agent_node
+from app.agents.planner_agent import planner_node
 from app.agents.rag_agent import rag_agent_node
 from app.agents.supervisor import supervisor_node
 from app.agents.tool_agent import tool_agent_node
+from app.agents.verifier_agent import verifier_node
+from app.agents.workflow_executor import workflow_executor_node
 from app.checkpointing.factory import get_checkpointer
 from app.constants.routes import (
     NODE_MEMORY,
@@ -17,6 +21,13 @@ from app.constants.routes import (
     ROUTE_NOVEL_SCRIPT_AGENT,
     ROUTE_RAG_AGENT,
     ROUTE_TOOL_AGENT,
+    ROUTE_WORKFLOW,
+)
+from app.constants.workflow import (
+    NODE_COMPOSER,
+    NODE_PLANNER,
+    NODE_VERIFIER,
+    NODE_WORKFLOW_EXECUTOR,
 )
 from app.nodes.memory import memory_node
 from app.runtime_context import get_stream_callback
@@ -32,6 +43,11 @@ def route_after_supervisor(state: AgentState) -> str:
 
     if routes == [ROUTE_NOVEL_SCRIPT_AGENT]:
         return ROUTE_NOVEL_SCRIPT_AGENT
+
+    # Phase 2：workflow 分支走 Planner → Executor → Merge。
+    # 走独立路由是因为 Planner 会失败 fail-closed，不能和 tool/rag 同级混用。
+    if routes == [ROUTE_WORKFLOW]:
+        return NODE_PLANNER
 
     if ROUTE_TOOL_AGENT in routes:
         return ROUTE_TOOL_AGENT
@@ -112,6 +128,13 @@ builder.add_node(
     ROUTE_NOVEL_SCRIPT_AGENT,
     with_timing(ROUTE_NOVEL_SCRIPT_AGENT, novel_script_agent_node),
 )
+builder.add_node(NODE_PLANNER, with_timing(NODE_PLANNER, planner_node))
+builder.add_node(
+    NODE_WORKFLOW_EXECUTOR,
+    with_timing(NODE_WORKFLOW_EXECUTOR, workflow_executor_node),
+)
+builder.add_node(NODE_VERIFIER, with_timing(NODE_VERIFIER, verifier_node))
+builder.add_node(NODE_COMPOSER, with_timing(NODE_COMPOSER, composer_node))
 builder.add_node(NODE_MERGE, with_timing(NODE_MERGE, merge_node))
 builder.add_node(NODE_MEMORY, with_timing(NODE_MEMORY, memory_node))
 
@@ -125,6 +148,7 @@ builder.add_conditional_edges(
         ROUTE_RAG_AGENT: ROUTE_RAG_AGENT,
         ROUTE_CHAT_AGENT: ROUTE_CHAT_AGENT,
         ROUTE_NOVEL_SCRIPT_AGENT: ROUTE_NOVEL_SCRIPT_AGENT,
+        NODE_PLANNER: NODE_PLANNER,
     },
 )
 
@@ -136,6 +160,16 @@ builder.add_conditional_edges(
         NODE_MERGE: NODE_MERGE,
     },
 )
+
+# Phase 2：Planner → Executor → Verifier → Composer → memory。
+# Planner fail-closed 时 plan 为空，Executor/Verifier/Composer 都会按空 plan 分支
+# 给出保守文案，避免把"没生成计划"误报成"执行失败"。
+# Composer 自己写 answer，因此 workflow 支路**不再经过 merge_node**（merge 面向
+# 多 agent LLM 融合场景，结构化 plan 的合成要确定性输出）。
+builder.add_edge(NODE_PLANNER, NODE_WORKFLOW_EXECUTOR)
+builder.add_edge(NODE_WORKFLOW_EXECUTOR, NODE_VERIFIER)
+builder.add_edge(NODE_VERIFIER, NODE_COMPOSER)
+builder.add_edge(NODE_COMPOSER, NODE_MEMORY)
 
 builder.add_edge(ROUTE_RAG_AGENT, NODE_MERGE)
 builder.add_edge(ROUTE_CHAT_AGENT, NODE_MERGE)

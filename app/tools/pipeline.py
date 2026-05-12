@@ -50,9 +50,7 @@ _PROMPT_NEED_CONFIRMATION = (
 )
 _PROMPT_ANON_FORBIDDEN = "匿名上下文禁止执行会产生副作用的工具。"
 _PROMPT_TOKEN_PREFIX = "确认 token 无效"
-_PROMPT_SECRET_MISSING = (
-    "服务端未配置 confirmation secret，side_effect 工具暂不可用。"
-)
+_PROMPT_SECRET_MISSING = "服务端未配置 confirmation secret，side_effect 工具暂不可用。"
 _PROMPT_STILL_PENDING = "该操作仍在执行中，请稍后重试。"
 _PROMPT_TIMEOUT_UNKNOWN = "操作本地超时，下游是否成功未知，请联系人工确认。"
 
@@ -110,7 +108,7 @@ def run_with_timeout(
     return fn(**args)
 
 
-def _format_result_for_llm(raw: Any) -> str:
+def format_result_for_llm(raw: Any) -> str:
     """把工具返回值转成 LLM 可读的字符串。
 
     字符串原样返回；dict 走 `repr` 保留 key 顺序但避免依赖 json；其他类型
@@ -218,7 +216,7 @@ def wrap_side_effect_tool(
         if acquire.outcome == AcquireOutcome.EXISTING:
             ctx.executions.append(_record_to_dict(acquire.record))
             if acquire.record.status == TOOL_STATUS_SUCCEEDED:
-                return _format_result_for_llm(acquire.record.result)
+                return format_result_for_llm(acquire.record.result)
             if acquire.record.error:
                 return f"该操作此前已失败：{acquire.record.error}"
             return _PROMPT_TIMEOUT_UNKNOWN
@@ -253,7 +251,7 @@ def wrap_side_effect_tool(
 
         record = finalize_success(idempotency_key, raw_result)
         ctx.executions.append(_record_to_dict(record))
-        return _format_result_for_llm(raw_result)
+        return format_result_for_llm(raw_result)
 
     return wrapped
 
@@ -276,9 +274,7 @@ def prepare_side_effect_impls(
             continue
         meta = metadata_lookup(name)
         if meta.side_effect:
-            result[name] = wrap_side_effect_tool(
-                name, tool_impls[name], meta, ctx
-            )
+            result[name] = wrap_side_effect_tool(name, tool_impls[name], meta, ctx)
         else:
             result[name] = tool_impls[name]
     return result
@@ -286,6 +282,7 @@ def prepare_side_effect_impls(
 
 __all__ = [
     "SideEffectContext",
+    "format_result_for_llm",
     "prepare_side_effect_impls",
     "run_with_timeout",
     "wrap_side_effect_tool",

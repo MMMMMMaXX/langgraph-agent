@@ -32,6 +32,7 @@ from app.constants.tool_safety import (
 from app.constants.tooling import (
     TOOL_NAME_CALCULATE,
     TOOL_NAME_GET_WEATHER,
+    TOOL_NAME_MONITOR_QUERY_ERRORS,
     TOOL_NAME_TICKET_CREATE,
 )
 
@@ -101,6 +102,14 @@ TOOL_METADATA: dict[str, ToolMetadata] = {
         requires_confirmation=True,
         idempotency_required=True,
         risk_level=RISK_LEVEL_MEDIUM,
+    ),
+    TOOL_NAME_MONITOR_QUERY_ERRORS: ToolMetadata(
+        name=TOOL_NAME_MONITOR_QUERY_ERRORS,
+        read_only=True,
+        side_effect=False,
+        requires_confirmation=False,
+        idempotency_required=False,
+        risk_level=RISK_LEVEL_LOW,
     ),
 }
 

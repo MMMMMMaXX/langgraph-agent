@@ -11,6 +11,11 @@ TOOL_NAME_CALCULATE = "calculate"
 # `^[a-zA-Z0-9_-]+$`，有点号会被 API 直接拒绝。
 TOOL_NAME_TICKET_CREATE = "ticket_create"
 
+# 查询 service 监控错误日志（read_only mock 工具，Phase 2 workflow demo 用）。
+# 业务名 `monitor.query_errors`，function name `monitor_query_errors`；
+# ToolRegistry 会把业务名映射到 function name，这里统一以下划线形式登记。
+TOOL_NAME_MONITOR_QUERY_ERRORS = "monitor_query_errors"
+
 # 无工具调用时的 debug 占位值。
 TOOL_TYPE_NONE = "none"
 
@@ -35,3 +40,20 @@ WEATHER_BY_CITY = {
     "上海": "上海今天天气多云，气温 28°C。",
     "广州": "广州今天天气阵雨，气温 30°C。",
 }
+
+# monitor.query_errors 的演示数据：按 service 返回近 30 分钟错误摘要。
+# 仅 Phase 2 workflow demo 使用；真实生产接入 APM 时会被替换掉，调用方签名
+# 不变（依旧是 service -> str）。
+MONITOR_QUERY_ERRORS_BY_SERVICE = {
+    "payment-service": (
+        "payment-service 最近 30 分钟累计 412 次 5xx，"
+        "其中 87% 来自下游 bank-adapter 超时；错误集中在 POST /pay/charge。"
+    ),
+    "order-service": (
+        "order-service 最近 30 分钟累计 23 次 5xx，无显著聚集，" "疑似偶发网络抖动。"
+    ),
+    "user-service": "user-service 最近 30 分钟无 5xx 错误。",
+}
+MONITOR_QUERY_ERRORS_DEFAULT = "未找到该 service 的监控数据（demo 数据集）。"
+# 为 service 参数做基础校验：过长输入直接拒绝，避免 mock 被当作 echo 滥用。
+MONITOR_SERVICE_MAX_CHARS = 64

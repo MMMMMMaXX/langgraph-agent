@@ -4,6 +4,7 @@ from app.constants.tooling import (
     TOOL_MULTI_INTENT_KEYWORDS,
     TOOL_NAME_CALCULATE,
     TOOL_NAME_GET_WEATHER,
+    TOOL_NAME_MONITOR_QUERY_ERRORS,
     TOOL_NAME_TICKET_CREATE,
     TOOL_TYPE_NONE,
 )
@@ -17,6 +18,7 @@ from app.tools.confirmation import (
     decode_signed_payload,
 )
 from app.tools.metadata import filter_tools_for_auth, get_tool_metadata
+from app.tools.monitor import monitor_query_errors
 from app.tools.pipeline import SideEffectContext, prepare_side_effect_impls
 from app.tools.ticket import ticket_create_tool
 from app.tools.tools import calculate, get_weather
@@ -85,12 +87,36 @@ TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": TOOL_NAME_MONITOR_QUERY_ERRORS,
+            "description": (
+                "查询指定 service 最近 30 分钟的 5xx/错误摘要，只读工具，"
+                "适合排障类 workflow 的第一步。"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "service": {
+                        "type": "string",
+                        "description": (
+                            "service 名称（slug，如 payment-service、order-service）"
+                        ),
+                    }
+                },
+                "required": ["service"],
+                "additionalProperties": False,
+            },
+        },
+    },
 ]
 
 TOOL_IMPLS = {
     TOOL_NAME_GET_WEATHER: get_weather,
     TOOL_NAME_CALCULATE: calculate,
     TOOL_NAME_TICKET_CREATE: ticket_create_tool,
+    TOOL_NAME_MONITOR_QUERY_ERRORS: monitor_query_errors,
 }
 
 

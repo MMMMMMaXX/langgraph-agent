@@ -136,6 +136,30 @@ TASK_STATE_MEMORY_KEYWORDS = (
 )
 
 
+# 工单/副作用类触发词：用户在请求创建工单、报修、下单等副作用操作。
+# Phase 2 Supervisor 用它识别"多步 workflow 请求"里的副作用子任务。
+TICKET_QUERY_KEYWORDS = ("工单", "提单", "报修", "派单")
+
+# 多步 workflow 触发词：明确的顺序连接词/主动编排词。任一命中即认为用户在请求
+# 多步任务，Supervisor 路由到 Planner → Executor 链路。
+# 设计取舍：只收"强信号"词，避免把日常短句（如"再说一下"、"然后呢"）误判成
+# workflow。模糊边界交给 Planner 自行 fail-closed。
+WORKFLOW_QUERY_KEYWORDS = (
+    "然后",
+    "接着",
+    "之后再",
+    "完成后",
+    "工作流",
+    "编排",
+    "先查",
+    "先看",
+    "再创建",
+    "再提",
+    "按步骤",
+    "分步",
+)
+
+
 def contains_any(text: str, keywords: tuple[str, ...]) -> bool:
     """判断文本是否包含任一关键词，统一替代散落的 any(k in text...)。"""
 

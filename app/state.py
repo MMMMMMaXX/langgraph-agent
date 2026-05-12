@@ -45,13 +45,42 @@ class AgentState(TypedDict, total=False):
     confirmation_token: str
 
     # supervisor 决策
-    routes: list[Literal["rag_agent", "tool_agent", "chat_agent", "novel_script_agent"]]
+    routes: list[
+        Literal[
+            "rag_agent",
+            "tool_agent",
+            "chat_agent",
+            "novel_script_agent",
+            "workflow_agent",
+        ]
+    ]
 
     # 中间结果
     rewritten_query: str
     context: str
     tool_result: str
     agent_outputs: Annotated[dict, merge_dict]
+
+    # Phase 2：Planner 输出的结构化 plan（序列化为 dict，内部结构见
+    # `app/workflow/schema.py`）。非 workflow 请求为空 dict。
+    plan: dict
+
+    # Phase 2：Plan 的唯一 id（Planner 生成的 uuid4.hex），用于 trace / debug 聚合。
+    # 非 workflow 请求为空字符串。
+    plan_id: str
+
+    # Phase 2：Workflow Executor 逐 step 写入的执行结果，key=step.id。
+    # 每个值形如：{"status": "succeeded"|"failed"|..., "output": str, "tool_executions": [...]}
+    # merge_dict 允许 Executor 分批追加，而不是一次性替换整张表。
+    step_results: Annotated[dict, merge_dict]
+
+    # Phase 2：Workflow 整体状态（对齐总设 §8.1 枚举），见
+    # `app/constants/workflow.py:VALID_WORKFLOW_STATUSES`。非 workflow 请求为空。
+    workflow_status: str
+
+    # Phase 2：Verifier 的结构化输出（PR-3 真正填充）；Planner 失败时也写此字段
+    # 的 unsupported_claims 方便 Composer 合成拒绝文案。
+    verification: dict
 
     # 新增：vector memory 检索结果
     memory_hits: list[dict]

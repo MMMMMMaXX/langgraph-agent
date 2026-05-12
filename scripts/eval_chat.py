@@ -700,8 +700,11 @@ def run_multistep_case(client, case: dict) -> dict:
         aggregated_problems.append(final_problems)
     assertion_status = "pass" if not aggregated_problems else "fail"
 
-    tool_safety_metrics = collect_tool_safety_metrics(case, step_results, last_payload)
     retrieval_eval = build_retrieval_eval(case, debug_nodes, answer)
+    tool_safety_metrics = collect_tool_safety_metrics(case, step_results, last_payload)
+    workflow_metrics = collect_workflow_metrics(
+        case, debug_nodes, last_payload, step_results
+    )
 
     return {
         "id": case["id"],
@@ -721,6 +724,7 @@ def run_multistep_case(client, case: dict) -> dict:
         "steps": step_results,
         **retrieval_eval,
         **tool_safety_metrics,
+        **workflow_metrics,
         "debug_nodes": debug_nodes,
         "answer": answer,
         "detail": last_payload.get("detail", ""),
@@ -830,6 +834,67 @@ def collect_tool_safety_metrics(
     return metrics
 
 
+def collect_workflow_metrics(
+    case: dict,
+    debug_nodes: dict,
+    last_payload: dict,
+    step_results: list[dict] | None = None,
+) -> dict[str, str]:
+    """为 category=workflow case 计算 Phase 2 DoD 要求的三项指标。
+
+    - plan_schema_pass_rate: Planner 是否成功产出合法 plan（debug.planner.status=="ok"）
+    - workflow_success_rate: 最终 workflow_status 是否落在"闭环"区间
+      （succeeded / need_confirmation 都视为正确闭环，failed/partial/need_clarification
+      不算；assertion 失败直接降为 false，避免 status 写了 succeeded 但答案错）
+    - confirmation_bridge_rate: 对出现 pending_confirmation 的 case，后续是否通过
+      token 重放成功落库；单步 case 天然无重放机会，该字段为 N/A（不计入分母）
+
+    放在 `category=workflow` 维度聚合，避免污染 tool_safety/retrieval 既有指标。
+    """
+
+    if case.get("category") != "workflow":
+        return {}
+
+    planner_debug = debug_nodes.get("planner", {}) or {}
+    composer_debug = debug_nodes.get("composer", {}) or {}
+
+    plan_ok = planner_debug.get("status") == "ok"
+    workflow_status = composer_debug.get("workflow_status", "")
+    closed_loop_statuses = {"succeeded", "need_confirmation"}
+    workflow_ok = workflow_status in closed_loop_statuses
+
+    metrics: dict[str, str] = {
+        "plan_schema_pass_rate": bool_metric(plan_ok),
+        "workflow_success_rate": bool_metric(workflow_ok),
+    }
+
+    # confirmation bridge：只对"出现过 pending_confirmation 的 case"统计。
+    # 单步 case 无法自证桥接，返回占位 "-" 让分母绕开。
+    steps = step_results or []
+    had_pending = any(sr.get("pending_confirmation") for sr in steps) or bool(
+        last_payload.get("pending_confirmation")
+    )
+    bridged = False
+    # 多步 case：最后一步不带 pending_confirmation 且 tool_executions 里有
+    # succeeded 记录，视为 token 桥接成功。
+    if steps:
+        last_step = steps[-1]
+        last_pending = bool(last_step.get("pending_confirmation"))
+        last_execs = last_step.get("tool_executions") or []
+        bridged = (
+            had_pending
+            and not last_pending
+            and any(ex.get("status") == "succeeded" for ex in last_execs)
+        )
+
+    if had_pending and steps:
+        metrics["confirmation_bridge_rate"] = bool_metric(bridged)
+    else:
+        metrics["confirmation_bridge_rate"] = "-"
+
+    return metrics
+
+
 def run_single_step_case(client, case: dict) -> dict:
     capture = io.StringIO()
     started_at = time.perf_counter()
@@ -881,6 +946,7 @@ def run_single_step_case(client, case: dict) -> dict:
         )
     retrieval_eval = build_retrieval_eval(case, debug_nodes, answer)
     tool_safety_metrics = collect_tool_safety_metrics(case, [], payload)
+    workflow_metrics = collect_workflow_metrics(case, debug_nodes, payload, [])
 
     return {
         "id": case["id"],
@@ -911,6 +977,7 @@ def run_single_step_case(client, case: dict) -> dict:
         "assertion_detail": assertion_detail,
         **retrieval_eval,
         **tool_safety_metrics,
+        **workflow_metrics,
         "debug_nodes": debug_nodes,
         "answer": answer,
         "detail": payload.get("detail", ""),
@@ -1048,6 +1115,25 @@ def summarize_results(results: list[dict]) -> dict:
             "rate": (hits / total_field * 100) if total_field else 0.0,
         }
 
+    # Phase 2 workflow 三项 DoD 指标：只聚合 category=workflow 的 case。
+    # plan_schema_pass_rate / workflow_success_rate 分母 = workflow 总数；
+    # confirmation_bridge_rate 只统计带 pending_confirmation 的 case，否则分母为 0。
+    workflow_fields = (
+        "plan_schema_pass_rate",
+        "workflow_success_rate",
+        "confirmation_bridge_rate",
+    )
+    workflow_stats: dict[str, dict] = {}
+    for field in workflow_fields:
+        field_cases = [item for item in results if item.get(field) not in (None, "-")]
+        hits = sum(1 for item in field_cases if item.get(field) == "true")
+        total_field = len(field_cases)
+        workflow_stats[field] = {
+            "hits": hits,
+            "total": total_field,
+            "rate": (hits / total_field * 100) if total_field else 0.0,
+        }
+
     return {
         "total": total,
         "passed": passed,
@@ -1065,6 +1151,7 @@ def summarize_results(results: list[dict]) -> dict:
             ),
         },
         "tool_safety_stats": tool_safety_stats,
+        "workflow_stats": workflow_stats,
     }
 
 
@@ -1119,6 +1206,17 @@ def print_summary(results: list[dict]) -> None:
         print("\nTool safety")
         print("-----------")
         for field, stats in tool_safety_stats.items():
+            if not stats["total"]:
+                continue
+            print(
+                f"{field}={stats['rate']:.1f}% " f"({stats['hits']}/{stats['total']})"
+            )
+
+    workflow_stats = summary.get("workflow_stats") or {}
+    if any(stats["total"] for stats in workflow_stats.values()):
+        print("\nWorkflow")
+        print("--------")
+        for field, stats in workflow_stats.items():
             if not stats["total"]:
                 continue
             print(
@@ -1198,6 +1296,9 @@ def write_csv_output(results: list[dict], path: Path) -> None:
         "filtered_count",
         "rerank_count",
         "merged_count",
+        "plan_schema_pass_rate",
+        "workflow_success_rate",
+        "confirmation_bridge_rate",
         "assertion",
         "assertion_detail",
         "answer",

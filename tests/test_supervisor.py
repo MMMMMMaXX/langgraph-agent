@@ -26,7 +26,9 @@ from app.constants.routes import (
     ROUTE_NOVEL_SCRIPT_AGENT,
     ROUTE_RAG_AGENT,
     ROUTE_TOOL_AGENT,
+    ROUTE_WORKFLOW,
 )
+from app.constants.workflow import INTENT_WORKFLOW
 
 
 def _state_with_message(message: str, history: list[dict] | None = None) -> dict:
@@ -75,6 +77,34 @@ def test_weather_plus_knowledge_produces_hybrid_route() -> None:
     result = supervisor_node(_state_with_message("北京天气是什么意思"))
     assert set(result["routes"]) == {ROUTE_TOOL_AGENT, ROUTE_RAG_AGENT}
     assert result["intent"] == "hybrid"
+
+
+# ----------------------------- Phase 2 workflow 路由 -----------------------------
+
+
+def test_confirmation_token_short_circuits_to_tool_agent() -> None:
+    # 二次确认请求必须绕开 Planner：token 冻住了 tool_name + args 的哈希，
+    # 再过 Planner 会产生 args drift。
+    state = _state_with_message("确认一下")
+    state["confirmation_token"] = "some-signed-token"
+    result = supervisor_node(state)
+    assert result["routes"] == [ROUTE_TOOL_AGENT]
+    assert result["debug_info"]["supervisor"]["route_reason"].startswith(
+        "confirmation_token"
+    )
+
+
+def test_workflow_keyword_routes_to_planner() -> None:
+    # "然后" 是 WORKFLOW_QUERY_KEYWORDS 之一 → 进 workflow 分支。
+    result = supervisor_node(_state_with_message("先查一下北京天气，然后给我开个工单"))
+    assert result["routes"] == [ROUTE_WORKFLOW]
+    assert result["intent"] == INTENT_WORKFLOW
+
+
+def test_workflow_query_plus_side_effect_triggers_workflow() -> None:
+    # 同句既有"天气"（查询）又有"工单"（副作用）：经典"先查后操作"模式。
+    result = supervisor_node(_state_with_message("查天气太热就帮我提工单"))
+    assert result["routes"] == [ROUTE_WORKFLOW]
 
 
 # ----------------------------- LLM fallback -----------------------------

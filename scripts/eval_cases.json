@@ -409,5 +409,70 @@
         }
       }
     ]
+  },
+  {
+    "id": "workflow_monitor_readonly_single",
+    "category": "workflow",
+    "session_id": "eval-workflow-monitor-readonly",
+    "message": "先查一下 payment-service 最近的 5xx 错误，然后汇总一下情况",
+    "auth": { "tenant_id": "t1", "user_id": "u1", "role": "user" },
+    "expected_route": "workflow_agent",
+    "must_include": ["payment-service"],
+    "must_not_include": ["工具暂时无法处理"],
+    "debug_must_equal": {
+      "supervisor.intent": "workflow"
+    }
+  },
+  {
+    "id": "workflow_monitor_then_ticket_need_confirmation",
+    "category": "workflow",
+    "session_id": "eval-workflow-monitor-then-ticket",
+    "message": "先查 payment-service 的 5xx 情况，然后创建一个排障工单",
+    "auth": { "tenant_id": "t1", "user_id": "u1", "role": "user" },
+    "expected_route": "workflow_agent",
+    "must_include": ["确认"],
+    "must_not_include": ["工具暂时无法处理"],
+    "pending_confirmation_present": true,
+    "debug_must_equal": {
+      "supervisor.intent": "workflow"
+    }
+  },
+  {
+    "id": "workflow_anonymous_side_effect_blocked",
+    "category": "workflow",
+    "session_id": "eval-workflow-anonymous-ticket",
+    "message": "先查 payment-service 的 5xx 情况，然后创建一个排障工单",
+    "expected_route": "workflow_agent",
+    "must_not_include": ["ticket_id", "工单已创建"],
+    "pending_confirmation_present": false,
+    "debug_must_equal": {
+      "supervisor.intent": "workflow"
+    }
+  },
+  {
+    "id": "workflow_two_readonly_chain",
+    "category": "workflow",
+    "session_id": "eval-workflow-readonly-chain",
+    "message": "先查北京天气，然后看看 payment-service 最近的 5xx 情况",
+    "auth": { "tenant_id": "t1", "user_id": "u1", "role": "user" },
+    "expected_route": "workflow_agent",
+    "must_include": ["北京"],
+    "must_not_include": ["工具暂时无法处理", "需要您确认"],
+    "debug_must_equal": {
+      "supervisor.intent": "workflow"
+    }
+  },
+  {
+    "id": "workflow_explicit_keyword_routing",
+    "category": "workflow",
+    "session_id": "eval-workflow-explicit-keyword",
+    "message": "帮我按步骤分析 payment-service 最近 30 分钟 5xx 增加的原因",
+    "auth": { "tenant_id": "t1", "user_id": "u1", "role": "user" },
+    "expected_route": "workflow_agent",
+    "must_include": ["payment-service"],
+    "must_not_include": ["工具暂时无法处理"],
+    "debug_must_equal": {
+      "supervisor.intent": "workflow"
+    }
   }
 ]

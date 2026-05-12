@@ -10,6 +10,11 @@ ROUTE_TOOL_AGENT = "tool_agent"
 # 创作改编节点：处理小说转剧本、短剧脚本等长创作任务。
 ROUTE_NOVEL_SCRIPT_AGENT = "novel_script_agent"
 
+# Phase 2：Workflow 节点（planner → executor → composer 编排入口）。
+# 常量真正定义在 `app/constants/workflow.py:ROUTE_WORKFLOW`，这里 re-export 以便
+# 路由/state 代码从同一个 `app.constants.routes` 模块集中消费，不用跨 import。
+from app.constants.workflow import ROUTE_WORKFLOW  # noqa: E402
+
 # Supervisor 节点：负责根据用户输入决定后续走哪些 agent。
 NODE_SUPERVISOR = "supervisor"
 
@@ -25,4 +30,5 @@ AGENT_ROUTES = (
     ROUTE_RAG_AGENT,
     ROUTE_CHAT_AGENT,
     ROUTE_NOVEL_SCRIPT_AGENT,
+    ROUTE_WORKFLOW,
 )
