@@ -29,6 +29,7 @@ from app.constants.retrieval import (
     LEXICAL_RESCUE_MIN_KEYWORD_SCORE,
 )
 from app.retrieval.lexical.tokenizer import lexical_terms
+from app.retrieval.content_quality import looks_like_template_placeholder
 from app.retrieval.doc_retrieval import (
     apply_keyword_scores,
     dense_retrieve_docs,
@@ -252,6 +253,35 @@ def run_search_step(state: DocRetrievalPipelineState) -> DocRetrievalPipelineSta
     return state
 
 
+def run_content_quality_step(
+    state: DocRetrievalPipelineState,
+) -> DocRetrievalPipelineState:
+    """剔除"模板占位符骨架"型低质量 chunk。
+
+    紧贴 hybrid_merge 之后、threshold 之前：此时 state.docs 已经带上最终
+    hybrid score，过滤后再走阈值判定，rerank/rescue 也不会再捞回被剔除的
+    noise chunk。debug 里暴露 `template_placeholder_dropped`，方便 eval
+    验证效果。
+
+    判定委托给 `looks_like_template_placeholder`：出现 ≥2 个形如
+    `[原因：...]` / `[常见错误消息]` 的占位符即判定为模板骨架。citation
+    refs（`[1]` 纯数字）在判定函数里通过白名单排除，不会误伤。
+    """
+
+    kept: list[dict] = []
+    dropped = 0
+    for doc in state.docs:
+        content = str(doc.get("content") or doc.get("preview") or "")
+        if looks_like_template_placeholder(content):
+            dropped += 1
+            continue
+        kept.append(doc)
+
+    state.docs = kept
+    state.retrieval_debug["template_placeholder_dropped"] = dropped
+    return state
+
+
 def run_threshold_step(state: DocRetrievalPipelineState) -> DocRetrievalPipelineState:
     """按硬阈值和 soft-match 策略过滤候选。"""
 
@@ -292,9 +322,7 @@ def select_lexical_focus_docs(
 ) -> list[dict]:
     """选择命中查询关键中文词的 lexical focus 候选。"""
 
-    rescue_terms = [
-        term for term in lexical_terms(state.query) if _contains_cjk(term)
-    ]
+    rescue_terms = [term for term in lexical_terms(state.query) if _contains_cjk(term)]
     if not rescue_terms:
         return []
 
@@ -497,6 +525,7 @@ def run_debug_step(state: DocRetrievalPipelineState) -> DocRetrievalPipelineStat
                 "dense_search",
                 "lexical_search",
                 "hybrid_merge",
+                "content_quality",
                 "threshold",
                 "rerank",
                 "chunk_merge",
@@ -552,6 +581,7 @@ def run_doc_retrieval_pipeline(
         run_dense_search_step,
         run_lexical_search_step,
         run_hybrid_merge_step,
+        run_content_quality_step,
         run_threshold_step,
         run_rerank_step,
         run_chunk_merge_step,
