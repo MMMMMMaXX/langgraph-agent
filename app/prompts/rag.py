@@ -102,3 +102,52 @@ CLASSIFIER_SYSTEM_PROMPT = f"""你是 query 分类助手。把用户问题归类
 
 def build_classifier_user_prompt(query: str) -> str:
     return f"问题: {query.strip()}"
+
+
+# ---------------------------------------------------------------------------
+# Multi-hop RAG：query decomposer prompt
+# ---------------------------------------------------------------------------
+
+# Decomposer 的设计边界（与 docs/phase3-multi-hop-rag.md §5.1 一致）：
+# - **只拆，不答**：输出里绝不能出现猜测性结论；
+# - intent 受限于 VALID_SUBQUERY_INTENTS；
+# - depends_on 仅用于"后续子查询依赖前序结果"的链式推理，不能指向未定义的 id；
+# - 上限在常量 MAX_SUBQUERIES；超过直接视为 schema 非法。
+DECOMPOSE_SYSTEM_PROMPT_TEMPLATE = """
+你是企业知识检索的子查询分解器。只输出 JSON，不要解释。
+
+规则：
+1. 最多 {max_subqueries} 个子查询。若原问题是单定义/单实体查询，只输出 1 个且
+   必须与原问题实质不同；否则请返回 `{{"subqueries": []}}` 交给单跳路径兜底。
+2. 每个子查询必须可独立检索——不含"它/这/该"等代词，指代已全部补全。
+3. id 从 sq1 开始，连续递增；depends_on 只能引用前序 id，不允许环或自引用。
+4. intent 只能取：entity_lookup / procedure / definition / comparison_arm。
+5. 不要补充常识，不要猜测答案，不要产出"总结类"子查询。
+
+输出格式（严格 JSON）：
+{{
+  "subqueries": [
+    {{"id": "sq1", "intent": "entity_lookup", "query": "...", "depends_on": []}},
+    {{"id": "sq2", "intent": "procedure", "query": "...", "depends_on": ["sq1"]}}
+  ]
+}}
+""".strip()
+
+
+DECOMPOSE_USER_PROMPT_TEMPLATE = """
+用户问题（已改写为可独立检索形态）：
+{rewritten_query}
+
+当前 auth.role={role}。请按规则输出 subqueries JSON。
+""".strip()
+
+
+def build_decompose_system_prompt(max_subqueries: int) -> str:
+    return DECOMPOSE_SYSTEM_PROMPT_TEMPLATE.format(max_subqueries=max_subqueries)
+
+
+def build_decompose_user_prompt(rewritten_query: str, role: str) -> str:
+    return DECOMPOSE_USER_PROMPT_TEMPLATE.format(
+        rewritten_query=rewritten_query.strip(),
+        role=role,
+    )

@@ -14,6 +14,11 @@ from __future__ import annotations
 
 from typing import Final
 
+# Phase 3 multi-hop：风险码在 `app/constants/multi_hop.py` 定义，这里 re-import
+# 让 RISK_WARN_LABELS 的文案映射仍然集中在本文件，下游代码仍可从
+# `app.constants.workflow` 导入 RISK_WARN_MULTI_HOP_COVERAGE，保持一份入口。
+from app.constants.multi_hop import RISK_WARN_MULTI_HOP_COVERAGE
+
 # ---- Supervisor 路由 ----------------------------------------------------
 
 # Phase 2：Supervisor 把多步编排任务路由到 workflow 支路（入口是 planner_node）。
@@ -126,6 +131,10 @@ RISK_WARN_HIGH_RISK_TOOL: Final[str] = "high_risk_tool_invoked"
 # 承载任何 citation → 说明 RAG 子调用把证据丢了，或 Composer 拼装失败。
 # 这属于"答案缺证据"的质量信号，让 UI/用户知道这次回复没有可追溯的引用。
 RISK_WARN_RAG_MISSING_CITATION: Final[str] = "rag_step_missing_citation"
+# Phase 3 multi-hop：某个 subquery 一条 chunk 都没召回，或 gap_detector
+# 判定全局覆盖度不足。单跳的 RAG_MISSING_CITATION 只管"有 doc 但没 citation"，
+# multi-hop 会出现"根本没证据"的新场景，因此单独登记一条。
+# 定义在 `app/constants/multi_hop.py`，这里 re-export 用途仅为 RISK_WARN_LABELS 与 __all__。
 
 # Composer 用于把 risk_warning code 翻译成用户可见的中文提示。集中在此避免
 # 文案散落；Composer、eval、前端展示共享同一份映射。
@@ -133,7 +142,18 @@ RISK_WARN_LABELS: Final[dict[str, str]] = {
     RISK_WARN_SIDE_EFFECT_CONFIRMED: "此操作具有副作用，需要您的二次确认。",
     RISK_WARN_HIGH_RISK_TOOL: "本次操作涉及中/高风险工具，请复核。",
     RISK_WARN_RAG_MISSING_CITATION: "本次检索答案缺少可追溯的文档引用，请谨慎参考。",
+    RISK_WARN_MULTI_HOP_COVERAGE: (
+        "多跳检索中部分子问题未能召回文档证据，答案可能不完整，请谨慎参考。"
+    ),
 }
+
+# ---- 任务类型（Plan.task_type 的已登记取值）-----------------------------
+
+# Plan.task_type 是自由字符串，但部分下游分支（如 Composer 的多跳直通）必须按
+# 具体取值识别。此处登记"有下游逻辑分支"的任务类型常量，避免各模块裸写字面量。
+# Phase 3 multi-hop 直达路径：multi_hop_node 合成 plan 时写入此值，Composer
+# 识别后走 `step_results["mh1"].output` 原样透传，不再二次合成（§7.1）。
+TASK_TYPE_MULTI_HOP_RAG: Final[str] = "multi_hop_rag"
 
 # ---- Verifier 错误码（写进 verification.unsupported_claims / missing_fields）
 
@@ -186,6 +206,7 @@ __all__ = [
     "NODE_WORKFLOW_EXECUTOR",
     "RISK_WARN_HIGH_RISK_TOOL",
     "RISK_WARN_LABELS",
+    "RISK_WARN_MULTI_HOP_COVERAGE",
     "RISK_WARN_RAG_MISSING_CITATION",
     "RISK_WARN_SIDE_EFFECT_CONFIRMED",
     "ROUTE_WORKFLOW",
@@ -202,6 +223,7 @@ __all__ = [
     "STEP_STATUS_SKIPPED",
     "STEP_STATUS_SUCCEEDED",
     "STEP_STATUS_WAITING_USER",
+    "TASK_TYPE_MULTI_HOP_RAG",
     "VALID_STEP_STATUSES",
     "VALID_VERIFICATION_STATUSES",
     "VALID_WORKFLOW_STATUSES",
