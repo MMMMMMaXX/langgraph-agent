@@ -15,6 +15,11 @@ DEFAULT_HYBRID_BETA = 0.35
 # Dense / lexical 初召回候选放大倍数，给后续 hybrid/rerank 留排序空间。
 DOC_CANDIDATE_MULTIPLIER = 4
 
+# Phase 3 PR-2：multi_hop refine 调用 retrieve_docs_for_rag 时传入的乘子下限。
+# 乘子 >1 表示下一跳扩大召回，<1 表示延迟降档（减少重复召回成本），=0 视为非法。
+# 这里给一个合理下限，避免乘子被意外设成极小值导致 doc_top_k 被压到 0。
+REFINE_MULTIPLIER_MIN = 0.25
+
 # Lexical query 停用词：这些词常表达提问方式而非知识实体，参与 FTS OR 查询时
 # 容易把“什么时候/应该/使用”这类泛词段落排到精确实体（如“脚本”）前面。
 LEXICAL_QUERY_STOPWORDS = {

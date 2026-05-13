@@ -33,6 +33,13 @@ class DocRetrievalPipelineConfig:
     rerank_enabled: bool = True
     chunk_merge_enabled: bool = True
     source_diversity_enabled: bool = False
+    # ---- 结构化 refine 参数（Phase 3 PR-2，见 `docs/phase3-multi-hop-rag.md` §6.3）
+    # 这些字段默认等价于旧行为，所有 Phase 2 调用方不感知。multi_hop_node 按 gap
+    # detector 输出的 RefinePlan 填充后，触发下一跳 retrieval 时才会启用。
+    exclude_doc_ids: frozenset[str] = field(default_factory=frozenset)
+    per_doc_limit: int | None = None
+    force_source_diversity: bool = False
+    entity_hints: tuple[str, ...] = ()
 
 
 @dataclass

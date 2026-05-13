@@ -745,3 +745,149 @@ def test_adapt_strategy_preserves_other_fields() -> None:
     assert adapted["answer_style"] == "用对比方式回答"
     assert adapted["context_chars"] == 360
     assert adapted["max_tokens"] == 40  # 80 // 2
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 PR-2：retrieve_docs_for_rag 结构化 refine 参数
+# ---------------------------------------------------------------------------
+
+
+def test_retrieve_refine_exclude_doc_ids_drops_matching_docs(
+    doc_pipeline_io: dict,
+) -> None:
+    """exclude_doc_ids 里的 doc_id 在 hybrid 之后被直接剔除，不进 rerank。"""
+
+    doc_pipeline_io["docs"] = [
+        _doc(score=0.9, doc_id="d1", chunk_index=0),
+        _doc(score=0.8, doc_id="d2", chunk_index=0),
+        _doc(score=0.7, doc_id="d1", chunk_index=1),
+    ]
+    result = retrieve_docs_for_rag(
+        "q",
+        exclude_doc_ids={"d1"},
+    )
+
+    ids = {hit["doc_id"] for hit in result.filtered_docs}
+    assert "d1" not in ids
+    assert "d2" in ids
+    assert result.retrieval_debug["refine_exclude_doc_ids"] == ["d1"]
+    # 命中两条 d1 → 被 drop 2
+    assert result.retrieval_debug["refine_docs_dropped"] == 2
+
+
+def test_retrieve_refine_exclude_backfills_lower_ranked_candidates(
+    doc_pipeline_io: dict,
+) -> None:
+    """exclude_doc_ids 在完整 hybrid 候选池上生效，低排位新文档能够补位。
+
+    关键回归：default `doc_top_k=5`。构造 top-5 全是 d1，d2/d3 只在第 6/7 位。
+    若约束作用在已截断的 state.docs 上，过滤后结果会变空，multi-hop refine
+    就会误判“没有新证据”。正确行为是从 state.hybrid_hits 过滤后再截断，
+    这样 d2/d3 能补位进入 filtered_docs。
+    """
+
+    doc_pipeline_io["docs"] = [
+        _doc(score=1.0, doc_id="d1", chunk_index=0),
+        _doc(score=0.99, doc_id="d1", chunk_index=1),
+        _doc(score=0.98, doc_id="d1", chunk_index=2),
+        _doc(score=0.97, doc_id="d1", chunk_index=3),
+        _doc(score=0.96, doc_id="d1", chunk_index=4),
+        _doc(score=0.95, doc_id="d2", chunk_index=0),
+        _doc(score=0.9, doc_id="d3", chunk_index=0),
+    ]
+
+    result = retrieve_docs_for_rag(
+        "q",
+        exclude_doc_ids={"d1"},
+    )
+
+    ids = {hit["doc_id"] for hit in result.filtered_docs}
+    assert "d1" not in ids
+    # 低排位 d2/d3 应该从候选池补位进入最终集合，而不是被静默吞掉
+    assert ids == {"d2", "d3"}
+
+
+def test_retrieve_refine_per_doc_limit_caps_same_doc(doc_pipeline_io: dict) -> None:
+    """同 doc_id 的 chunk 数被 per_doc_limit 裁剪，高分优先保留。"""
+
+    doc_pipeline_io["docs"] = [
+        _doc(score=0.9, doc_id="d1", chunk_index=0),
+        _doc(score=0.8, doc_id="d1", chunk_index=1),
+        _doc(score=0.7, doc_id="d1", chunk_index=2),
+        _doc(score=0.6, doc_id="d2", chunk_index=0),
+    ]
+    result = retrieve_docs_for_rag(
+        "q",
+        per_doc_limit=1,
+    )
+
+    d1_hits = [hit for hit in result.filtered_docs if hit["doc_id"] == "d1"]
+    # 核心断言：同 doc 的 3 条被裁成 1 条；d2 是否保留取决于硬阈值，这里不做断言
+    # 以免受 stub 的 hybrid 打分细节影响。
+    assert len(d1_hits) == 1
+    assert result.retrieval_debug["refine_per_doc_limit"] == 1
+
+
+def test_retrieve_refine_no_constraints_keeps_legacy_behavior(
+    doc_pipeline_io: dict,
+) -> None:
+    """未传任何 refine 参数时 debug 里不新增 refine_* 字段（零回归）。"""
+
+    doc_pipeline_io["docs"] = [
+        _doc(score=0.9, doc_id="d1"),
+        _doc(score=0.8, doc_id="d2"),
+    ]
+    result = retrieve_docs_for_rag("q")
+
+    # 旧字段仍在；refine_* 字段只在实际启用 refine 时注入
+    assert "refine_exclude_doc_ids" not in result.retrieval_debug
+    assert "refine_per_doc_limit" not in result.retrieval_debug
+    assert "refine_entity_hints" not in result.retrieval_debug
+
+
+def test_retrieve_refine_force_source_diversity_enables_on_non_comparison(
+    doc_pipeline_io: dict,
+) -> None:
+    """默认只对 comparison 启用 source_diversity；force 参数为其它场景打开。"""
+
+    doc_pipeline_io["docs"] = [
+        _doc(score=0.9, doc_id="d1", chunk_index=0),
+        _doc(score=0.85, doc_id="d1", chunk_index=1),
+        _doc(score=0.8, doc_id="d2", chunk_index=0),
+    ]
+    result = retrieve_docs_for_rag(
+        "q",
+        # 故意用非 comparison 类型
+        query_type=QUERY_TYPE_DEFINITION,
+        force_source_diversity=True,
+    )
+    assert result.retrieval_debug["source_diversity_enabled"] is True
+
+
+def test_retrieve_refine_entity_hints_recorded_in_debug(
+    doc_pipeline_io: dict,
+) -> None:
+    """entity_hints 至少进入 debug，PR-3 再决定是否介入打分。"""
+
+    doc_pipeline_io["docs"] = [_doc(score=0.9, doc_id="d1")]
+    result = retrieve_docs_for_rag(
+        "q",
+        entity_hints=("JWT",),
+    )
+    assert result.retrieval_debug["refine_entity_hints"] == ["JWT"]
+
+
+def test_retrieve_refine_top_k_multiplier_bumps_effective_top_k(
+    doc_pipeline_io: dict,
+) -> None:
+    """top_k_multiplier 将 doc_top_k 放大，requested_top_k debug 字段反映改动。"""
+
+    doc_pipeline_io["docs"] = [_doc(score=0.9, doc_id=f"d{i}") for i in range(1, 10)]
+
+    baseline = retrieve_docs_for_rag("q")
+    boosted = retrieve_docs_for_rag("q", top_k_multiplier=2.0)
+
+    assert (
+        boosted.retrieval_debug["requested_top_k"]
+        >= baseline.retrieval_debug["requested_top_k"]
+    )

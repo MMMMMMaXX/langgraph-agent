@@ -27,6 +27,7 @@ from app.constants.retrieval import (
     DOC_CANDIDATE_MULTIPLIER,
     LEXICAL_RESCUE_MAX_DOCS,
     LEXICAL_RESCUE_MIN_KEYWORD_SCORE,
+    REFINE_MULTIPLIER_MIN,
 )
 from app.retrieval.lexical.tokenizer import lexical_terms
 from app.retrieval.content_quality import looks_like_template_placeholder
@@ -82,12 +83,25 @@ def build_doc_pipeline_config(
     query_type: str = "",
     query: str = "",
     confidence: float = 1.0,
+    *,
+    top_k_multiplier: float = 1.0,
+    rerank_top_k_multiplier: float = 1.0,
+    exclude_doc_ids: frozenset[str] | set[str] | None = None,
+    per_doc_limit: int | None = None,
+    force_source_diversity: bool = False,
+    entity_hints: tuple[str, ...] = (),
 ) -> DocRetrievalPipelineConfig:
     """根据 query_type/query 生成文档检索 pipeline 配置。
 
     对比类问题需要更广覆盖；定义类问题更依赖关键词和专有名词；追问改写后更依赖
     语义召回；fallback 类问题更保守，避免低置信模糊问题硬答。
     confidence 用于衰减 hybrid 权重：分类不确定时向均衡 (0.5, 0.5) 收敛。
+
+    Phase 3 PR-2 追加结构化 refine 参数（§6.3）：`top_k_multiplier` /
+    `rerank_top_k_multiplier` 用于下一跳扩大召回；`exclude_doc_ids` 让
+    gap detector 判定"已充分采样"的文档不再占下一跳位置；`per_doc_limit` /
+    `force_source_diversity` 强制跨文档多样性；`entity_hints` 目前记入 debug，
+    由 PR-3 的 multi_hop_node 与 retrieval 细化时再决定是否在打分层介入。
     """
 
     doc_top_k = RAG_CONFIG.doc_top_k
@@ -113,6 +127,19 @@ def build_doc_pipeline_config(
         doc_top_k = max(doc_top_k, 6)
         candidate_multiplier = max(candidate_multiplier, 5)
 
+    # 结构化 refine：乘子可 >1 扩大召回，也可 <1 延迟降档（PR-3 loop 若已接近
+    # 预算上限时想减少重复召回的场景）。此处不再保留 `max(original, ...)`，否则
+    # 降档请求会被静默吞掉；改为直接按乘子计算，并夹到 `REFINE_MULTIPLIER_MIN`
+    # 之上，避免被意外设成极小值导致 doc_top_k / rerank 窗口压到 0。
+    top_k_mult = max(REFINE_MULTIPLIER_MIN, top_k_multiplier)
+    rerank_mult = max(REFINE_MULTIPLIER_MIN, rerank_top_k_multiplier)
+    if top_k_mult != 1.0:
+        doc_top_k = max(1, int(round(doc_top_k * top_k_mult)))
+    if rerank_mult != 1.0:
+        doc_rerank_top_k = max(1, int(round(doc_rerank_top_k * rerank_mult)))
+
+    normalized_exclude: frozenset[str] = frozenset(exclude_doc_ids or ())
+
     return DocRetrievalPipelineConfig(
         query_type=query_type or "unknown",
         doc_top_k=doc_top_k,
@@ -122,7 +149,13 @@ def build_doc_pipeline_config(
         soft_match_threshold=soft_match_threshold,
         hybrid_alpha=hybrid_alpha,
         hybrid_beta=hybrid_beta,
-        source_diversity_enabled=query_type == QUERY_TYPE_COMPARISON,
+        source_diversity_enabled=(
+            query_type == QUERY_TYPE_COMPARISON or force_source_diversity
+        ),
+        exclude_doc_ids=normalized_exclude,
+        per_doc_limit=per_doc_limit,
+        force_source_diversity=force_source_diversity,
+        entity_hints=tuple(entity_hints),
     )
 
 
@@ -250,6 +283,70 @@ def run_search_step(state: DocRetrievalPipelineState) -> DocRetrievalPipelineSta
     state = run_dense_search_step(state)
     state = run_lexical_search_step(state)
     state = run_hybrid_merge_step(state)
+    return state
+
+
+def run_refine_constraints_step(
+    state: DocRetrievalPipelineState,
+) -> DocRetrievalPipelineState:
+    """Phase 3 PR-2：应用结构化 refine 参数裁剪 hybrid 候选。
+
+    紧跟在 `run_hybrid_merge_step` 之后、`run_content_quality_step` 之前：
+    - `exclude_doc_ids`：彻底剔除 gap detector 标记为"已充分采样"的文档，
+      避免下一跳 rerank/answer 仍把位置让给它们。
+    - `per_doc_limit`：同 doc 最多保留 N 条（按 hybrid score 降序），配合
+      `force_source_diversity=True` 让 comparison refine 强制多文档铺开。
+
+    实现要点：约束必须作用在 **完整的 `state.hybrid_hits` 候选池** 上，而不是
+    已被截断到 `doc_top_k` 的 `state.docs`。否则若 top-k 前几位全是 gap detector
+    标记已覆盖的高分 doc，过滤后会把位置留空，低排位的新文档拿不到补位机会，
+    multi-hop refine 会误判"没有新证据"。顺序为 `hybrid_hits → 过滤 → 截到 doc_top_k`。
+
+    所有参数均为可选，缺省时保持旧行为（docs 已由 hybrid_merge 截断到 doc_top_k）。
+    """
+
+    config = state.config
+    exclude = config.exclude_doc_ids
+    per_doc_limit = config.per_doc_limit
+
+    # 无约束就短路，保持旧路径字段完整性（debug 里也不新增噪声字段）。
+    if not exclude and per_doc_limit is None and not config.entity_hints:
+        return state
+
+    before_count = len(state.docs)
+
+    # 重新从完整候选池出发，保证 exclude/per_doc_limit 能从更低排位补位。
+    candidates = state.hybrid_hits
+
+    if exclude:
+        candidates = [
+            doc for doc in candidates if str(doc.get("doc_id", "")) not in exclude
+        ]
+
+    if per_doc_limit is not None and per_doc_limit > 0:
+        kept: list[dict] = []
+        per_doc_counter: dict[str, int] = {}
+        # hybrid_hits 已按 hybrid score 降序（`rank_hybrid`），保留前 N 条即高分优先。
+        for doc in candidates:
+            doc_id = str(doc.get("doc_id", ""))
+            if not doc_id:
+                kept.append(doc)
+                continue
+            if per_doc_counter.get(doc_id, 0) >= per_doc_limit:
+                continue
+            per_doc_counter[doc_id] = per_doc_counter.get(doc_id, 0) + 1
+            kept.append(doc)
+        candidates = kept
+
+    # 最后再切到 doc_top_k，让过滤掉的位置由 lower candidate 补齐。
+    state.docs = candidates[: state.config.doc_top_k]
+
+    state.retrieval_debug["refine_exclude_doc_ids"] = sorted(exclude) if exclude else []
+    state.retrieval_debug["refine_per_doc_limit"] = per_doc_limit
+    state.retrieval_debug["refine_entity_hints"] = list(config.entity_hints)
+    state.retrieval_debug["refine_docs_dropped"] = max(
+        0, before_count - len(state.docs)
+    )
     return state
 
 
@@ -525,6 +622,7 @@ def run_debug_step(state: DocRetrievalPipelineState) -> DocRetrievalPipelineStat
                 "dense_search",
                 "lexical_search",
                 "hybrid_merge",
+                "refine_constraints",
                 "content_quality",
                 "threshold",
                 "rerank",
@@ -581,6 +679,7 @@ def run_doc_retrieval_pipeline(
         run_dense_search_step,
         run_lexical_search_step,
         run_hybrid_merge_step,
+        run_refine_constraints_step,
         run_content_quality_step,
         run_threshold_step,
         run_rerank_step,
@@ -596,8 +695,30 @@ def retrieve_docs_for_rag(
     query: str,
     query_type: str = "",
     confidence: float = 1.0,
+    *,
+    top_k_multiplier: float = 1.0,
+    rerank_top_k_multiplier: float = 1.0,
+    exclude_doc_ids: frozenset[str] | set[str] | None = None,
+    per_doc_limit: int | None = None,
+    force_source_diversity: bool = False,
+    entity_hints: tuple[str, ...] = (),
 ) -> DocRetrievalResult:
-    """执行 RAG 文档检索主流程。"""
+    """执行 RAG 文档检索主流程。
 
-    config = build_doc_pipeline_config(query_type, query=query, confidence=confidence)
+    Phase 3 PR-2 在既有接口上追加结构化 refine 参数，默认值等价于旧行为，
+    现有 Phase 2 调用方不受影响。multi_hop_node（PR-3）按 gap detector 输出
+    `RefinePlan.per_subquery[*]` 映射到这些参数触发下一跳 retrieval。
+    """
+
+    config = build_doc_pipeline_config(
+        query_type,
+        query=query,
+        confidence=confidence,
+        top_k_multiplier=top_k_multiplier,
+        rerank_top_k_multiplier=rerank_top_k_multiplier,
+        exclude_doc_ids=exclude_doc_ids,
+        per_doc_limit=per_doc_limit,
+        force_source_diversity=force_source_diversity,
+        entity_hints=entity_hints,
+    )
     return run_doc_retrieval_pipeline(query, config)
