@@ -40,7 +40,9 @@ from app.constants.workflow import (
     WORKFLOW_STATUS_SUCCEEDED,
 )
 from app.state import AgentState
+from app.tools.confirmation import redact_pending_confirmation
 from app.tools.metadata import ToolNotRegisteredError
+from app.runtime_context import set_pending_confirmation_token
 from app.tools.pipeline import (
     SideEffectContext,
     format_result_for_llm,
@@ -183,6 +185,13 @@ def run_rag_step(step: dict[str, Any], state: AgentState) -> dict[str, Any]:
     做法：合成一个临时 state，把 `step.query` 作为最新 user 消息，调用
     `rag_agent_node`；只吃它的 `answer`，不继承它写回 state 的其他副作用
     （memory_hits、context 等）避免污染 workflow 主 state。
+
+    citations 透传：rag_agent_node 已经在 `debug_info[rag_agent]` 里生成了
+    结构化 citations（doc_id / ref / chunk_id / source），这是 Composer 做
+    "给前端展示"和 Verifier 做"答案是否有证据"判定的唯一真相源。
+    Phase 2 MVP 以前把整段 debug 扔掉，只留纯文本 answer，导致 Verifier
+    无法校验证据、Composer 只能返回空 citations；现在把 citations /
+    doc_used 明确挑出来挂到 step_result。
     """
 
     # 延迟 import，避免模块循环依赖（rag → state → executor）。
@@ -206,10 +215,15 @@ def run_rag_step(step: dict[str, Any], state: AgentState) -> dict[str, Any]:
             "query": query,
         }
     answer = sub_result.get("answer") or ""
+    rag_debug = (sub_result.get("debug_info") or {}).get(ROUTE_RAG_AGENT, {}) or {}
+    citations = list(rag_debug.get("citations") or [])
+    doc_used = bool(rag_debug.get("doc_used"))
     return {
         "status": STEP_STATUS_SUCCEEDED,
         "output": answer,
         "query": query,
+        "citations": citations,
+        "doc_used": doc_used,
     }
 
 
@@ -239,6 +253,29 @@ _STEP_DISPATCH: dict[str, str] = {
     STEP_AGENT_RAG: ROUTE_RAG_AGENT,
     STEP_AGENT_CHAT: "chat_agent",
 }
+
+
+def _redact_step_results(
+    step_results: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """把 step_results 里的 pending_confirmation 做 token redaction。
+
+    step_results 会同时出现在 `state["step_results"]`（下游 Verifier/Composer 读）
+    和 `debug_info[NODE_WORKFLOW_EXECUTOR]["step_results"]`（trace/debug 读）。
+    两路都不应暴露 token 原文；Verifier 也只消费 status，脱敏后语义不变。
+    """
+
+    redacted: dict[str, dict[str, Any]] = {}
+    for step_id, result in step_results.items():
+        if "pending_confirmation" in result:
+            clone = dict(result)
+            clone["pending_confirmation"] = redact_pending_confirmation(
+                result.get("pending_confirmation")
+            )
+            redacted[step_id] = clone
+        else:
+            redacted[step_id] = result
+    return redacted
 
 
 def _compose_fallback_answer(
@@ -382,20 +419,28 @@ def workflow_executor_node(
             or fallback_answer
         )
 
+    # debug_info / state 里的 pending_confirmation 全部做 redaction：token 原文
+    # 只经过请求级 ContextVar 透出 API 响应（见 runtime_context.set_pending_confirmation_token）。
+    # 这样 LangGraph checkpoint / LangSmith trace 里都拿不到 token；step_results
+    # 同样脱敏，避免 debug 视图或下游节点间接泄漏。
+    redacted_step_results = _redact_step_results(step_results)
+    redacted_pending = redact_pending_confirmation(pending_confirmation)
+    if pending_confirmation.get("token"):
+        set_pending_confirmation_token(pending_confirmation["token"])
     next_state: AgentState = {
         "workflow_status": final_status,
-        "step_results": step_results,
+        "step_results": redacted_step_results,
         "tool_executions": list(side_ctx.executions),
-        "pending_confirmation": pending_confirmation,
+        "pending_confirmation": redacted_pending,
         "agent_outputs": {NODE_WORKFLOW_EXECUTOR: fallback_answer},
         "debug_info": {
             NODE_WORKFLOW_EXECUTOR: {
                 "plan_id": plan_id,
                 "status": final_status,
                 "step_count": len(steps),
-                "step_results": step_results,
+                "step_results": redacted_step_results,
                 "tool_executions": list(side_ctx.executions),
-                "pending_confirmation": pending_confirmation,
+                "pending_confirmation": redacted_pending,
             }
         },
     }

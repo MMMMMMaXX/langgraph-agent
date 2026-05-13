@@ -36,6 +36,7 @@ from app.constants.auth import (
 from app.constants.routes import ROUTE_TOOL_AGENT
 from app.constants.tool_safety import (
     CONFIRMATION_SECRET_ENV,
+    ERR_TOKEN_AUTH_FORBIDDEN,
     TOOL_STATUS_SUCCEEDED,
 )
 from app.constants.tooling import (
@@ -269,15 +270,32 @@ def test_tool_agent_ticket_create_without_token_returns_pending(
         )
     )
 
-    result = tool_agent_node(_authed_state("帮我创建一个工单"))
+    from app.runtime_context import (
+        begin_pending_confirmation_scope,
+        get_pending_confirmation_token,
+        reset_pending_confirmation_token,
+    )
+
+    # 裸调节点需要自己开一个 token holder scope，否则 node 里的 push 会被忽略
+    # （chat_service 在生产路径上会替我们开 scope）。
+    scope_token = begin_pending_confirmation_scope()
+    try:
+        result = tool_agent_node(_authed_state("帮我创建一个工单"))
+        captured_token = get_pending_confirmation_token()
+    finally:
+        reset_pending_confirmation_token(scope_token)
 
     # answer 来自 pipeline 的 need_confirmation 提示文本。
     assert "确认" in result["answer"]
-    # state 里带着可供客户端回填的 token + 意图摘要。
+    # state 里带着可供客户端回填的意图摘要，但 token 原文不会写入 AgentState
+    # （会进 checkpoint / LangSmith trace），只放在请求级 ContextVar，由
+    # chat_service 在出口拼回 API 响应。
     pc = result["pending_confirmation"]
     assert pc["tool_name"] == TOOL_NAME_TICKET_CREATE
     assert pc["args"] == {"title": "Reset password"}
-    assert pc["token"]
+    assert "token" not in pc
+    assert pc["token_present"] is True
+    assert captured_token  # ContextVar holder 里确实收到了 token
     # 首次请求还没执行工具，executions 为空。
     assert result["tool_executions"] == []
 
@@ -376,3 +394,77 @@ def test_tool_agent_ticket_create_filtered_out_for_anonymous(
     # read_only 工具应当保留。
     assert TOOL_NAME_GET_WEATHER in tool_names
     assert TOOL_NAME_CALCULATE in tool_names
+
+
+def test_tool_agent_anonymous_with_side_effect_token_fails_closed(
+    llm_stub, side_effect_env
+) -> None:
+    """防御纵深：签名合法的 token 被匿名上下文使用，也不能被兑现。
+
+    构造：authed 用户签 `ticket_create` token；换到匿名身份重放。
+    预期：
+    - `filter_tools_for_auth` 已把 ticket_create 从可见工具里剔除；
+    - 旧代码会悄悄 fall-through 到 LLM path（tool_name 不在 pipelined_impls），
+      相当于匿名用户凭一个合法 token 拿到了 side_effect；
+    - 修复后必须 fail-closed，返回带 `confirmation_token_auth_forbidden` 的
+      错误文案，且不产生 tool_execution。
+    """
+
+    # 先用合法身份签一个 token。
+    authed_auth = AuthContext(
+        tenant_id="t-real",
+        user_id="u-real",
+        groups=(),
+        role=ROLE_USER,
+        anonymous=False,
+    )
+    args = {"title": "Fix login"}
+    ikey = compute_idempotency_key(
+        tenant_id=authed_auth.tenant_id,
+        user_id=authed_auth.user_id,
+        session_id="s-authed",
+        tool_name=TOOL_NAME_TICKET_CREATE,
+        args=args,
+    )
+    token, _ = issue_token(
+        idempotency_key=ikey,
+        tool_name=TOOL_NAME_TICKET_CREATE,
+        tenant_id=authed_auth.tenant_id,
+        user_id=authed_auth.user_id,
+        args=args,
+    )
+
+    # 换到匿名身份，把 token 原样带回。
+    state = {
+        "session_id": "s-anon",
+        "request_id": "req-replay",
+        "messages": [{"role": "user", "content": "确认工单"}],
+        "auth": AuthContext(
+            tenant_id=ANONYMOUS_TENANT_ID,
+            user_id=ANONYMOUS_USER_ID,
+            groups=(),
+            role=ROLE_ANONYMOUS,
+            anonymous=True,
+        ),
+        "confirmation_token": token,
+    }
+
+    # LLM 不能被调用：一旦被调就意味着 fall-through 出现。
+    import app.agents.tool_agent as ta_mod
+
+    original = ta_mod.chat_with_tools
+
+    def fail_chat_with_tools(**_kwargs):
+        raise AssertionError(
+            "chat_with_tools must not be called when token auth forbidden"
+        )
+
+    ta_mod.chat_with_tools = fail_chat_with_tools  # type: ignore[assignment]
+    try:
+        result = tool_agent_node(state)
+    finally:
+        ta_mod.chat_with_tools = original
+
+    assert ERR_TOKEN_AUTH_FORBIDDEN in result["answer"]
+    assert result["pending_confirmation"] == {}
+    assert result["tool_executions"] == []

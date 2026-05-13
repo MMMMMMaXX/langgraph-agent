@@ -46,7 +46,9 @@ from app.constants.workflow import (
     ERR_VERIFY_TOOL_UNAUTHORIZED,
     NODE_VERIFIER,
     RISK_WARN_HIGH_RISK_TOOL,
+    RISK_WARN_RAG_MISSING_CITATION,
     RISK_WARN_SIDE_EFFECT_CONFIRMED,
+    STEP_AGENT_RAG,
     STEP_AGENT_TOOL,
     STEP_STATUS_FAILED,
     STEP_STATUS_NEED_CONFIRMATION,
@@ -182,6 +184,31 @@ def _check_step_result(
         unsupported_claims.append(f"{ERR_VERIFY_STEP_FAILED}:{step_id}")
 
 
+def _check_rag_step(
+    step: dict[str, Any],
+    step_result: dict[str, Any],
+    *,
+    risk_warnings: list[str],
+) -> None:
+    """RAG step 证据校验。
+
+    规则：RAG step 成功时，如果 `doc_used=True` 但没有 citations（或 citations
+    被丢掉），说明答案没有可追溯的来源——这是质量信号（而非硬错误），
+    挂 `rag_step_missing_citation` 让 Composer 在回答尾部追加提示，同时 eval
+    可以据此聚合"缺证据回答率"。
+    纯 memory 回复（doc_used=False）不触发：没命中文档时本来就不需要引用。
+    """
+
+    del step  # 参数保留以对齐其他 _check_* 签名
+    if step_result.get("status") != STEP_STATUS_SUCCEEDED:
+        return
+    if not step_result.get("doc_used"):
+        return
+    citations = step_result.get("citations") or []
+    if not citations:
+        risk_warnings.append(RISK_WARN_RAG_MISSING_CITATION)
+
+
 def _derive_verification_status(
     *,
     executor_status: str,
@@ -281,7 +308,9 @@ def verifier_node(
                 unsupported_claims=unsupported_claims,
                 risk_warnings=risk_warnings,
             )
-        # rag / chat step 当前无规则，留空以便未来扩展；仍然跑 step_result 层失败检查。
+        elif step.get("agent") == STEP_AGENT_RAG:
+            _check_rag_step(step, step_result, risk_warnings=risk_warnings)
+        # chat step 当前无规则，留空以便未来扩展；仍然跑 step_result 层失败检查。
         _check_step_result(step, step_result, unsupported_claims=unsupported_claims)
 
     # 去重但保留首次出现顺序，避免 Composer 看到重复文案。

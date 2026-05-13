@@ -122,12 +122,17 @@ VALID_VERIFICATION_STATUSES: Final[tuple[str, ...]] = (
 # 用户可见文案，未来扩展 code 时必须在此登记。
 RISK_WARN_SIDE_EFFECT_CONFIRMED: Final[str] = "side_effect_requires_user_confirmation"
 RISK_WARN_HIGH_RISK_TOOL: Final[str] = "high_risk_tool_invoked"
+# RAG step 使用了文档证据（doc_used=True），但工作流 step_result 里没有
+# 承载任何 citation → 说明 RAG 子调用把证据丢了，或 Composer 拼装失败。
+# 这属于"答案缺证据"的质量信号，让 UI/用户知道这次回复没有可追溯的引用。
+RISK_WARN_RAG_MISSING_CITATION: Final[str] = "rag_step_missing_citation"
 
 # Composer 用于把 risk_warning code 翻译成用户可见的中文提示。集中在此避免
 # 文案散落；Composer、eval、前端展示共享同一份映射。
 RISK_WARN_LABELS: Final[dict[str, str]] = {
     RISK_WARN_SIDE_EFFECT_CONFIRMED: "此操作具有副作用，需要您的二次确认。",
     RISK_WARN_HIGH_RISK_TOOL: "本次操作涉及中/高风险工具，请复核。",
+    RISK_WARN_RAG_MISSING_CITATION: "本次检索答案缺少可追溯的文档引用，请谨慎参考。",
 }
 
 # ---- Verifier 错误码（写进 verification.unsupported_claims / missing_fields）
@@ -181,6 +186,7 @@ __all__ = [
     "NODE_WORKFLOW_EXECUTOR",
     "RISK_WARN_HIGH_RISK_TOOL",
     "RISK_WARN_LABELS",
+    "RISK_WARN_RAG_MISSING_CITATION",
     "RISK_WARN_SIDE_EFFECT_CONFIRMED",
     "ROUTE_WORKFLOW",
     "STEP_AGENTS",

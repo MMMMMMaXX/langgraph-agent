@@ -8,11 +8,18 @@
 
 解析规则（单向收敛到 canonical function name）：
 1. 如果 `name` 已经在 `TOOL_METADATA` 中 → 就是 canonical。
-2. 否则把所有 `.` 替换为 `_` 再查一次 → 命中则视为业务别名。
+2. 否则把所有 `.` 替换为 `_`（一次性全局替换，不做分段/suffix 匹配）再查一次
+   → 命中则视为业务别名。
 3. 否则抛 `ToolNotRegisteredError`。
 
-这样 Planner 写 `ticket.create` / `ticket_create` / 甚至 `foo.bar.ticket_create`
-都会落到同一个 canonical function name，避免 Executor 这层还要再处理命名差异。
+行为边界：**仅做"点替换下划线"**，不做命名空间剥离。也就是说：
+- `ticket.create` → `ticket_create`（命中）
+- `monitor.query.errors` → `monitor_query_errors`（命中，若已登记）
+- `foo.bar.ticket_create` → `foo_bar_ticket_create`（**不**命中，会抛错）
+
+这样避免把意料外的前缀悄悄映射到受保护的 side_effect 工具上，给潜在注入留口。
+如果未来真的需要允许命名空间别名，应显式登记完整别名，而不是在解析层做 suffix
+猜测。
 """
 
 from __future__ import annotations

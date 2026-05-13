@@ -125,7 +125,11 @@ def test_composer_success_joins_step_outputs_in_order() -> None:
 def test_composer_appends_risk_warnings_as_user_text() -> None:
     plan = _plan([_tool_step("s1", "get_weather")])
     step_results = {
-        "s1": {"status": STEP_STATUS_SUCCEEDED, "output": "出结果", "tool_name": "get_weather"}
+        "s1": {
+            "status": STEP_STATUS_SUCCEEDED,
+            "output": "出结果",
+            "tool_name": "get_weather",
+        }
     }
     verification = {
         "status": "pass",
@@ -172,9 +176,51 @@ def test_composer_need_confirmation_surfaces_pending_token() -> None:
     assert composer["pending_confirmations"] == [
         {
             "tool": "ticket_create",
-            "token": "abc",
             "expires_at": "2026-05-12T00:00:00Z",
             "idempotency_key": "ik-1",
+            "token_present": True,
+        }
+    ]
+
+
+def test_composer_need_confirmation_redacted_pending_still_marks_token_present() -> (
+    None
+):
+    """workflow_executor 进 composer 前，pending_confirmation 已走 `redact_pending_confirmation`：
+    只剩 `token_present=True`，没有 `token` 原文。composer 必须识别这种形态，
+    否则 agent_outputs 里的 token_present 会误判为 False，debug / 前端视图就拿
+    不到"这里需要确认"的结构化信号。
+    """
+
+    plan = _plan([_tool_step("s1", "ticket.create", args={"title": "bug"})])
+    step_results = {
+        "s1": {
+            "status": STEP_STATUS_NEED_CONFIRMATION,
+            "output": "请确认 ticket.create",
+        }
+    }
+    pending_redacted = {
+        "tool_name": "ticket_create",
+        "expires_at": "2026-05-12T00:00:00Z",
+        "idempotency_key": "ik-1",
+        "token_present": True,
+        "args": {"title": "bug"},
+    }
+    out = composer_node(
+        _state(
+            plan=plan,
+            step_results=step_results,
+            workflow_status=WORKFLOW_STATUS_NEED_CONFIRMATION,
+            pending_confirmation=pending_redacted,
+        )
+    )
+    composer = out["agent_outputs"][COMPOSER_OUTPUT_KEY]
+    assert composer["pending_confirmations"] == [
+        {
+            "tool": "ticket_create",
+            "expires_at": "2026-05-12T00:00:00Z",
+            "idempotency_key": "ik-1",
+            "token_present": True,
         }
     ]
 

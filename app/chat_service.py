@@ -2,7 +2,13 @@ from app.graph import graph
 from app.llm import get_embedding_cache_stats, reset_embedding_cache
 from app.runtime import SessionRuntime
 from app.runtime.initial_state import create_initial_state as build_initial_state
-from app.runtime_context import reset_stream_callback, set_stream_callback
+from app.runtime_context import (
+    begin_pending_confirmation_scope,
+    get_pending_confirmation_token,
+    reset_pending_confirmation_token,
+    reset_stream_callback,
+    set_stream_callback,
+)
 from app.state import AgentState
 from app.tracing import build_graph_trace_config, reset_model_call_index
 
@@ -53,10 +59,18 @@ def run_chat_turn(state: AgentState, message: str) -> AgentState:
     reset_model_call_index()
     reset_embedding_cache()
     callback_token = set_stream_callback(state.get("stream_callback"))
+    # 每次 turn 新建一个"confirmation token 原文"上下文；节点通过 append 向
+    # holder 里塞 token，请求出口再读出注入 API 响应，避免 token 落进
+    # AgentState / checkpoint / LangSmith。
+    # 注意：LangGraph 会在子 Context 里跑节点，单纯 ContextVar.set(str) 写入
+    # 不会回传父上下文；这里换成 list holder 让 append 的效果跨上下文可见。
+    pending_token_ctx = begin_pending_confirmation_scope()
     try:
         result = graph.invoke(next_state, config=graph_config)
+        pending_token_plain = get_pending_confirmation_token()
     finally:
         reset_stream_callback(callback_token)
+        reset_pending_confirmation_token(pending_token_ctx)
     answer = result.get("answer", "").strip()
     updated_messages = _SESSION_RUNTIME.commit(
         session_id=next_state["session_id"],
@@ -67,6 +81,13 @@ def run_chat_turn(state: AgentState, message: str) -> AgentState:
 
     debug_info = dict(result.get("debug_info", {}))
     debug_info["embedding_cache"] = get_embedding_cache_stats()
+
+    # Graph state 里的 pending_confirmation 是脱敏版（token_present 布尔 + 元
+    # 数据），API 出口再把 ContextVar 里的原文 token 贴回来。token 从此**只**
+    # 出现在 chat_runner 构造的 HTTP 响应体里，不会进 checkpoint/trace。
+    pending_redacted = dict(result.get("pending_confirmation") or {})
+    if pending_redacted and pending_token_plain:
+        pending_redacted["token"] = pending_token_plain
 
     return {
         "request_id": result.get("request_id", next_state["request_id"]),
@@ -86,6 +107,6 @@ def run_chat_turn(state: AgentState, message: str) -> AgentState:
         # Phase 1 tool_safety：把 side_effect pipeline 的输出透传给 API 层，
         # 由 chat_runner 决定是否暴露给客户端（pending_confirmation 会；
         # tool_executions 只在 debug=True 场景放到 debug_info 里）。
-        "pending_confirmation": result.get("pending_confirmation") or {},
+        "pending_confirmation": pending_redacted,
         "tool_executions": list(result.get("tool_executions") or []),
     }

@@ -298,6 +298,31 @@ def decode_signed_payload(
     return payload
 
 
+def redact_pending_confirmation(pending: dict[str, Any] | None) -> dict[str, Any]:
+    """去掉 token 本体，保留前端/trace 用得上的元数据 + `token_present` 布尔。
+
+    使用约束：**只有 API 顶层 `pending_confirmation` 才允许携带原始 token**；
+    任何会被写入 debug_info / LangSmith / agent_outputs 的 pending_confirmation
+    都必须先走这个函数，避免 token 随 trace 泄漏。
+
+    空输入返回空 dict，保持调用点不用判空。
+    """
+
+    if not pending:
+        return {}
+    redacted: dict[str, Any] = {
+        "tool_name": pending.get("tool_name", ""),
+        "expires_at": pending.get("expires_at", ""),
+        "idempotency_key": pending.get("idempotency_key", ""),
+        "token_present": bool(pending.get("token")),
+    }
+    # args 对 Verifier / 展示都有用（tool_name + args 构成"将要执行什么"）；
+    # token 本体是唯一必须剔除的字段。
+    if "args" in pending:
+        redacted["args"] = pending["args"]
+    return redacted
+
+
 __all__ = [
     "ConfirmationPayload",
     "ConfirmationSecretMissing",
@@ -307,5 +332,6 @@ __all__ = [
     "MismatchedConfirmationToken",
     "decode_signed_payload",
     "issue_token",
+    "redact_pending_confirmation",
     "verify_token",
 ]

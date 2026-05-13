@@ -49,7 +49,6 @@ from app.runtime_context import get_stream_callback
 from app.state import AgentState
 from app.utils.logger import log_node, preview
 
-
 # --------------------------------------------------------------------------
 # 结构化片段构造
 # --------------------------------------------------------------------------
@@ -86,16 +85,28 @@ def _build_completed_actions(
 def _build_pending_confirmations(
     pending_confirmation: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    """单步短路模型下最多一个 pending confirmation；用 list 是为了前端结构兼容。"""
+    """单步短路模型下最多一个 pending confirmation；用 list 是为了前端结构兼容。
+
+    agent_outputs 会被写入 debug / trace，这里刻意**不**携带 token 本体，只暴露
+    `token_present` 布尔。客户端要拿原始 token 请从 API 响应顶层 `pending_confirmation`
+    字段读取（由 chat_runner 透出），而不是从 composer 结构体里翻。
+    """
 
     if not pending_confirmation:
         return []
+    # workflow 路径进 composer 之前，pending_confirmation 已经被
+    # `redact_pending_confirmation` 脱敏过，只剩 `token_present=True` 而没有
+    # `token` 原文；tool_agent 单 turn 兜底路径可能仍然带着 `token`（老调用点）。
+    # 两种形态都要识别，否则脱敏路径上 token_present 会被误判为 False。
+    token_present = bool(
+        pending_confirmation.get("token_present") or pending_confirmation.get("token")
+    )
     return [
         {
             "tool": pending_confirmation.get("tool_name", ""),
-            "token": pending_confirmation.get("token", ""),
             "expires_at": pending_confirmation.get("expires_at", ""),
             "idempotency_key": pending_confirmation.get("idempotency_key", ""),
+            "token_present": token_present,
         }
     ]
 
@@ -115,14 +126,42 @@ def _build_citations(
     steps: list[dict[str, Any]],
     step_results: dict[str, dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """MVP：rag step 只返回纯文本 answer，没有 citation 结构。
+    """把每个 RAG step 的 citations 汇总成扁平列表。
 
-    留空 list 作为 schema 占位；rag_agent 输出结构化 citations 后，这里按 step
-    维度归集即可，接口无需再改。
+    结构（保留 step 归属以便前端按 step 分组展示）：
+    `{step, ref, doc_id, chunk_id, doc_title, source, section_title}`
+    其余字段（content / score 等）不暴露，避免把长正文或内部分数推给前端。
+    同一 `(step, doc_id, ref)` 不重复；顺序按 step 声明顺序 + ref 顺序。
     """
 
-    _ = steps, step_results  # 占位参数保留，未来扩展不改签名
-    return []
+    flattened: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for step in steps:
+        if step.get("agent") != STEP_AGENT_RAG:
+            continue
+        step_id = step.get("id", "")
+        res = step_results.get(step_id) or {}
+        if res.get("status") != STEP_STATUS_SUCCEEDED:
+            continue
+        for citation in res.get("citations") or []:
+            ref = str(citation.get("ref") or "")
+            doc_id = str(citation.get("doc_id") or "")
+            key = (step_id, doc_id, ref)
+            if key in seen:
+                continue
+            seen.add(key)
+            flattened.append(
+                {
+                    "step": step_id,
+                    "ref": ref,
+                    "doc_id": doc_id,
+                    "chunk_id": citation.get("chunk_id", ""),
+                    "doc_title": citation.get("doc_title", ""),
+                    "source": citation.get("source", ""),
+                    "section_title": citation.get("section_title", ""),
+                }
+            )
+    return flattened
 
 
 def _collect_step_failures(
@@ -269,13 +308,17 @@ def composer_node(state: AgentState) -> AgentState:
     elif workflow_status == WORKFLOW_STATUS_FAILED:
         # 失败路径也要尽力保留已成功 step 的片段，方便用户继续对话；
         # 没有成功片段时回退到全失败模板。
-        answer = _compose_partial_answer(steps, step_results) or COMPOSER_FALLBACK_ALL_FAILED
+        answer = (
+            _compose_partial_answer(steps, step_results) or COMPOSER_FALLBACK_ALL_FAILED
+        )
     # --- 分支 5：部分成功 ---
     elif workflow_status == WORKFLOW_STATUS_PARTIAL:
         answer = _compose_partial_answer(steps, step_results)
     # --- 分支 6：成功（含 succeeded / 未知状态兜底） ---
     else:
-        answer = _compose_success_answer(steps, step_results) or COMPOSER_FALLBACK_ALL_FAILED
+        answer = (
+            _compose_success_answer(steps, step_results) or COMPOSER_FALLBACK_ALL_FAILED
+        )
 
     # 风险提示统一附加到 answer 末尾，保证任何分支都不会漏掉 UI 徽标。
     risk_texts = _build_risk_warning_texts(risk_codes)

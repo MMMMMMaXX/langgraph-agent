@@ -1,5 +1,6 @@
 from app.constants.model_profiles import PROFILE_TOOL_CHAT
 from app.constants.routes import ROUTE_TOOL_AGENT
+from app.constants.tool_safety import ERR_TOKEN_AUTH_FORBIDDEN
 from app.constants.tooling import (
     TOOL_MULTI_INTENT_KEYWORDS,
     TOOL_NAME_CALCULATE,
@@ -10,12 +11,14 @@ from app.constants.tooling import (
 )
 from app.llm import chat_with_tools, get_profile_runtime_info
 from app.prompts.tooling import TOOL_AGENT_SYSTEM_PROMPT
+from app.runtime_context import set_pending_confirmation_token
 from app.state import AgentState
 from app.streaming import build_answer_streamer
 from app.tools.confirmation import (
     ConfirmationSecretMissing,
     ConfirmationTokenError,
     decode_signed_payload,
+    redact_pending_confirmation,
 )
 from app.tools.metadata import filter_tools_for_auth, get_tool_metadata
 from app.tools.monitor import monitor_query_errors
@@ -204,6 +207,17 @@ def tool_agent_node(state: AgentState) -> AgentState:
                 "tool_results": tool_results,
                 "answer": "",
             }
+        elif replay_payload is not None:
+            # 安全门：token 解签通过，但 `tool_name` 在当前上下文里被
+            # `filter_tools_for_auth` 过滤掉（匿名 × side_effect 最常见），
+            # 或工具已经下架。这时**禁止**降级到 LLM 路径——否则 LLM 很可能
+            # 走原生 function-calling 把该工具找回来，等于让一个"签名合法但无权"
+            # 的 token 绕过鉴权。必须 fail-closed 给出明确错误码。
+            tool_run = {
+                "tool_calls": [],
+                "tool_results": [],
+                "answer": f"确认 token 无效: {ERR_TOKEN_AUTH_FORBIDDEN}",
+            }
         else:
             tool_run = chat_with_tools(
                 messages=[
@@ -264,12 +278,19 @@ def tool_agent_node(state: AgentState) -> AgentState:
         # answer 沿用 tool_result（pipeline 写入的提示），不再让兜底覆盖。
         # chat_with_tools 在 tool_results[0]["output"] 里就是提示文案。
 
+    # debug_info / trace 侧只保留脱敏版 pending_confirmation：token 本体仅通过
+    # 请求级 ContextVar 透出 API 响应（见 runtime_context.set_pending_confirmation_token）。
+    # 这样即便 LangGraph 把节点返回的 state 拍进 checkpoint / LangSmith，也拿不到 token 原文。
+    debug_pending = redact_pending_confirmation(pending_confirmation)
+    if pending_confirmation.get("token"):
+        set_pending_confirmation_token(pending_confirmation["token"])
+
     next_state: AgentState = {
         "tool_result": answer,
         "agent_outputs": {ROUTE_TOOL_AGENT: answer},
         "answer": answer,
         "tool_executions": list(side_ctx.executions),
-        "pending_confirmation": pending_confirmation,
+        "pending_confirmation": debug_pending,
         "debug_info": {
             ROUTE_TOOL_AGENT: {
                 "llm_profiles": {
@@ -284,7 +305,7 @@ def tool_agent_node(state: AgentState) -> AgentState:
                 "error": error_message,
                 "tool_result": answer,
                 "tool_executions": list(side_ctx.executions),
-                "pending_confirmation": pending_confirmation,
+                "pending_confirmation": debug_pending,
             }
         },
     }
@@ -304,7 +325,7 @@ def tool_agent_node(state: AgentState) -> AgentState:
             "error": error_message,
             "toolResult": answer,
             "toolExecutions": list(side_ctx.executions),
-            "pendingConfirmation": pending_confirmation,
+            "pendingConfirmation": debug_pending,
         },
     )
     return next_state
