@@ -1,4 +1,5 @@
 from app.agents.novel_script_agent import looks_like_script_task
+from app.agents.rag.multi_hop.gate import should_enter_multi_hop
 from app.constants.keywords import (
     FOLLOWUP_QUERY_MAX_CHARS,
     FOLLOWUP_QUERY_PREFIXES,
@@ -17,6 +18,7 @@ from app.constants.keywords import (
 )
 from app.constants.routes import (
     ROUTE_CHAT_AGENT,
+    ROUTE_MULTI_HOP_AGENT,
     ROUTE_NOVEL_SCRIPT_AGENT,
     ROUTE_RAG_AGENT,
     ROUTE_TOOL_AGENT,
@@ -177,8 +179,17 @@ def supervisor_node(state: AgentState) -> AgentState:
         if weather_query or math_query:
             routes.append(ROUTE_TOOL_AGENT)
 
-        # 知识型问题再走 RAG，避免“北京天气怎么样”因为带城市名被误拉到知识库链路。
-        if knowledge_query or (followup_query and not weather_query and not math_query):
+        # Phase 3 multi-hop gate：独立于 KNOWLEDGE_QUERY_KEYWORDS。
+        # 很多典型多跳请求（"基于A项目接口文档和B项目部署逻辑写集成测试方案"）
+        # 不含"是什么/原理/技术"等知识关键词，但语义上依赖跨文档推理。
+        # 所以只要不是 tool 类诉求，就交给 `should_enter_multi_hop` 自己判（它已经
+        # 先过 negative gates，再过 positive triggers，不会错拦定义/对比类）。
+        if not weather_query and not math_query and should_enter_multi_hop(message):
+            routes.append(ROUTE_MULTI_HOP_AGENT)
+        elif knowledge_query or (
+            followup_query and not weather_query and not math_query
+        ):
+            # 知识型问题再走 RAG，避免"北京天气怎么样"因为带城市名被误拉到知识库链路。
             routes.append(ROUTE_RAG_AGENT)
 
         # 规则没兜住，再让 LLM 规划
@@ -195,6 +206,8 @@ def supervisor_node(state: AgentState) -> AgentState:
         intent = "creative"
     elif routes == [ROUTE_WORKFLOW]:
         intent = INTENT_WORKFLOW
+    elif ROUTE_MULTI_HOP_AGENT in routes:
+        intent = "multi_hop_retrieval"
     elif ROUTE_TOOL_AGENT in routes and ROUTE_RAG_AGENT in routes:
         intent = "hybrid"
     elif ROUTE_TOOL_AGENT in routes:

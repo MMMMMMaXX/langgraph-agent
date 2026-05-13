@@ -23,6 +23,7 @@ import pytest
 from app.agents.supervisor import supervisor_node
 from app.constants.routes import (
     ROUTE_CHAT_AGENT,
+    ROUTE_MULTI_HOP_AGENT,
     ROUTE_NOVEL_SCRIPT_AGENT,
     ROUTE_RAG_AGENT,
     ROUTE_TOOL_AGENT,
@@ -77,6 +78,56 @@ def test_weather_plus_knowledge_produces_hybrid_route() -> None:
     result = supervisor_node(_state_with_message("北京天气是什么意思"))
     assert set(result["routes"]) == {ROUTE_TOOL_AGENT, ROUTE_RAG_AGENT}
     assert result["intent"] == "hybrid"
+
+
+# ----------------------------- Phase 3 multi-hop gate -----------------------------
+
+
+def test_supervisor_routes_multi_hop_on_positive_trigger() -> None:
+    # supervisor 的 multi-hop gate 独立于 KNOWLEDGE_QUERY_KEYWORDS：只要命中
+    # MULTI_HOP_TRIGGERS 且没被 negative gate 拦，就进 multi_hop。这里用一个
+    # 同时带 "技术/原理" 知识词 + "结合.*和.*设计" 正向触发的混合样本，
+    # 证明主干路径 OK。不含知识词的纯多跳样本在下一条用例单独锁住。
+    result = supervisor_node(
+        _state_with_message("结合A系统的技术原理和B系统的技术实现，给出统一的优化设计")
+    )
+    assert result["routes"] == [ROUTE_MULTI_HOP_AGENT]
+    assert result["intent"] == "multi_hop_retrieval"
+
+
+def test_supervisor_routes_multi_hop_without_knowledge_keywords() -> None:
+    # 不含"技术/原理/什么/WAI-ARIA"等 KNOWLEDGE_QUERY_KEYWORDS 的典型多跳 query：
+    # 之前 gate 被包在 knowledge 分支里时会漏到 LLM fallback，现在应直接进 multi_hop。
+    result = supervisor_node(
+        _state_with_message("基于A项目接口文档和B项目部署逻辑，写集成测试方案")
+    )
+    assert result["routes"] == [ROUTE_MULTI_HOP_AGENT]
+    assert result["intent"] == "multi_hop_retrieval"
+
+
+def test_supervisor_negative_gate_keeps_simple_comparison_on_rag() -> None:
+    # "WAI-ARIA vs 虚拟列表" 命中 negative gate → 不升级，回落到 ROUTE_RAG_AGENT。
+    result = supervisor_node(_state_with_message("WAI-ARIA vs 虚拟列表"))
+    assert result["routes"] == [ROUTE_RAG_AGENT]
+    assert result["intent"] == "retrieval"
+
+
+def test_supervisor_simple_definition_stays_on_rag() -> None:
+    # "什么是 JWT" 是 RAG 已有的最常见形态；multi-hop 不应污染。
+    result = supervisor_node(_state_with_message("什么是 JWT？"))
+    assert result["routes"] == [ROUTE_RAG_AGENT]
+    assert result["intent"] == "retrieval"
+
+
+def test_supervisor_multi_hop_does_not_affect_weather_plus_knowledge() -> None:
+    # weather + knowledge 组合即使命中 multi-hop trigger 关键字，也应保持 hybrid，
+    # 不能把 tool 路由偷成 multi-hop（会丢掉天气查询）。
+    result = supervisor_node(
+        _state_with_message("北京天气怎么样，再结合气候资料给我一个出行方案")
+    )
+    # 只要 tool 还在 + 没有 multi_hop，即满足契约
+    assert ROUTE_TOOL_AGENT in result["routes"]
+    assert ROUTE_MULTI_HOP_AGENT not in result["routes"]
 
 
 # ----------------------------- Phase 2 workflow 路由 -----------------------------

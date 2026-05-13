@@ -15,6 +15,11 @@ ROUTE_NOVEL_SCRIPT_AGENT = "novel_script_agent"
 # 路由/state 代码从同一个 `app.constants.routes` 模块集中消费，不用跨 import。
 from app.constants.workflow import ROUTE_WORKFLOW  # noqa: E402
 
+# Phase 3：Multi-hop RAG 节点（decompose → per-sq retrieve → gap → refine → answer）。
+# 常量真正定义在 `app/constants/multi_hop.py:ROUTE_MULTI_HOP_AGENT`，这里 re-export
+# 保持 "所有 agent 路由值从 routes.py 导入" 的约定（见 `feedback_constant_extraction.md`）。
+from app.constants.multi_hop import ROUTE_MULTI_HOP_AGENT  # noqa: E402
+
 # Supervisor 节点：负责根据用户输入决定后续走哪些 agent。
 NODE_SUPERVISOR = "supervisor"
 
@@ -24,6 +29,10 @@ NODE_MERGE = "merge"
 # Memory 节点：负责摘要刷新、向量记忆写入、会话流水写入。
 NODE_MEMORY = "memory"
 
+# Phase 3：Multi-hop RAG 在 LangGraph 里的节点名，和 ROUTE_MULTI_HOP_AGENT 故意相等，
+# 与 ROUTE_RAG_AGENT / ROUTE_CHAT_AGENT 的用法保持一致：节点名 == agent_outputs key。
+NODE_MULTI_HOP_AGENT = ROUTE_MULTI_HOP_AGENT
+
 # 允许出现在 state["routes"] 里的 agent 路由集合。
 AGENT_ROUTES = (
     ROUTE_TOOL_AGENT,
@@ -31,4 +40,5 @@ AGENT_ROUTES = (
     ROUTE_CHAT_AGENT,
     ROUTE_NOVEL_SCRIPT_AGENT,
     ROUTE_WORKFLOW,
+    ROUTE_MULTI_HOP_AGENT,
 )

@@ -7,6 +7,7 @@ from app.agents.composer_agent import composer_node
 from app.agents.merge import merge_node
 from app.agents.novel_script_agent import novel_script_agent_node
 from app.agents.planner_agent import planner_node
+from app.agents.rag.multi_hop.node import multi_hop_node
 from app.agents.rag_agent import rag_agent_node
 from app.agents.supervisor import supervisor_node
 from app.agents.tool_agent import tool_agent_node
@@ -16,8 +17,10 @@ from app.checkpointing.factory import get_checkpointer
 from app.constants.routes import (
     NODE_MEMORY,
     NODE_MERGE,
+    NODE_MULTI_HOP_AGENT,
     NODE_SUPERVISOR,
     ROUTE_CHAT_AGENT,
+    ROUTE_MULTI_HOP_AGENT,
     ROUTE_NOVEL_SCRIPT_AGENT,
     ROUTE_RAG_AGENT,
     ROUTE_TOOL_AGENT,
@@ -48,6 +51,12 @@ def route_after_supervisor(state: AgentState) -> str:
     # 走独立路由是因为 Planner 会失败 fail-closed，不能和 tool/rag 同级混用。
     if routes == [ROUTE_WORKFLOW]:
         return NODE_PLANNER
+
+    # Phase 3：multi-hop agent 作为独立 RAG 变体走 merge 分支。supervisor 的 gate
+    # 保证 routes 要么是 [ROUTE_MULTI_HOP_AGENT] 要么退回 [ROUTE_RAG_AGENT]；不与
+    # ROUTE_TOOL_AGENT 混合（multi-hop 命中的都是知识类 query）。
+    if ROUTE_MULTI_HOP_AGENT in routes:
+        return ROUTE_MULTI_HOP_AGENT
 
     if ROUTE_TOOL_AGENT in routes:
         return ROUTE_TOOL_AGENT
@@ -123,6 +132,10 @@ builder = StateGraph(AgentState)
 builder.add_node(NODE_SUPERVISOR, with_timing(NODE_SUPERVISOR, supervisor_node))
 builder.add_node(ROUTE_TOOL_AGENT, with_timing(ROUTE_TOOL_AGENT, tool_agent_node))
 builder.add_node(ROUTE_RAG_AGENT, with_timing(ROUTE_RAG_AGENT, rag_agent_node))
+builder.add_node(
+    NODE_MULTI_HOP_AGENT,
+    with_timing(NODE_MULTI_HOP_AGENT, multi_hop_node),
+)
 builder.add_node(ROUTE_CHAT_AGENT, with_timing(ROUTE_CHAT_AGENT, chat_agent_node))
 builder.add_node(
     ROUTE_NOVEL_SCRIPT_AGENT,
@@ -146,6 +159,7 @@ builder.add_conditional_edges(
     {
         ROUTE_TOOL_AGENT: ROUTE_TOOL_AGENT,
         ROUTE_RAG_AGENT: ROUTE_RAG_AGENT,
+        ROUTE_MULTI_HOP_AGENT: NODE_MULTI_HOP_AGENT,
         ROUTE_CHAT_AGENT: ROUTE_CHAT_AGENT,
         ROUTE_NOVEL_SCRIPT_AGENT: ROUTE_NOVEL_SCRIPT_AGENT,
         NODE_PLANNER: NODE_PLANNER,
@@ -172,6 +186,7 @@ builder.add_edge(NODE_VERIFIER, NODE_COMPOSER)
 builder.add_edge(NODE_COMPOSER, NODE_MEMORY)
 
 builder.add_edge(ROUTE_RAG_AGENT, NODE_MERGE)
+builder.add_edge(NODE_MULTI_HOP_AGENT, NODE_MERGE)
 builder.add_edge(ROUTE_CHAT_AGENT, NODE_MERGE)
 builder.add_edge(ROUTE_NOVEL_SCRIPT_AGENT, NODE_MERGE)
 builder.add_edge(NODE_MERGE, NODE_MEMORY)

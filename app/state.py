@@ -52,6 +52,7 @@ class AgentState(TypedDict, total=False):
             "chat_agent",
             "novel_script_agent",
             "workflow_agent",
+            "multi_hop_agent",
         ]
     ]
 
@@ -81,6 +82,17 @@ class AgentState(TypedDict, total=False):
     # Phase 2：Verifier 的结构化输出（PR-3 真正填充）；Planner 失败时也写此字段
     # 的 unsupported_claims 方便 Composer 合成拒绝文案。
     verification: dict
+
+    # Phase 3 PR-3：multi_hop_node 写入的最小计划摘要，仅保留
+    # {"task_type", "subqueries": [{"id","text","intent"}]} 这类轻量字段，
+    # 不承载全量 RefinePlan / chunk content。非 multi-hop 请求为空 dict。
+    # 非 Annotated（覆盖语义）：multi_hop 是单节点内部循环，State 顶层不需要跨节点
+    # 增量合并，避免重试 / 并行时残留跨请求脏数据。
+    multi_hop_plan: dict
+
+    # Phase 3 PR-3：multi_hop_node 实际执行的 hop 次数（含降级分支）。
+    # 非 multi-hop 请求为 0。Verifier / Composer / eval 可按此判定多跳行为。
+    hop_count: int
 
     # 新增：vector memory 检索结果
     memory_hits: list[dict]

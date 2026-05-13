@@ -36,6 +36,11 @@ ANSWER_STRATEGY_FOLLOWUP = "followup"
 # 低置信兜底策略：明确资料不足时不要硬答。
 ANSWER_STRATEGY_FALLBACK = "fallback"
 
+# Phase 3：Multi-hop 回答策略。`multi_hop_node` 在最终 answer LLM 调用时显式使用此
+# 策略，避免被 `build_doc_answer_strategy` 的单跳 query_type → strategy 映射误压缩
+# 为 definition/followup 短答。策略语义：按 subquery 逐段叙述 + 汇总统一 citations。
+ANSWER_STRATEGY_MULTI_HOP = "multi_hop"
+
 # 少量候选时才允许跳过 LLM rerank，避免误跳过复杂候选集。
 DOC_RERANK_SKIP_MAX_CANDIDATES = 2
 
