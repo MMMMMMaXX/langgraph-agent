@@ -39,6 +39,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.constants.multi_hop import (
+    MULTI_HOP_STEP_ID,
+    RISK_WARN_MULTI_HOP_COVERAGE,
+)
 from app.constants.tool_safety import RISK_LEVEL_HIGH, RISK_LEVEL_MEDIUM
 from app.constants.workflow import (
     ERR_VERIFY_MISSING_ARGS,
@@ -53,6 +57,7 @@ from app.constants.workflow import (
     STEP_STATUS_FAILED,
     STEP_STATUS_NEED_CONFIRMATION,
     STEP_STATUS_SUCCEEDED,
+    TASK_TYPE_MULTI_HOP_RAG,
     VERIFICATION_STATUS_FAILED,
     VERIFICATION_STATUS_NEED_CLARIFICATION,
     VERIFICATION_STATUS_NEED_CONFIRMATION,
@@ -209,6 +214,27 @@ def _check_rag_step(
         risk_warnings.append(RISK_WARN_RAG_MISSING_CITATION)
 
 
+def _check_multi_hop_coverage(
+    step_results: dict[str, dict[str, Any]],
+    *,
+    risk_warnings: list[str],
+) -> None:
+    """Multi-hop 覆盖度校验（Phase 3 PR-4）。
+
+    multi_hop_node 在 pseudo-step 的 `meta.missing_coverage_sq_ids` 里
+    登记"零 chunk 的 sq_id 列表"。Verifier 只做 presence 检查——faithfulness
+    之类的语义评测交给离线 eval，在线链路不跑 LLM judge。
+
+    不覆盖 "doc_used=False" 场景：multi-hop 触发路径本来就是文档依赖，
+    没命中证据属于 evidence_empty 失败链路而非缺引用的降级。
+    """
+
+    mh = step_results.get(MULTI_HOP_STEP_ID) or {}
+    meta = mh.get("meta") or {}
+    if meta.get("missing_coverage_sq_ids"):
+        risk_warnings.append(RISK_WARN_MULTI_HOP_COVERAGE)
+
+
 def _derive_verification_status(
     *,
     executor_status: str,
@@ -312,6 +338,13 @@ def verifier_node(
             _check_rag_step(step, step_result, risk_warnings=risk_warnings)
         # chat step 当前无规则，留空以便未来扩展；仍然跑 step_result 层失败检查。
         _check_step_result(step, step_result, unsupported_claims=unsupported_claims)
+
+    # Phase 3 PR-4：multi-hop 直达路径（task_type = multi_hop_rag）没有
+    # 常规 plan.steps，Verifier 按 task_type 直接看 pseudo-step 的 meta。
+    # 这条检查对 PR-6 workflow 嵌套路径同样生效：只要 plan.task_type 是
+    # multi_hop_rag，coverage 缺失就一定要提示。
+    if plan.get("task_type") == TASK_TYPE_MULTI_HOP_RAG:
+        _check_multi_hop_coverage(step_results, risk_warnings=risk_warnings)
 
     # 去重但保留首次出现顺序，避免 Composer 看到重复文案。
     dedup_claims = list(dict.fromkeys(unsupported_claims))

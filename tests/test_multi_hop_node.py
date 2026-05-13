@@ -635,3 +635,108 @@ def test_multi_hop_node_global_source_diversity_refine(patch_node) -> None:
     # hop 在第二跳关闭（不应空转到 MAX_HOPS）
     assert result["hop_count"] == 2
     assert result["workflow_status"] == WORKFLOW_STATUS_SUCCEEDED
+
+
+# ---------------------------------------------------------------------------
+# contract: multi_hop_node → Composer / Verifier
+# ---------------------------------------------------------------------------
+
+
+def test_multi_hop_node_output_flows_through_composer_and_verifier(
+    patch_node,
+) -> None:
+    """契约测试：multi_hop_node 的 State 能被 Composer / Verifier 直接消费。
+
+    multi_hop_node 只写 `plan`/`multi_hop_plan`/`step_results["mh1"]`；Composer
+    必须命中 multi-hop 直通分支（不回落 plan_failed），Verifier 必须命中
+    coverage 检查（不被 empty-plan early-return 截断）。
+    """
+
+    from app.agents.composer_agent import composer_node
+    from app.agents.verifier_agent import verifier_node
+    from app.auth.context import AuthContext
+    from app.constants.multi_hop import (
+        MULTI_HOP_STEP_ID,
+        RISK_WARN_MULTI_HOP_COVERAGE,
+    )
+    from app.constants.workflow import (
+        COMPOSER_FALLBACK_PLAN_FAILED,
+        COMPOSER_OUTPUT_KEY,
+        TASK_TYPE_MULTI_HOP_RAG,
+    )
+
+    patch_node["decompose"] = lambda q, role: DecomposeResult(
+        subqueries=(
+            Subquery(id="sq1", intent="entity_lookup", query="A 定义"),
+            Subquery(id="sq2", intent="procedure", query="B 排查"),
+        ),
+        degraded_to_single_hop=False,
+    )
+
+    # sq2 召回为空 → missing_coverage_sq_ids 会登记 sq2
+    def _retrieve_stub(query: str) -> _DocRetrievalStub:
+        if query.startswith("A"):
+            return _DocRetrievalStub(
+                merged_doc_hits=[
+                    _make_doc_hit(
+                        doc_id="doc-A", chunk_id="A-c1", score=0.9, content="内容"
+                    ),
+                    _make_doc_hit(
+                        doc_id="doc-A", chunk_id="A-c2", score=0.7, content="内容"
+                    ),
+                ],
+                retrieval_debug={},
+                errors=[],
+                timings_ms={},
+            )
+        return _DocRetrievalStub(
+            merged_doc_hits=[], retrieval_debug={}, errors=[], timings_ms={}
+        )
+
+    patch_node["retrieve"] = _retrieve_stub
+    patch_node["answer"] = lambda **kw: (
+        "multi-hop 综合答案",
+        [{"ref": "[1]", "doc_id": "doc-A", "chunk_id": "A-c1"}],
+        {"name": "multi_hop"},
+        {},
+        [],
+        5.0,
+    )
+
+    mh_state = mh_node.multi_hop_node(_state(rewritten="跨项目排查"))
+
+    # multi_hop_node 契约：写 plan + multi_hop_plan，pseudo plan 有 mh1 一条 step
+    assert mh_state["plan"]["task_type"] == TASK_TYPE_MULTI_HOP_RAG
+    assert [s["id"] for s in mh_state["plan"]["steps"]] == [MULTI_HOP_STEP_ID]
+
+    # Composer：命中直通分支，answer 原样透传
+    auth = AuthContext(tenant_id="t1", user_id="u1", role="user", anonymous=False)
+    composer_in = {
+        **mh_state,
+        "messages": [{"role": "user", "content": "跨项目排查"}],
+        "auth": auth,
+        "request_id": "req-x",
+        "session_id": "sess-x",
+        "plan_id": "plan-x",
+        "verification": {
+            "status": "pass",
+            "missing_fields": [],
+            "unsupported_claims": [],
+            "risk_warnings": [],
+        },
+        "pending_confirmation": {},
+    }
+    composer_out = composer_node(composer_in)
+    assert composer_out["answer"].startswith("multi-hop 综合答案")
+    assert COMPOSER_FALLBACK_PLAN_FAILED not in composer_out["answer"]
+    debug = composer_out["debug_info"][list(composer_out["debug_info"].keys())[0]]
+    assert debug.get("multi_hop_passthrough") is True
+    composer_output = composer_out["agent_outputs"][COMPOSER_OUTPUT_KEY]
+    assert [a["step"] for a in composer_output["completed_actions"]] == [
+        MULTI_HOP_STEP_ID
+    ]
+
+    # Verifier：empty-plan early-return 已绕过，coverage 风险码被加上
+    verifier_in = {**composer_in, "verification": {}}
+    verifier_out = verifier_node(verifier_in)
+    assert RISK_WARN_MULTI_HOP_COVERAGE in verifier_out["verification"]["risk_warnings"]

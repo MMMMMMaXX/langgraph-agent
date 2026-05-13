@@ -11,6 +11,10 @@ from app.constants.auth import (
     ANONYMOUS_USER_ID,
     ROLE_ANONYMOUS,
 )
+from app.constants.multi_hop import (
+    MULTI_HOP_STEP_ID,
+    RISK_WARN_MULTI_HOP_COVERAGE,
+)
 from app.constants.workflow import (
     ERR_PLAN_LLM_FAILED,
     ERR_VERIFY_MISSING_ARGS,
@@ -22,6 +26,7 @@ from app.constants.workflow import (
     STEP_STATUS_FAILED,
     STEP_STATUS_NEED_CONFIRMATION,
     STEP_STATUS_SUCCEEDED,
+    TASK_TYPE_MULTI_HOP_RAG,
     VERIFICATION_STATUS_FAILED,
     VERIFICATION_STATUS_NEED_CLARIFICATION,
     VERIFICATION_STATUS_NEED_CONFIRMATION,
@@ -31,7 +36,6 @@ from app.constants.workflow import (
     WORKFLOW_STATUS_NEED_CONFIRMATION,
     WORKFLOW_STATUS_SUCCEEDED,
 )
-
 
 # ---------------------------- helpers ----------------------------
 
@@ -72,9 +76,7 @@ def _plan(steps: list[dict]) -> dict:
     return {"task_type": "multi", "steps": steps, "compose_goal": ""}
 
 
-def _tool_step(
-    step_id: str, tool: str, args: dict | None = None
-) -> dict:
+def _tool_step(step_id: str, tool: str, args: dict | None = None) -> dict:
     return {
         "id": step_id,
         "agent": "tool_agent",
@@ -166,7 +168,11 @@ def test_verifier_flags_anonymous_side_effect_as_unauthorized() -> None:
     plan = _plan([_tool_step("s1", "ticket.create", {"title": "bug"})])
     # 执行器匿名会把它标 failed；verifier 仍然把越权原因写进 claims。
     step_results = {
-        "s1": {"status": STEP_STATUS_FAILED, "output": "", "error": "tool_not_resolvable"}
+        "s1": {
+            "status": STEP_STATUS_FAILED,
+            "output": "",
+            "error": "tool_not_resolvable",
+        }
     }
     out = verifier_node(
         _state(
@@ -333,3 +339,47 @@ def test_verifier_ignores_rag_and_chat_steps_for_arg_rules() -> None:
     # rag/chat 不受 required_args 规则影响
     assert v["missing_fields"] == []
     assert v["status"] == VERIFICATION_STATUS_PASS
+
+
+# ---------------------------- multi-hop coverage (PR-4) ----------------------------
+
+
+def test_verifier_flags_multi_hop_missing_coverage() -> None:
+    """plan.task_type=multi_hop_rag + meta.missing_coverage_sq_ids 非空
+    → risk_warnings 追加 RISK_WARN_MULTI_HOP_COVERAGE。"""
+
+    plan = {
+        "task_type": TASK_TYPE_MULTI_HOP_RAG,
+        "steps": [{"id": MULTI_HOP_STEP_ID, "agent": "rag_agent", "depends_on": []}],
+        "compose_goal": "",
+    }
+    step_results = {
+        MULTI_HOP_STEP_ID: {
+            "status": STEP_STATUS_SUCCEEDED,
+            "output": "partial answer",
+            "citations": [],
+            "meta": {"missing_coverage_sq_ids": ["sq2"]},
+        }
+    }
+    out = verifier_node(_state(plan=plan, step_results=step_results))
+    assert RISK_WARN_MULTI_HOP_COVERAGE in out["verification"]["risk_warnings"]
+
+
+def test_verifier_multi_hop_full_coverage_no_warning() -> None:
+    """missing_coverage_sq_ids 为空 → 不追加 coverage 风险码。"""
+
+    plan = {
+        "task_type": TASK_TYPE_MULTI_HOP_RAG,
+        "steps": [{"id": MULTI_HOP_STEP_ID, "agent": "rag_agent", "depends_on": []}],
+        "compose_goal": "",
+    }
+    step_results = {
+        MULTI_HOP_STEP_ID: {
+            "status": STEP_STATUS_SUCCEEDED,
+            "output": "ok",
+            "citations": [],
+            "meta": {"missing_coverage_sq_ids": []},
+        }
+    }
+    out = verifier_node(_state(plan=plan, step_results=step_results))
+    assert RISK_WARN_MULTI_HOP_COVERAGE not in out["verification"]["risk_warnings"]

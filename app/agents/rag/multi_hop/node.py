@@ -29,6 +29,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+from typing import Any
 
 from app.agents.rag.answer_flow import (
     answer_with_doc_hits,
@@ -57,9 +58,11 @@ from app.constants.multi_hop import (
     MAX_HOPS,
     MAX_SUBQUERIES,
     MAX_TOTAL_CHUNKS,
+    MULTI_HOP_STEP_ID,
 )
 from app.constants.routes import ROUTE_MULTI_HOP_AGENT
 from app.constants.workflow import (
+    STEP_AGENT_RAG,
     STEP_STATUS_FAILED,
     STEP_STATUS_SUCCEEDED,
     TASK_TYPE_MULTI_HOP_RAG,
@@ -75,8 +78,8 @@ from app.utils.logger import log_node, now_ms, preview
 # `multi_hop_plan.subqueries[*]` 只登记这几个 key，避免 State 体积膨胀与全文泄漏。
 _PLAN_SUBQUERY_KEEP_KEYS = ("id", "intent", "query")
 
-# Multi-hop pseudo-step 固定 id，与 §4.1 对齐；Composer 以后按此 id 直通。
-_MULTI_HOP_STEP_ID = "mh1"
+# Multi-hop pseudo-step 固定 id 在 `app/constants/multi_hop.py:MULTI_HOP_STEP_ID`
+# 统一维护，Composer / Verifier / eval 共享同一常量，避免字面量副本。
 
 # debug_info 下的多跳分层 key，集中在此避免各处散落字面量。
 _DEBUG_KEY = "multi_hop"
@@ -208,6 +211,45 @@ def _build_plan_summary(decompose: DecomposeResult) -> dict:
     }
 
 
+def _build_chunk_id_to_sq_ids(
+    evidence_groups: dict[str, EvidenceGroup],
+) -> dict[str, tuple[str, ...]]:
+    """chunk_id → 出现过的 sq_id 元组（稳定有序）。
+
+    Composer 的 `_build_citations_from_mh` 会读 citation.subquery_ids 做展示；
+    refine loop 可能让同一 chunk 被多个 sq 引用，所以这里保留全部关联 sq。
+    """
+
+    mapping: dict[str, list[str]] = {}
+    for sq_id, group in evidence_groups.items():
+        for chunk in group.chunks:
+            chunk_id = chunk.chunk_id
+            if not chunk_id:
+                continue
+            bucket = mapping.setdefault(chunk_id, [])
+            if sq_id not in bucket:
+                bucket.append(sq_id)
+    return {cid: tuple(ids) for cid, ids in mapping.items()}
+
+
+def _annotate_citations_with_subquery_ids(
+    citations: list[dict],
+    chunk_id_to_sq_ids: dict[str, tuple[str, ...]],
+) -> list[dict]:
+    """给 citation 补 `subquery_ids` 字段（空时写 ())，保持字段齐整。
+
+    Composer/前端据此展示 "[1] 资料来自 sq1, sq3"；非多跳链路没有该字段，
+    PR-4 的 `_build_citations_from_mh` 会按 `(doc_id, ref)` 合并。
+    """
+
+    enriched: list[dict] = []
+    for citation in citations:
+        chunk_id = citation.get("chunk_id", "")
+        sq_ids = chunk_id_to_sq_ids.get(chunk_id, ())
+        enriched.append({**citation, "subquery_ids": sq_ids})
+    return enriched
+
+
 def _evidence_group_to_dict(group: EvidenceGroup) -> dict:
     data = asdict(group)
     # preview 已在入口截断；这里再保险一次，避免后续改动漏 check。
@@ -239,7 +281,7 @@ def _pseudo_step(
     if extra:
         meta.update(extra)
     return {
-        "id": _MULTI_HOP_STEP_ID,
+        "id": MULTI_HOP_STEP_ID,
         "status": status,
         "output": output,
         "citations": citations,
@@ -651,31 +693,50 @@ def multi_hop_node(state: AgentState) -> AgentState:
     debug["answer_ms"] = ans_ms
     debug["selected_chunk_count"] = len(top_chunks)
 
+    # Phase 3 PR-4 契约：给每条 citation 打上 subquery_ids（保留 0..N 关联），
+    # 让 Composer 的 `_build_citations_from_mh` 可以按 (doc_id, ref) 合并展示。
+    citations = _annotate_citations_with_subquery_ids(
+        citations,
+        _build_chunk_id_to_sq_ids(evidence_groups),
+    )
+
+    # Phase 3 PR-4：把"哪些 sq 没召回任何 chunk"落到 step.meta，供 Verifier
+    # 直接消费（RISK_WARN_MULTI_HOP_COVERAGE）。不走 debug_info——debug 只做展示，
+    # 跨节点语义信号应该留在结构化状态里。
+    missing_coverage_sq_ids: list[str] = [
+        sq.id
+        for sq in subqueries
+        if not (evidence_groups.get(sq.id) and evidence_groups[sq.id].chunks)
+    ]
+
     # 状态判定：gap 未闭合 → PARTIAL + budget_exceeded（有答案但覆盖不完整，
     # 由 Composer/前端据此提示用户"可能有子问题未回答"）；全部 sq 覆盖 ok →
     # SUCCEEDED。只要进到这里 full_chunks_pool 非空，就一定有证据可用。
     plan_ok = bool(last_refine_plan and last_refine_plan.ok)
+    mh_extra: dict = {}
+    if missing_coverage_sq_ids:
+        mh_extra["missing_coverage_sq_ids"] = missing_coverage_sq_ids
     if plan_ok:
         step = _pseudo_step(
             status=STEP_STATUS_SUCCEEDED,
             output=answer,
             citations=citations,
             hop_count=hop,
+            extra=mh_extra or None,
         )
         workflow_status = WORKFLOW_STATUS_SUCCEEDED
     else:
         debug["degrade_reason"] = DEGRADE_REASON_BUDGET_EXCEEDED
+        mh_extra["final_plan_reason"] = (
+            last_refine_plan.reason if last_refine_plan else ""
+        )
         step = _pseudo_step(
             status=STEP_STATUS_SUCCEEDED if answer else STEP_STATUS_FAILED,
             output=answer,
             citations=citations,
             hop_count=hop,
             degrade_reason=DEGRADE_REASON_BUDGET_EXCEEDED,
-            extra={
-                "final_plan_reason": (
-                    last_refine_plan.reason if last_refine_plan else ""
-                ),
-            },
+            extra=mh_extra,
         )
         workflow_status = WORKFLOW_STATUS_PARTIAL if answer else WORKFLOW_STATUS_FAILED
 
@@ -714,7 +775,30 @@ def _finalize(
     if errors:
         debug_payload["errors"] = errors
 
+    # 统一 State 契约：Composer / Verifier 只读 `state["plan"]`。
+    # multi-hop 没有真实 plan，这里合成一条 pseudo plan，只包含 mh1 一条 step：
+    # - 让 Composer 的 `task_type == multi_hop_rag` 直通分支命中；
+    # - 让 Verifier 的 `not steps` early-return 不再吞掉 multi-hop 路径，
+    #   使 `_check_multi_hop_coverage` 可以执行。
+    # `multi_hop_plan`（去字面化的 subqueries 摘要）仍单独透传给 debug / eval。
+    pseudo_plan: dict[str, Any] = {
+        "task_type": TASK_TYPE_MULTI_HOP_RAG,
+        "steps": [
+            {
+                "id": step["id"],
+                "agent": STEP_AGENT_RAG,
+                "purpose": "multi_hop_rag",
+                "tool": None,
+                "args": {},
+                "query": None,
+                "depends_on": [],
+            }
+        ],
+        "compose_goal": "",
+    }
+
     next_state: AgentState = {
+        "plan": pseudo_plan,
         "multi_hop_plan": multi_hop_plan,
         "hop_count": hop_count,
         "workflow_status": workflow_status,

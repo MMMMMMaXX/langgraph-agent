@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from app.agents.composer_agent import composer_node
 from app.auth.context import AuthContext
+from app.constants.multi_hop import (
+    DEGRADE_NOTICE_LABELS,
+    DEGRADE_REASON_BUDGET_EXCEEDED,
+    MULTI_HOP_STEP_ID,
+)
 from app.constants.workflow import (
     COMPOSER_FALLBACK_ALL_FAILED,
     COMPOSER_FALLBACK_NEED_CLARIFICATION,
@@ -18,6 +23,7 @@ from app.constants.workflow import (
     STEP_STATUS_NEED_CONFIRMATION,
     STEP_STATUS_SKIPPED,
     STEP_STATUS_SUCCEEDED,
+    TASK_TYPE_MULTI_HOP_RAG,
     WORKFLOW_STATUS_FAILED,
     WORKFLOW_STATUS_NEED_CLARIFICATION,
     WORKFLOW_STATUS_NEED_CONFIRMATION,
@@ -350,3 +356,113 @@ def test_composer_emits_answer_via_stream_callback(monkeypatch) -> None:
     assert out.get("streamed_answer") is True
     chunks = [p for e, p in captured if e == "chunk"]
     assert chunks and chunks[0]["delta"] == out["answer"]
+
+
+# ---------------------------- multi-hop passthrough (PR-4) ----------------------------
+
+
+def _mh_plan() -> dict:
+    # multi-hop plan 的 steps 只有一个 pseudo-step；Composer 直通路径不遍历它。
+    return {
+        "task_type": TASK_TYPE_MULTI_HOP_RAG,
+        "steps": [{"id": MULTI_HOP_STEP_ID, "agent": "rag_agent", "depends_on": []}],
+        "compose_goal": "",
+    }
+
+
+def test_composer_multi_hop_passthrough_preserves_answer_verbatim() -> None:
+    """multi-hop 分支直接透传 step_results[mh1].output，不走二次合成。"""
+
+    fixed_answer = "这是 multi-hop 给出的终稿答案[1][2]。"
+    step_results = {
+        MULTI_HOP_STEP_ID: {
+            "status": STEP_STATUS_SUCCEEDED,
+            "output": fixed_answer,
+            "citations": [],
+            "meta": {},
+        }
+    }
+    out = composer_node(_state(plan=_mh_plan(), step_results=step_results))
+    assert out["answer"] == fixed_answer
+    composer = out["agent_outputs"][COMPOSER_OUTPUT_KEY]
+    # 单条 mh 摘要，不展开 subqueries
+    assert [a["step"] for a in composer["completed_actions"]] == [MULTI_HOP_STEP_ID]
+
+
+def test_composer_multi_hop_partial_appends_degrade_notice() -> None:
+    """PARTIAL + degrade_reason=budget_exceeded → 末尾追加对应中文提示。"""
+
+    step_results = {
+        MULTI_HOP_STEP_ID: {
+            "status": STEP_STATUS_SUCCEEDED,
+            "output": "部分答案。",
+            "citations": [],
+            "meta": {"degrade_reason": "budget_exceeded"},
+        }
+    }
+    out = composer_node(
+        _state(
+            plan=_mh_plan(),
+            step_results=step_results,
+            workflow_status=WORKFLOW_STATUS_PARTIAL,
+        )
+    )
+    assert DEGRADE_NOTICE_LABELS[DEGRADE_REASON_BUDGET_EXCEEDED] in out["answer"]
+    assert out["answer"].startswith("部分答案。")
+
+
+def test_composer_multi_hop_citations_merge_subquery_ids() -> None:
+    """同 (doc_id, ref) 的多 citations 应合并为一条并合并 subquery_ids。"""
+
+    step_results = {
+        MULTI_HOP_STEP_ID: {
+            "status": STEP_STATUS_SUCCEEDED,
+            "output": "ok",
+            "citations": [
+                {
+                    "ref": "1",
+                    "doc_id": "d1",
+                    "chunk_id": "c1",
+                    "subquery_ids": ("sq1",),
+                },
+                {
+                    "ref": "1",
+                    "doc_id": "d1",
+                    "chunk_id": "c1",
+                    "subquery_ids": ("sq3",),
+                },
+                {
+                    "ref": "2",
+                    "doc_id": "d2",
+                    "chunk_id": "c2",
+                    "subquery_ids": ("sq2",),
+                },
+            ],
+            "meta": {},
+        }
+    }
+    out = composer_node(_state(plan=_mh_plan(), step_results=step_results))
+    citations = out["agent_outputs"][COMPOSER_OUTPUT_KEY]["citations"]
+    assert len(citations) == 2
+    merged = next(c for c in citations if c["doc_id"] == "d1")
+    assert merged["subquery_ids"] == ("sq1", "sq3")
+    assert merged["step"] == MULTI_HOP_STEP_ID
+
+
+def test_composer_non_multi_hop_task_ignores_mh_branch() -> None:
+    """task_type != multi_hop_rag → 正常 _compose_success_answer 路径不受影响。"""
+
+    plan = _plan([_tool_step("s1", "get_weather")])
+    step_results = {
+        "s1": {"status": STEP_STATUS_SUCCEEDED, "output": "北京晴。"},
+        # 哪怕 step_results 里偶然带 mh1，没有 task_type 也不应命中透传
+        MULTI_HOP_STEP_ID: {
+            "status": STEP_STATUS_SUCCEEDED,
+            "output": "不该出现",
+            "citations": [],
+            "meta": {},
+        },
+    }
+    out = composer_node(_state(plan=plan, step_results=step_results))
+    assert "北京晴" in out["answer"]
+    assert "不该出现" not in out["answer"]

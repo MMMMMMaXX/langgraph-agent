@@ -25,6 +25,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.constants.multi_hop import (
+    DEGRADE_NOTICE_FALLBACK,
+    DEGRADE_NOTICE_LABELS,
+    MULTI_HOP_STEP_ID,
+)
 from app.constants.workflow import (
     COMPOSER_FALLBACK_ALL_FAILED,
     COMPOSER_FALLBACK_NEED_CLARIFICATION,
@@ -39,6 +44,7 @@ from app.constants.workflow import (
     STEP_STATUS_NEED_CONFIRMATION,
     STEP_STATUS_SKIPPED,
     STEP_STATUS_SUCCEEDED,
+    TASK_TYPE_MULTI_HOP_RAG,
     WORKFLOW_STATUS_FAILED,
     WORKFLOW_STATUS_NEED_CLARIFICATION,
     WORKFLOW_STATUS_NEED_CONFIRMATION,
@@ -164,6 +170,65 @@ def _build_citations(
     return flattened
 
 
+def _build_citations_from_mh(
+    mh_citations: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Multi-hop 专用 citations 合并器。
+
+    与 `_build_citations` 的区别：
+    - multi-hop 只有一条 pseudo-step（MULTI_HOP_STEP_ID），不做 step 级聚合。
+    - 同一 `(doc_id, ref)` 可能被多个子查询共享，这里做合并而不是丢弃后者，
+      把 `subquery_ids` 元组合并去重，让前端可以展示"[1] 资料来自 sq1 / sq3"。
+    - 不引入 `section_title`（多跳 citations 目前不带该字段，强加反而误导）。
+
+    输出结构：`{step, ref, doc_id, chunk_id, doc_title, source, subquery_ids}`
+    step 固定为 `MULTI_HOP_STEP_ID`，便于前端按统一 schema 聚合。
+    """
+
+    merged: dict[tuple[str, str], dict[str, Any]] = {}
+    order: list[tuple[str, str]] = []
+    for citation in mh_citations:
+        ref = str(citation.get("ref") or "")
+        doc_id = str(citation.get("doc_id") or "")
+        key = (doc_id, ref)
+        sq_ids = tuple(citation.get("subquery_ids") or ())
+        if key not in merged:
+            merged[key] = {
+                "step": MULTI_HOP_STEP_ID,
+                "ref": ref,
+                "doc_id": doc_id,
+                "chunk_id": citation.get("chunk_id", ""),
+                "doc_title": citation.get("doc_title", ""),
+                "source": citation.get("source", ""),
+                "subquery_ids": sq_ids,
+            }
+            order.append(key)
+        elif sq_ids:
+            # 合并：保留出现顺序，去重 sq_id
+            existing = list(merged[key]["subquery_ids"])
+            for sq_id in sq_ids:
+                if sq_id not in existing:
+                    existing.append(sq_id)
+            merged[key]["subquery_ids"] = tuple(existing)
+    return [merged[k] for k in order]
+
+
+def _append_degrade_notice(answer: str, degrade_reason: str) -> str:
+    """给 multi-hop PARTIAL / degraded 的 answer 末尾追加中文提示。
+
+    文案来自 `DEGRADE_NOTICE_LABELS`（按 reason 查表），未登记的 reason 回退
+    到 `DEGRADE_NOTICE_FALLBACK`。空 answer 直接返回提示本身，避免 UI 空白。
+    """
+
+    notice = DEGRADE_NOTICE_LABELS.get(degrade_reason, DEGRADE_NOTICE_FALLBACK)
+    if not answer:
+        return notice
+    if notice in answer:
+        # 幂等：上游偶尔会重复调用（eval 回放），避免提示堆叠
+        return answer
+    return f"{answer.rstrip()}\n\n{notice}"
+
+
 def _collect_step_failures(
     steps: list[dict[str, Any]],
     step_results: dict[str, dict[str, Any]],
@@ -265,6 +330,110 @@ def _emit_answer(state: AgentState, answer: str) -> bool:
     return True
 
 
+def _compose_multi_hop_passthrough(
+    *,
+    state: AgentState,
+    step_results: dict[str, dict[str, Any]],
+    verification: dict[str, Any],
+    pending_confirmation: dict[str, Any],
+    workflow_status: str,
+    risk_codes: list[str],
+    missing_fields: list[str],
+) -> AgentState:
+    """multi_hop_node → Composer 的直通合成分支（§7.1）。
+
+    硬契约：
+    - answer 来自 `step_results[MULTI_HOP_STEP_ID].output`，不做二次合成；
+    - citations 经 `_build_citations_from_mh` 按 (doc_id, ref) 合并 subquery_ids；
+    - WORKFLOW_STATUS_PARTIAL 或 step.meta.degrade_reason 非空 → 追加降级提示；
+    - completed_actions 降级为单条 mh 摘要（sentence-level 展示不刷屏）。
+
+    这里禁止读 plan.steps 循环——multi-hop 只有一条 pseudo-step，其他都是
+    空架子，走 `_build_completed_actions`/`_build_citations` 反而会漏 citations。
+    """
+
+    mh = step_results.get(MULTI_HOP_STEP_ID) or {}
+    mh_meta = mh.get("meta") or {}
+    answer = str(mh.get("output") or "")
+    degrade_reason = str(mh_meta.get("degrade_reason") or "")
+
+    # PARTIAL 或显式降级：追加提示；全成功路径保持原文
+    degraded = workflow_status == WORKFLOW_STATUS_PARTIAL or bool(degrade_reason)
+    if degraded:
+        answer = _append_degrade_notice(answer, degrade_reason)
+    if not answer:
+        answer = COMPOSER_FALLBACK_ALL_FAILED
+
+    # 风险提示统一附加（与主分支一致，保持前端 UI 契约）
+    risk_texts = _build_risk_warning_texts(risk_codes)
+    if risk_texts:
+        answer = answer.rstrip() + "\n" + "\n".join(f"- {t}" for t in risk_texts)
+
+    citations = _build_citations_from_mh(list(mh.get("citations") or []))
+    pending_confirmations = _build_pending_confirmations(pending_confirmation)
+
+    # 单条 mh 摘要：便于前端显示"已执行多跳检索"这一抽象动作，
+    # 不展开 subqueries 细节（那部分属于 debug_info，不进 agent_outputs）
+    completed_actions: list[dict[str, Any]] = []
+    if mh.get("status") == STEP_STATUS_SUCCEEDED and answer:
+        completed_actions.append(
+            {
+                "step": MULTI_HOP_STEP_ID,
+                "agent": STEP_AGENT_RAG,
+                "tool": "",
+                "purpose": "multi_hop_rag",
+                "summary": preview(str(mh.get("output") or ""), 200),
+            }
+        )
+
+    composer_output: dict[str, Any] = {
+        "answer": answer,
+        "completed_actions": completed_actions,
+        "pending_confirmations": pending_confirmations,
+        "missing_information": missing_fields,
+        "citations": citations,
+        "risk_warnings": risk_texts,
+        "workflow_status": workflow_status,
+    }
+
+    streamed = _emit_answer(state, answer)
+
+    next_state: AgentState = {
+        "answer": answer,
+        "agent_outputs": {COMPOSER_OUTPUT_KEY: composer_output},
+        "debug_info": {
+            NODE_COMPOSER: {
+                "plan_id": state.get("plan_id", ""),
+                "workflow_status": workflow_status,
+                "completed_action_count": len(completed_actions),
+                "pending_confirmation_count": len(pending_confirmations),
+                "missing_fields": missing_fields,
+                "risk_warnings": risk_texts,
+                "streamed_answer": streamed,
+                "final_answer_preview": preview(answer, 160),
+                "multi_hop_passthrough": True,
+                "degrade_reason": degrade_reason,
+            }
+        },
+    }
+    if streamed:
+        next_state["streamed_answer"] = True
+
+    log_state = {**state, **next_state}
+    log_node(
+        NODE_COMPOSER,
+        log_state,
+        extra={
+            "planId": state.get("plan_id", ""),
+            "workflowStatus": workflow_status,
+            "multiHopPassthrough": True,
+            "degradeReason": degrade_reason,
+            "finalAnswerPreview": preview(answer, 160),
+        },
+    )
+    return next_state
+
+
 def composer_node(state: AgentState) -> AgentState:
     """Composer 主节点。
 
@@ -282,6 +451,23 @@ def composer_node(state: AgentState) -> AgentState:
 
     risk_codes = list(verification.get("risk_warnings") or [])
     missing_fields = list(verification.get("missing_fields") or [])
+
+    # --- 分支 0：Multi-hop 直通 ---
+    # multi_hop_node 已经用全量 chunks 生成终稿 answer，并把 pseudo-step 写到
+    # `step_results[MULTI_HOP_STEP_ID]`。这里**禁止**走 `_compose_success_answer`
+    # 二次合成（它只能看到 preview，会把 faithfulness 搞砸）。直接原样透传，
+    # degraded / PARTIAL 时末尾追加中文提示；citations 走专用合并器保留
+    # subquery_ids，以便前端展示"[N] 资料来自 sq1、sq3"。
+    if plan.get("task_type") == TASK_TYPE_MULTI_HOP_RAG:
+        return _compose_multi_hop_passthrough(
+            state=state,
+            step_results=step_results,
+            verification=verification,
+            pending_confirmation=pending_confirmation,
+            workflow_status=workflow_status,
+            risk_codes=risk_codes,
+            missing_fields=missing_fields,
+        )
 
     # --- 分支 1：Planner 失败（plan 为空） ---
     if not steps:

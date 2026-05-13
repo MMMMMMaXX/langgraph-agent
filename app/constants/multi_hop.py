@@ -120,8 +120,31 @@ DEGRADE_REASON_BUDGET_EXCEEDED: Final[str] = "budget_exceeded"
 DEGRADE_REASON_EVIDENCE_EMPTY: Final[str] = "evidence_empty"
 DEGRADE_REASON_ANSWER_LLM_FAILED: Final[str] = "answer_llm_failed"
 
+# PARTIAL 答案末尾追加的用户可见中文提示。Composer 的 `_append_degrade_notice`
+# 按 degrade_reason 查此表；未登记的 reason 回退到通用提示，避免静默丢信号。
+DEGRADE_NOTICE_LABELS: Final[dict[str, str]] = {
+    DEGRADE_REASON_BUDGET_EXCEEDED: (
+        "提示：受多跳预算限制，部分子问题可能未覆盖完整，答案仅基于已检索到的证据。"
+    ),
+    DEGRADE_REASON_DECOMPOSE_FAILED: (
+        "提示：问题拆解失败，已回落到单跳检索，答案可能不如多跳推理全面。"
+    ),
+    DEGRADE_REASON_EVIDENCE_EMPTY: ("提示：未检索到足够证据，以下内容仅供参考。"),
+    DEGRADE_REASON_ANSWER_LLM_FAILED: ("提示：答案生成过程异常，已尽力返回可用信息。"),
+}
+DEGRADE_NOTICE_FALLBACK: Final[str] = "提示：本次回答存在降级，内容可能不完整。"
+
+# ---- step_results key ----------------------------------------------------
+
+# multi_hop_node 把 pseudo-step 写入 `step_results[MULTI_HOP_STEP_ID]`；
+# Composer 的直通分支、Verifier 的 coverage 检查、eval 断言都读同一个 key，
+# 避免字面量"mh1"散落各处。
+MULTI_HOP_STEP_ID: Final[str] = "mh1"
+
 
 __all__ = [
+    "DEGRADE_NOTICE_FALLBACK",
+    "DEGRADE_NOTICE_LABELS",
     "DEGRADE_REASON_ANSWER_LLM_FAILED",
     "DEGRADE_REASON_BUDGET_EXCEEDED",
     "DEGRADE_REASON_DECOMPOSE_FAILED",
@@ -136,6 +159,7 @@ __all__ = [
     "MIN_CHUNK_SCORE",
     "MIN_DOCS_MULTI",
     "MULTI_HOP_NEGATIVE_GATES",
+    "MULTI_HOP_STEP_ID",
     "MULTI_HOP_TRIGGERS",
     "PER_SUBQUERY_OK_THRESHOLD",
     "QUERY_CLASS_MULTI_HOP",
