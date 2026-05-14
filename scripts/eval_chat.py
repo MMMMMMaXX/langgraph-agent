@@ -12,6 +12,7 @@ import contextlib
 import csv
 import io
 import json
+import fnmatch
 import os
 import re
 import sys
@@ -78,8 +79,13 @@ def filter_cases(cases: list[dict]) -> list[dict]:
     if not case_ids:
         return cases
 
-    selected_ids = {item.strip() for item in case_ids.split(",") if item.strip()}
-    return [case for case in cases if case["id"] in selected_ids]
+    patterns = [item.strip() for item in case_ids.split(",") if item.strip()]
+    # 支持 glob（例如 multihop_*）以及精确 id，两种可以混用。
+    return [
+        case
+        for case in cases
+        if any(fnmatch.fnmatchcase(case["id"], pat) for pat in patterns)
+    ]
 
 
 def extract_scalar(log_text: str, key: str) -> str:
@@ -895,6 +901,52 @@ def collect_workflow_metrics(
     return metrics
 
 
+def collect_multi_hop_metrics(debug_nodes: dict) -> dict[str, str]:
+    """提取 multi_hop_agent 的分层指标，仅在 multi_hop_agent 出现在 debug_nodes 时生效。
+
+    - decompose_ms: 拆解耗时
+    - hop_count: 实际 refine 次数（1 表示未 refine）
+    - global_coverage: 整体覆盖率（0-1）
+    - retrieval_ms_total: 所有 subquery 检索耗时累加
+    - subquery_count: 子问题数量
+    - per_subquery_coverage_avg: 子问题平均覆盖率
+    - answer_strategy: multi_hop / passthrough / degrade_*
+
+    仅 category=multi_hop* 的 case 有此输出，其他 case 返回空。
+    """
+
+    mh_debug = (debug_nodes.get("multi_hop_agent") or {}).get("multi_hop") or {}
+    if not mh_debug:
+        return {}
+
+    retrieval_ms_map = mh_debug.get("retrieval_ms_per_subquery") or {}
+    retrieval_ms_total = (
+        round(sum(float(v) for v in retrieval_ms_map.values()), 2)
+        if retrieval_ms_map
+        else 0.0
+    )
+    coverage_map = mh_debug.get("per_subquery_coverage") or {}
+    per_sq_cov_avg = (
+        round(sum(float(v) for v in coverage_map.values()) / len(coverage_map), 3)
+        if coverage_map
+        else 0.0
+    )
+
+    return {
+        "mh_decompose_ms": format_ms(mh_debug.get("decompose_ms")),
+        "mh_hop_count": str(mh_debug.get("hop_count", "")),
+        "mh_global_coverage": (
+            f"{float(mh_debug.get('global_coverage', 0.0)):.3f}"
+            if mh_debug.get("global_coverage") is not None
+            else "-"
+        ),
+        "mh_retrieval_ms_total": format_ms(retrieval_ms_total),
+        "mh_subquery_count": str(len(retrieval_ms_map) or len(coverage_map)),
+        "mh_per_subquery_coverage_avg": f"{per_sq_cov_avg:.3f}",
+        "mh_answer_strategy": str(mh_debug.get("answer_strategy") or ""),
+    }
+
+
 def run_single_step_case(client, case: dict) -> dict:
     capture = io.StringIO()
     started_at = time.perf_counter()
@@ -947,6 +999,7 @@ def run_single_step_case(client, case: dict) -> dict:
     retrieval_eval = build_retrieval_eval(case, debug_nodes, answer)
     tool_safety_metrics = collect_tool_safety_metrics(case, [], payload)
     workflow_metrics = collect_workflow_metrics(case, debug_nodes, payload, [])
+    multi_hop_metrics = collect_multi_hop_metrics(debug_nodes)
 
     return {
         "id": case["id"],
@@ -978,6 +1031,7 @@ def run_single_step_case(client, case: dict) -> dict:
         **retrieval_eval,
         **tool_safety_metrics,
         **workflow_metrics,
+        **multi_hop_metrics,
         "debug_nodes": debug_nodes,
         "answer": answer,
         "detail": payload.get("detail", ""),
@@ -1134,6 +1188,34 @@ def summarize_results(results: list[dict]) -> dict:
             "rate": (hits / total_field * 100) if total_field else 0.0,
         }
 
+    # Phase 3 multi-hop 指标：只聚合真实走过 multi_hop_agent 的 case
+    # （通过 mh_hop_count 是否存在判定，避免 negative-gate case 污染分母）。
+    mh_cases = [
+        item for item in results if item.get("mh_hop_count") not in (None, "", "-")
+    ]
+    if mh_cases:
+
+        def _avg(field: str) -> float:
+            values = []
+            for item in mh_cases:
+                val = item.get(field)
+                try:
+                    values.append(float(str(val).replace("ms", "")))
+                except (TypeError, ValueError):
+                    continue
+            return sum(values) / len(values) if values else 0.0
+
+        multi_hop_stats = {
+            "total": len(mh_cases),
+            "avg_decompose_ms": _avg("mh_decompose_ms"),
+            "avg_retrieval_ms_total": _avg("mh_retrieval_ms_total"),
+            "avg_hop_count": _avg("mh_hop_count"),
+            "avg_global_coverage": _avg("mh_global_coverage"),
+            "avg_per_subquery_coverage": _avg("mh_per_subquery_coverage_avg"),
+        }
+    else:
+        multi_hop_stats = {}
+
     return {
         "total": total,
         "passed": passed,
@@ -1152,6 +1234,7 @@ def summarize_results(results: list[dict]) -> dict:
         },
         "tool_safety_stats": tool_safety_stats,
         "workflow_stats": workflow_stats,
+        "multi_hop_stats": multi_hop_stats,
     }
 
 
@@ -1222,6 +1305,20 @@ def print_summary(results: list[dict]) -> None:
             print(
                 f"{field}={stats['rate']:.1f}% " f"({stats['hits']}/{stats['total']})"
             )
+
+    multi_hop_stats = summary.get("multi_hop_stats") or {}
+    if multi_hop_stats.get("total"):
+        print("\nMulti-hop")
+        print("---------")
+        print(f"cases={multi_hop_stats['total']}")
+        print(f"avg_decompose_ms={multi_hop_stats['avg_decompose_ms']:.2f}")
+        print(f"avg_retrieval_ms_total={multi_hop_stats['avg_retrieval_ms_total']:.2f}")
+        print(f"avg_hop_count={multi_hop_stats['avg_hop_count']:.2f}")
+        print(f"avg_global_coverage={multi_hop_stats['avg_global_coverage']:.3f}")
+        print(
+            f"avg_per_subquery_coverage="
+            f"{multi_hop_stats['avg_per_subquery_coverage']:.3f}"
+        )
 
     print("\nFailures")
     print("--------")
@@ -1299,6 +1396,13 @@ def write_csv_output(results: list[dict], path: Path) -> None:
         "plan_schema_pass_rate",
         "workflow_success_rate",
         "confirmation_bridge_rate",
+        "mh_decompose_ms",
+        "mh_hop_count",
+        "mh_global_coverage",
+        "mh_retrieval_ms_total",
+        "mh_subquery_count",
+        "mh_per_subquery_coverage_avg",
+        "mh_answer_strategy",
         "assertion",
         "assertion_detail",
         "answer",

@@ -502,5 +502,146 @@
         }
       }
     ]
+  },
+  {
+    "id": "multihop_cross_doc_chain",
+    "category": "multi_hop",
+    "session_id": "eval-multihop-cross-doc-chain",
+    "setup_knowledge_imports": [
+      {
+        "alias": "mh_rag_doc",
+        "title": "RAG 实战分享",
+        "source": "what-is-rag.md",
+        "source_type": "md",
+        "content_path": "scripts/eval_fixtures/what-is-rag.md"
+      },
+      {
+        "alias": "mh_agent_doc",
+        "title": "Agent 怎么设计",
+        "source": "how-design-agent.md",
+        "source_type": "md",
+        "content_path": "scripts/eval_fixtures/how-design-agent.md"
+      }
+    ],
+    "message": "基于 RAG 的检索要点和 Agent 的循环机制，设计一个带检索能力的 Agent 架构方案",
+    "expected_route": "multi_hop_agent",
+    "expected_import_aliases": ["mh_rag_doc", "mh_agent_doc"],
+    "must_include": ["RAG", "Agent"],
+    "must_not_include": ["资料不足", "工具暂时无法处理"]
+  },
+  {
+    "id": "multihop_scheme_generation",
+    "category": "multi_hop",
+    "session_id": "eval-multihop-scheme-generation",
+    "setup_knowledge_imports": [
+      {
+        "alias": "mh_rag_doc",
+        "title": "RAG 实战分享",
+        "source": "what-is-rag.md",
+        "source_type": "md",
+        "content_path": "scripts/eval_fixtures/what-is-rag.md"
+      },
+      {
+        "alias": "mh_openai_doc",
+        "title": "OpenAI 多 Agent 系统设计",
+        "source": "openAI-muliti-agents-design.md",
+        "source_type": "md",
+        "content_path": "scripts/eval_fixtures/openAI-muliti-agents-design.md"
+      }
+    ],
+    "message": "基于 RAG 的检索流程和 OpenAI Agents SDK 的多 Agent 架构，设计一个可落地的知识问答多 Agent 方案",
+    "expected_route": "multi_hop_agent",
+    "expected_import_aliases": ["mh_rag_doc", "mh_openai_doc"],
+    "must_include": ["RAG"],
+    "must_not_include": ["资料不足"]
+  },
+  {
+    "id": "multihop_negative_gate_simple_compare",
+    "category": "multi_hop_gate",
+    "session_id": "eval-multihop-neg-gate-compare",
+    "setup_knowledge_imports": [
+      {
+        "alias": "mh_rag_doc",
+        "title": "RAG 实战分享",
+        "source": "what-is-rag.md",
+        "source_type": "md",
+        "content_path": "scripts/eval_fixtures/what-is-rag.md"
+      },
+      {
+        "alias": "mh_agent_doc",
+        "title": "Agent 怎么设计",
+        "source": "how-design-agent.md",
+        "source_type": "md",
+        "content_path": "scripts/eval_fixtures/how-design-agent.md"
+      }
+    ],
+    "message": "RAG 和 Agent 有什么区别？",
+    "expected_route": "rag_agent",
+    "expected_import_aliases": ["mh_rag_doc", "mh_agent_doc"],
+    "must_not_include": ["资料不足"]
+  },
+  {
+    "id": "multihop_negative_gate_definition_query",
+    "category": "multi_hop_gate",
+    "session_id": "eval-multihop-neg-gate-definition",
+    "setup_knowledge_imports": [
+      {
+        "alias": "mh_rag_doc",
+        "title": "RAG 实战分享",
+        "source": "what-is-rag.md",
+        "source_type": "md",
+        "content_path": "scripts/eval_fixtures/what-is-rag.md"
+      }
+    ],
+    "message": "什么是 RAG？",
+    "expected_route": "rag_agent",
+    "expected_import_aliases": ["mh_rag_doc"],
+    "must_not_include": ["资料不足"]
+  },
+  {
+    "id": "multihop_composer_passthrough",
+    "category": "multi_hop",
+    "session_id": "eval-multihop-composer-passthrough",
+    "setup_knowledge_imports": [
+      {
+        "alias": "mh_rag_doc",
+        "title": "RAG 实战分享",
+        "source": "what-is-rag.md",
+        "source_type": "md",
+        "content_path": "scripts/eval_fixtures/what-is-rag.md"
+      },
+      {
+        "alias": "mh_openai_doc",
+        "title": "OpenAI 多 Agent 系统设计",
+        "source": "openAI-muliti-agents-design.md",
+        "source_type": "md",
+        "content_path": "scripts/eval_fixtures/openAI-muliti-agents-design.md"
+      }
+    ],
+    "message": "结合 RAG 检索策略和 OpenAI 多 Agent 架构，设计一个可落地的知识问答 Agent",
+    "expected_route": "multi_hop_agent",
+    "expected_import_aliases": ["mh_rag_doc", "mh_openai_doc"],
+    "must_not_include": ["资料不足"],
+    "debug_must_equal": {
+      "composer.multi_hop_passthrough": true
+    }
+  },
+  {
+    "id": "multihop_budget_degrades_gracefully",
+    "category": "multi_hop",
+    "session_id": "eval-multihop-budget-degrade",
+    "setup_knowledge_imports": [
+      {
+        "alias": "mh_openclaw_doc",
+        "title": "OpenClaw 安全使用",
+        "source": "how-safely-use-openclaw.md",
+        "source_type": "md",
+        "content_path": "scripts/eval_fixtures/how-safely-use-openclaw.md"
+      }
+    ],
+    "message": "基于 OpenClaw 的安全使用要点和尚未登记的某个未知工具，生成跨系统安全改造方案",
+    "expected_route": "multi_hop_agent",
+    "expected_import_aliases": ["mh_openclaw_doc"],
+    "must_not_include": ["工具暂时无法处理"]
   }
 ]
