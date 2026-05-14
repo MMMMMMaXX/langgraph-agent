@@ -52,7 +52,9 @@ def route_after_supervisor(state: AgentState) -> str:
     if routes == [ROUTE_WORKFLOW]:
         return NODE_PLANNER
 
-    # Phase 3：multi-hop agent 作为独立 RAG 变体走 merge 分支。supervisor 的 gate
+    # Phase 3：multi-hop agent 作为独立 RAG 变体进入 Verifier → Composer。
+    # multi_hop_node 会写入 pseudo plan / step_results，后续节点可以像 workflow
+    # 一样做 coverage 校验与确定性直通合成。supervisor 的 gate
     # 保证 routes 要么是 [ROUTE_MULTI_HOP_AGENT] 要么退回 [ROUTE_RAG_AGENT]；不与
     # ROUTE_TOOL_AGENT 混合（multi-hop 命中的都是知识类 query）。
     if ROUTE_MULTI_HOP_AGENT in routes:
@@ -186,7 +188,9 @@ builder.add_edge(NODE_VERIFIER, NODE_COMPOSER)
 builder.add_edge(NODE_COMPOSER, NODE_MEMORY)
 
 builder.add_edge(ROUTE_RAG_AGENT, NODE_MERGE)
-builder.add_edge(NODE_MULTI_HOP_AGENT, NODE_MERGE)
+# Multi-hop 已在节点内完成最终答案生成，后续只需要 Verifier 做 coverage
+# 风险检查，再由 Composer 的 multi_hop_passthrough 分支原样透传答案。
+builder.add_edge(NODE_MULTI_HOP_AGENT, NODE_VERIFIER)
 builder.add_edge(ROUTE_CHAT_AGENT, NODE_MERGE)
 builder.add_edge(ROUTE_NOVEL_SCRIPT_AGENT, NODE_MERGE)
 builder.add_edge(NODE_MERGE, NODE_MEMORY)

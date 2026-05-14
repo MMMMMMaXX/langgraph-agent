@@ -31,10 +31,13 @@ from app.agents.rag.types import (
 from app.chat_service import create_initial_state, run_chat_turn
 from app.constants.routes import (
     NODE_MEMORY,
+    NODE_MERGE,
     NODE_SUPERVISOR,
+    ROUTE_MULTI_HOP_AGENT,
     ROUTE_RAG_AGENT,
     ROUTE_TOOL_AGENT,
 )
+from app.constants.workflow import NODE_COMPOSER, NODE_VERIFIER
 from tests.conftest import make_tool_call
 
 
@@ -213,6 +216,116 @@ def test_e2e_rag_no_hits_falls_back_to_insufficient(
     assert result["answer"] == "资料不足"
     # answer 仍然被 memory_node 处理：assistant 消息被追加
     assert result["messages"][-1]["content"] == "资料不足"
+
+
+# ----------------------------- multi_hop_agent E2E -----------------------------
+
+
+def test_e2e_multi_hop_routes_through_verifier_and_composer(
+    monkeypatch: pytest.MonkeyPatch,
+    llm_stub,
+    isolate_memory_io,
+) -> None:
+    """multi-hop 真实 graph 拓扑必须经过 Verifier → Composer，而不是直接进 merge。
+
+    之前只有 `multi_hop_node -> composer_node` 的单元契约测试，绕开了 graph，
+    导致真实请求走 `multi_hop_agent -> merge -> memory` 时 composer passthrough
+    死代码无法被发现。这里从 `run_chat_turn` 入口驱动整张图，锁住拓扑。
+    """
+
+    from app.agents.rag.multi_hop import node as mh_mod
+    from app.agents.rag.multi_hop.gap import RefinePlan
+    from app.agents.rag.multi_hop.types import DecomposeResult, Subquery
+
+    subqueries = (
+        Subquery(id="sq1", intent="entity_lookup", query="RAG 检索要点"),
+        Subquery(id="sq2", intent="entity_lookup", query="Agent 循环机制"),
+    )
+
+    monkeypatch.setattr(
+        mh_mod,
+        "decompose_query",
+        lambda **_kwargs: DecomposeResult(
+            subqueries=subqueries,
+            degraded_to_single_hop=False,
+        ),
+    )
+    monkeypatch.setattr(
+        mh_mod,
+        "detect_gaps",
+        lambda **_kwargs: RefinePlan(
+            per_subquery=(),
+            new_subqueries=(),
+            per_subquery_coverage={sq.id: 1.0 for sq in subqueries},
+            global_coverage=1.0,
+            global_required=True,
+            ok=True,
+        ),
+    )
+
+    def fake_retrieve(query: str, **_kwargs) -> DocRetrievalResult:
+        doc_id = "rag-doc" if "RAG" in query else "agent-doc"
+        hit = {
+            "id": f"{doc_id}::chunk::0",
+            "doc_id": doc_id,
+            "doc_title": doc_id,
+            "source": "fixture.md",
+            "chunk_index": 0,
+            "content": f"{query} 的证据内容",
+            "score": 0.9,
+        }
+        return DocRetrievalResult(
+            docs=[hit],
+            filtered_docs=[hit],
+            doc_hits=[hit],
+            merged_doc_hits=[hit],
+            retrieval_debug={},
+            errors=[],
+            timings_ms={},
+        )
+
+    monkeypatch.setattr(mh_mod, "retrieve_docs_for_rag", fake_retrieve)
+    monkeypatch.setattr(
+        mh_mod,
+        "answer_with_doc_hits",
+        lambda **_kwargs: (
+            "multi-hop final answer [1] [2]",
+            [
+                {
+                    "ref": "[1]",
+                    "doc_id": "rag-doc",
+                    "chunk_id": "rag-doc::chunk::0",
+                    "doc_title": "rag-doc",
+                    "source": "fixture.md",
+                },
+                {
+                    "ref": "[2]",
+                    "doc_id": "agent-doc",
+                    "chunk_id": "agent-doc::chunk::0",
+                    "doc_title": "agent-doc",
+                    "source": "fixture.md",
+                },
+            ],
+            {"name": "multi_hop"},
+            {},
+            [],
+            1.0,
+        ),
+    )
+
+    state = create_initial_state("sess-multi-hop")
+    state["request_id"] = "req-mh"
+    result = run_chat_turn(
+        state,
+        "基于 RAG 检索要点和 Agent 循环机制，设计一个跨文档方案",
+    )
+
+    assert result["routes"] == [ROUTE_MULTI_HOP_AGENT]
+    assert result["answer"] == "multi-hop final answer [1] [2]"
+    assert NODE_VERIFIER in result["debug_info"]
+    assert NODE_COMPOSER in result["debug_info"]
+    assert result["debug_info"][NODE_COMPOSER]["multi_hop_passthrough"] is True
+    assert NODE_MERGE not in result["debug_info"]
 
 
 # ------------------------------ 多轮状态 E2E ------------------------------

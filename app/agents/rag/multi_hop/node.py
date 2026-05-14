@@ -12,7 +12,8 @@
 4. 从 full_chunks 里按 hybrid score 挑前 `MAX_TOTAL_CHUNKS` 条，走
    `answer_with_doc_hits` 生成最终 answer（策略固定为 `ANSWER_STRATEGY_MULTI_HOP`）。
 5. 合成 §4.1 的 pseudo-step 写入 `step_results["mh1"]`；同步把最终 answer 写到
-   `agent_outputs[ROUTE_MULTI_HOP_AGENT]`，让下游 merge 以现有方式消费。
+   `agent_outputs[ROUTE_MULTI_HOP_AGENT]`，再交给 Verifier / Composer 做覆盖校验
+   和直通合成。
 
 降级路径（不双写 agent_outputs）：
 - decompose 失败 → `run_single_hop_retrieval_answer(base_query)` + degrade_reason
