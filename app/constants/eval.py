@@ -87,3 +87,32 @@ EVAL_KNOWLEDGE_SQLITE_SUFFIX = ".knowledge.sqlite3"
 
 # Eval 输出后缀：每次评测独立的 Chroma 持久化目录。
 EVAL_CHROMA_DIR_SUFFIX = ".chroma"
+
+# Eval 输出后缀：每次评测的 manifest（运行元信息 + chroma 生命周期记录）。
+EVAL_MANIFEST_SUFFIX = ".manifest.json"
+
+# Eval 环境变量：保留 eval 自动创建的 Chroma 目录，便于失败排查。
+EVAL_KEEP_CHROMA_ENV = "EVAL_KEEP_CHROMA"
+
+# Eval manifest 字段：Chroma 目录路径与生命周期。
+EVAL_MANIFEST_CHROMA_PERSIST_DIR_KEY = "chroma_persist_dir"
+EVAL_MANIFEST_CHROMA_AUTO_CREATED_KEY = "chroma_auto_created"
+EVAL_MANIFEST_CHROMA_CLEANED_KEY = "chroma_cleaned"
+EVAL_MANIFEST_CHROMA_KEEP_REASON_KEY = "chroma_keep_reason"
+EVAL_MANIFEST_CHROMA_SIZE_BYTES_KEY = "chroma_size_bytes"
+# wrapper 在清理前/后分别记录目录大小：清理后会被覆写为 0，
+# 但仍想知道清理前 Chroma 真实占用，便于排查（chunks 与磁盘占用对比）。
+EVAL_MANIFEST_CHROMA_SIZE_BEFORE_KEY = "chroma_size_bytes_before_cleanup"
+EVAL_MANIFEST_CHROMA_SIZE_AFTER_KEY = "chroma_size_bytes_after_cleanup"
+EVAL_MANIFEST_RUN_STATUS_KEY = "run_status"
+EVAL_MANIFEST_RUN_STATUS_SUCCESS = "success"
+EVAL_MANIFEST_RUN_STATUS_FAILURE = "failure"
+EVAL_MANIFEST_RUN_STATUS_ERROR = "error"
+EVAL_MANIFEST_PASS_RATE_KEY = "pass_rate"
+EVAL_MANIFEST_TOTAL_KEY = "total_cases"
+EVAL_MANIFEST_FAILED_KEY = "failed_cases"
+
+# Chroma 保留原因常量。
+EVAL_CHROMA_KEEP_REASON_FAILURE = "failure"
+EVAL_CHROMA_KEEP_REASON_FLAG = "keep_flag"
+EVAL_CHROMA_KEEP_REASON_EXTERNAL = "external_persist_dir"

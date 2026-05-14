@@ -7,6 +7,7 @@
 # EVAL_CASE_IDS=aria_definition,virtual_list_definition \
 # ./.venv/bin/python scripts/eval_chat.py
 
+import argparse
 import ast
 import contextlib
 import csv
@@ -42,6 +43,21 @@ if "OPERATIONS_SQLITE_PATH" not in os.environ:
         Path(_eval_ops_dir) / "operations.sqlite3"
     )
 
+# Chroma 持久化目录隔离：直接 invoke eval_chat 时，反复 delete+upsert 会让生产
+# data/chroma 的 HNSW 段无界膨胀（实测可到 250GB+）。这里跟 OPERATIONS_SQLITE_PATH
+# 同模式，把 eval 默认指到独立 tempdir，run 完按 success/failure 决定是否清理。
+# 外部已显式设了 CHROMA_PERSIST_DIR（例如 run_eval_profile.py 包装器）的话尊重原值。
+# base-url 模式下 eval 走的是已启动服务的 Chroma，进程内的 CHROMA_PERSIST_DIR 不会
+# 被服务读取到，再建 tempdir 反而会让 manifest 误显示“清理了 live backend 的目录”。
+_EVAL_CHROMA_AUTO_CREATED = False
+_EVAL_BASE_URL_AT_IMPORT = os.environ.get("EVAL_BASE_URL", "").strip()
+if "CHROMA_PERSIST_DIR" not in os.environ and not _EVAL_BASE_URL_AT_IMPORT:
+    import tempfile as _tempfile
+
+    _eval_chroma_dir = _tempfile.mkdtemp(prefix="eval-chroma-")
+    os.environ["CHROMA_PERSIST_DIR"] = _eval_chroma_dir
+    _EVAL_CHROMA_AUTO_CREATED = True
+
 import app.api as api
 from app.constants.eval import (
     EVAL_BOOL_FALSE,
@@ -50,6 +66,9 @@ from app.constants.eval import (
     EVAL_CATEGORY_FALLBACK,
     EVAL_BASE_URL_ENV,
     EVAL_CASE_IDS_ENV,
+    EVAL_CHROMA_KEEP_REASON_EXTERNAL,
+    EVAL_CHROMA_KEEP_REASON_FAILURE,
+    EVAL_CHROMA_KEEP_REASON_FLAG,
     EVAL_CONVERSATION_HISTORY_PATH_ENV,
     EVAL_EXPECTED_FALLBACK_KEY,
     EVAL_EXPECTED_IMPORT_CHUNK_ALIAS_KEY,
@@ -61,6 +80,20 @@ from app.constants.eval import (
     EVAL_IMPORT_ALIAS_KEY,
     EVAL_IMPORT_CONTENT_KEY,
     EVAL_IMPORT_CONTENT_PATH_KEY,
+    EVAL_KEEP_CHROMA_ENV,
+    EVAL_MANIFEST_CHROMA_AUTO_CREATED_KEY,
+    EVAL_MANIFEST_CHROMA_CLEANED_KEY,
+    EVAL_MANIFEST_CHROMA_KEEP_REASON_KEY,
+    EVAL_MANIFEST_CHROMA_PERSIST_DIR_KEY,
+    EVAL_MANIFEST_CHROMA_SIZE_BYTES_KEY,
+    EVAL_MANIFEST_FAILED_KEY,
+    EVAL_MANIFEST_PASS_RATE_KEY,
+    EVAL_MANIFEST_RUN_STATUS_ERROR,
+    EVAL_MANIFEST_RUN_STATUS_FAILURE,
+    EVAL_MANIFEST_RUN_STATUS_KEY,
+    EVAL_MANIFEST_RUN_STATUS_SUCCESS,
+    EVAL_MANIFEST_SUFFIX,
+    EVAL_MANIFEST_TOTAL_KEY,
     EVAL_OUTPUT_CSV_ENV,
     EVAL_OUTPUT_JSON_ENV,
 )
@@ -1445,25 +1478,241 @@ def build_client():
     return TestClient(api.app)
 
 
+def _is_truthy_env(value: str) -> bool:
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _compute_dir_size_bytes(path: Path) -> int:
+    """递归累加目录下所有常规文件大小，软链接和不可读文件按 0 处理。
+
+    供 manifest 写入 `chroma_size_bytes`，只读用途，不应抛错打断 cleanup。
+    """
+
+    total = 0
+    if not path.exists():
+        return 0
+    for entry in path.rglob("*"):
+        try:
+            if entry.is_file() and not entry.is_symlink():
+                total += entry.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
+def decide_chroma_keep_reason(
+    *,
+    auto_created: bool,
+    keep_flag: bool,
+    run_succeeded: bool,
+) -> str | None:
+    """根据 run 结果判断 Chroma 目录是否需要保留，返回保留原因或 None 表示可清理。
+
+    优先级：外部目录 > 强制保留 flag > 失败保留 > 清理。
+    """
+
+    if not auto_created:
+        return EVAL_CHROMA_KEEP_REASON_EXTERNAL
+    if keep_flag:
+        return EVAL_CHROMA_KEEP_REASON_FLAG
+    if not run_succeeded:
+        return EVAL_CHROMA_KEEP_REASON_FAILURE
+    return None
+
+
+def cleanup_chroma_dir(path: Path) -> bool:
+    """清理 Chroma 目录，返回是否真实清理成功。
+
+    只在调用方判定可清理时才会调用；这里捕获 OSError 让异常不要打断 manifest 写入。
+    """
+
+    import shutil
+
+    if not path.exists():
+        return False
+    try:
+        shutil.rmtree(path)
+        return True
+    except OSError:
+        return False
+
+
+def build_manifest_payload(
+    *,
+    chroma_dir: str,
+    chroma_auto_created: bool,
+    chroma_cleaned: bool,
+    chroma_keep_reason: str | None,
+    chroma_size_bytes: int,
+    run_status: str,
+    pass_rate: float,
+    total: int,
+    failed: int,
+) -> dict:
+    """构造 eval manifest payload。
+
+    把 Chroma 生命周期、run 结果、通过率聚合到一份独立 manifest，方便排查
+    某次 run 留下来的 chroma 目录到底是失败保留还是 keep flag 强保留。
+    """
+
+    return {
+        EVAL_MANIFEST_CHROMA_PERSIST_DIR_KEY: chroma_dir,
+        EVAL_MANIFEST_CHROMA_AUTO_CREATED_KEY: chroma_auto_created,
+        EVAL_MANIFEST_CHROMA_CLEANED_KEY: chroma_cleaned,
+        EVAL_MANIFEST_CHROMA_KEEP_REASON_KEY: chroma_keep_reason or "",
+        EVAL_MANIFEST_CHROMA_SIZE_BYTES_KEY: chroma_size_bytes,
+        EVAL_MANIFEST_RUN_STATUS_KEY: run_status,
+        EVAL_MANIFEST_PASS_RATE_KEY: pass_rate,
+        EVAL_MANIFEST_TOTAL_KEY: total,
+        EVAL_MANIFEST_FAILED_KEY: failed,
+    }
+
+
+def manifest_path_for_output(json_path: Path) -> Path:
+    """JSON 输出路径派生出 manifest 路径，保持 1:1 对应关系。"""
+
+    return json_path.with_name(f"{json_path.stem}{EVAL_MANIFEST_SUFFIX}")
+
+
+def write_manifest(payload: dict) -> Path | None:
+    """根据 EVAL_OUTPUT_JSON 派生 manifest 路径并落盘；未配置 JSON 输出时只打印。
+
+    eval 默认不强制写文件，但 chroma 生命周期信息很重要，没配 JSON 输出时
+    至少把 manifest 打印到 stdout，让 CI/排查同学能看到 chroma 路径。
+    """
+
+    json_path = os.getenv(EVAL_OUTPUT_JSON_ENV, "").strip()
+    if json_path:
+        path = manifest_path_for_output(Path(json_path))
+        ensure_parent_dir(path)
+        path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        print(f"\nWrote manifest to {path}")
+        return path
+
+    print("\nManifest (EVAL_OUTPUT_JSON not set, printing only):")
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return None
+
+
+def parse_eval_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """解析 CLI 参数；当前仅暴露 chroma 生命周期 flag，其它配置仍走环境变量。"""
+
+    parser = argparse.ArgumentParser(
+        description="Run eval chat cases (multi-agent + RAG + tool safety).",
+    )
+    parser.add_argument(
+        "--keep-chroma",
+        action="store_true",
+        default=_is_truthy_env(os.getenv(EVAL_KEEP_CHROMA_ENV, "")),
+        help=(
+            "保留 eval 自动创建的 Chroma 目录（用于排查）。"
+            f"等价于 {EVAL_KEEP_CHROMA_ENV}=1。"
+        ),
+    )
+    return parser.parse_args(argv)
+
+
+def determine_run_success(results: list[dict]) -> tuple[bool, int, float]:
+    """判断 run 是否整体成功；返回 (success, failed_count, pass_rate)。
+
+    把 case-level 结果聚合到 run-level；这里跟 summarize_results 共享判定口径——
+    任意 case 的 assertion 字段不为 "pass" 即视为整体失败，便于 chroma 生命周期
+    决策（不要用 "status" 字段，那个键在 case 结果里并不存在，会导致全部 case
+    都被误判为失败）。
+    """
+
+    if not results:
+        # 空 run 不算失败（filter 没匹配到 case），保留默认清理行为。
+        return True, 0, 0.0
+    failed = sum(1 for item in results if item.get("assertion") != "pass")
+    total = len(results)
+    pass_rate = (total - failed) / total if total else 0.0
+    return failed == 0, failed, pass_rate
+
+
 def main() -> None:
+    args = parse_eval_args()
     cases = filter_cases(load_cases())
     client = build_client()
     results = []
+    run_error: BaseException | None = None
 
     try:
         total = len(cases)
         for index, case in enumerate(cases, start=1):
             print(f"[{index}/{total}] running {case['id']} ...", flush=True)
             results.append(run_case(client, case))
+    except BaseException as exc:  # 捕获异常用于决定 chroma 是否保留
+        run_error = exc
+        raise
     finally:
         close = getattr(client, "close", None)
         if callable(close):
             close()
+        # 任何退出路径（正常完成 / 异常 / KeyboardInterrupt）都需要写 manifest +
+        # 决定 chroma 清理；放 finally 块里保证 ctrl-c 时也能记录现场。
+        _finalize_chroma_lifecycle(
+            results=results,
+            run_error=run_error,
+            keep_flag=args.keep_chroma,
+        )
 
     print_table(results)
     print_summary(results)
     print_answer_details(results)
     maybe_write_outputs(results)
+
+
+def _finalize_chroma_lifecycle(
+    *,
+    results: list[dict],
+    run_error: BaseException | None,
+    keep_flag: bool,
+) -> None:
+    """收尾时按 success/failure 决定 chroma 目录是否清理，并写 manifest。"""
+
+    chroma_dir_str = os.environ.get("CHROMA_PERSIST_DIR", "")
+    chroma_path = Path(chroma_dir_str) if chroma_dir_str else None
+
+    if run_error is not None:
+        run_status = EVAL_MANIFEST_RUN_STATUS_ERROR
+        run_succeeded = False
+        success, failed, pass_rate = False, len(results), 0.0
+    else:
+        success, failed, pass_rate = determine_run_success(results)
+        run_status = (
+            EVAL_MANIFEST_RUN_STATUS_SUCCESS
+            if success
+            else EVAL_MANIFEST_RUN_STATUS_FAILURE
+        )
+        run_succeeded = success
+
+    keep_reason = decide_chroma_keep_reason(
+        auto_created=_EVAL_CHROMA_AUTO_CREATED,
+        keep_flag=keep_flag,
+        run_succeeded=run_succeeded,
+    )
+
+    chroma_size_bytes = _compute_dir_size_bytes(chroma_path) if chroma_path else 0
+    chroma_cleaned = False
+    if chroma_path and _EVAL_CHROMA_AUTO_CREATED and keep_reason is None:
+        chroma_cleaned = cleanup_chroma_dir(chroma_path)
+
+    payload = build_manifest_payload(
+        chroma_dir=str(chroma_path) if chroma_path else "",
+        chroma_auto_created=_EVAL_CHROMA_AUTO_CREATED,
+        chroma_cleaned=chroma_cleaned,
+        chroma_keep_reason=keep_reason,
+        chroma_size_bytes=chroma_size_bytes,
+        run_status=run_status,
+        pass_rate=pass_rate,
+        total=len(results),
+        failed=failed,
+    )
+    write_manifest(payload)
 
 
 if __name__ == "__main__":

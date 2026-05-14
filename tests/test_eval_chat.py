@@ -1,7 +1,12 @@
 from scripts.eval_chat import (
     build_knowledge_import_payload,
+    build_manifest_payload,
     build_retrieval_eval,
+    cleanup_chroma_dir,
+    decide_chroma_keep_reason,
+    determine_run_success,
     load_cases,
+    manifest_path_for_output,
     resolve_expected_doc_ids,
     setup_knowledge_imports,
 )
@@ -293,3 +298,107 @@ def test_build_retrieval_eval_reports_chunk_merge_miss() -> None:
     assert metrics["rerank_hit"] == "true"
     assert metrics["merged_hit"] == "false"
     assert metrics["retrieval_failure_stage"] == "chunk_merge_miss"
+
+
+def test_decide_chroma_keep_reason_priority() -> None:
+    # 外部目录优先级最高：即使 run 成功也不能动用户/包装器自己管理的目录。
+    assert (
+        decide_chroma_keep_reason(
+            auto_created=False, keep_flag=False, run_succeeded=True
+        )
+        == "external_persist_dir"
+    )
+    # 强制保留 flag 高于失败保留。
+    assert (
+        decide_chroma_keep_reason(
+            auto_created=True, keep_flag=True, run_succeeded=False
+        )
+        == "keep_flag"
+    )
+    # 自动创建 + 失败 -> 保留供排查。
+    assert (
+        decide_chroma_keep_reason(
+            auto_created=True, keep_flag=False, run_succeeded=False
+        )
+        == "failure"
+    )
+    # 自动创建 + 成功 + 无强制保留 -> 可清理（None）。
+    assert (
+        decide_chroma_keep_reason(
+            auto_created=True, keep_flag=False, run_succeeded=True
+        )
+        is None
+    )
+
+
+def test_determine_run_success_handles_empty_and_mixed() -> None:
+    success, failed, rate = determine_run_success([])
+    assert success is True
+    assert failed == 0
+    assert rate == 0.0
+
+    # 真实 case 结果使用 "assertion" 字段（参见 summarize_results / write_csv）。
+    # 这里必须用同一字段，否则等价于“status 不存在 -> 全部失败”，不能反映成功路径。
+    success, failed, rate = determine_run_success(
+        [{"assertion": "pass"}, {"assertion": "pass"}]
+    )
+    assert success is True
+    assert failed == 0
+    assert rate == 1.0
+
+    success, failed, rate = determine_run_success(
+        [
+            {"assertion": "pass"},
+            {"assertion": "fail"},
+            {"assertion": "error"},
+        ]
+    )
+    assert success is False
+    assert failed == 2
+    assert abs(rate - 1 / 3) < 1e-6
+
+    # 缺失 "assertion" 字段也算失败，避免结构变更后又退化成“全 pass”假象。
+    success, failed, _ = determine_run_success([{"status": "pass"}])
+    assert success is False
+    assert failed == 1
+
+
+def test_cleanup_chroma_dir_removes_directory(tmp_path) -> None:
+    target = tmp_path / "chroma"
+    target.mkdir()
+    (target / "data_level0.bin").write_bytes(b"x" * 16)
+
+    assert cleanup_chroma_dir(target) is True
+    assert not target.exists()
+
+
+def test_cleanup_chroma_dir_returns_false_when_missing(tmp_path) -> None:
+    assert cleanup_chroma_dir(tmp_path / "nonexistent") is False
+
+
+def test_manifest_path_uses_eval_manifest_suffix(tmp_path) -> None:
+    json_path = tmp_path / "run.json"
+    assert manifest_path_for_output(json_path) == tmp_path / "run.manifest.json"
+
+
+def test_build_manifest_payload_round_trip() -> None:
+    payload = build_manifest_payload(
+        chroma_dir="/tmp/eval-chroma-x",
+        chroma_auto_created=True,
+        chroma_cleaned=False,
+        chroma_keep_reason="failure",
+        chroma_size_bytes=2048,
+        run_status="failure",
+        pass_rate=0.5,
+        total=4,
+        failed=2,
+    )
+    assert payload["chroma_persist_dir"] == "/tmp/eval-chroma-x"
+    assert payload["chroma_auto_created"] is True
+    assert payload["chroma_cleaned"] is False
+    assert payload["chroma_keep_reason"] == "failure"
+    assert payload["chroma_size_bytes"] == 2048
+    assert payload["run_status"] == "failure"
+    assert payload["pass_rate"] == 0.5
+    assert payload["total_cases"] == 4
+    assert payload["failed_cases"] == 2
