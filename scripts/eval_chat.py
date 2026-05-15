@@ -1093,6 +1093,9 @@ def collect_multi_hop_metrics(debug_nodes: dict) -> dict[str, str]:
         "mh_subquery_count": str(len(retrieval_ms_map) or len(coverage_map)),
         "mh_per_subquery_coverage_avg": f"{per_sq_cov_avg:.3f}",
         "mh_answer_strategy": str(mh_debug.get("answer_strategy") or ""),
+        # decompose 失败原因（仅在降级时非空），用于定位单跳回落的根因
+        "mh_decompose_error_code": str(mh_debug.get("decompose_error_code") or ""),
+        "mh_decompose_reason": str(mh_debug.get("decompose_reason") or ""),
     }
 
 
@@ -1551,6 +1554,8 @@ def write_csv_output(results: list[dict], path: Path) -> None:
         "mh_subquery_count",
         "mh_per_subquery_coverage_avg",
         "mh_answer_strategy",
+        "mh_decompose_error_code",
+        "mh_decompose_reason",
         "assertion",
         "assertion_detail",
         "answer",

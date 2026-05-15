@@ -117,8 +117,10 @@ DECOMPOSE_SYSTEM_PROMPT_TEMPLATE = """
 你是企业知识检索的子查询分解器。只输出 JSON，不要解释。
 
 规则：
-1. 最多 {max_subqueries} 个子查询。若原问题是单定义/单实体查询，只输出 1 个且
-   必须与原问题实质不同；否则请返回 `{{"subqueries": []}}` 交给单跳路径兜底。
+1. 最多 {max_subqueries} 个子查询。原问题若可拆成多个相互独立的检索点
+   （例如同时涉及多个实体/方面/对比），请输出 2-{max_subqueries} 个子查询；
+   仅当原问题是单一定义/单一实体且无法进一步拆分时，才返回 `{{"subqueries": []}}`
+   交给单跳路径兜底（不要把可拆解的复合问题当成单实体返回空）。
 2. 每个子查询必须可独立检索——不含"它/这/该"等代词，指代已全部补全。
 3. id 从 sq1 开始，连续递增；depends_on 只能引用前序 id，不允许环或自引用。
 4. intent 只能取：entity_lookup / procedure / definition / comparison_arm。
