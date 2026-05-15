@@ -122,6 +122,27 @@ def test_per_subquery_entity_hint_case_insensitive() -> None:
     assert coverage == 1.0
 
 
+def test_per_subquery_coverage_grades_relevance_in_mid_state() -> None:
+    """召回到了但 chunk score 偏低时，coverage 必须低于 1.0 且无 missing_aspects。
+
+    旧实现 base 恒为 1.0，只要 chunks≥2 且并非全部低于阈值就给满分；导致
+    baseline 中"勉强相关"的检索（一个达标 + 一个低分）也被记为 coverage=1.0。
+    新公式按 score / MIN_CHUNK_SCORE 加权，应能反映这种灰色地带。
+    """
+
+    sq = Subquery(id="sq1", intent=SUBQUERY_INTENT_PROCEDURE, query="X")
+    # 一个达标 + 一个低分（不会触发 low_confidence，因为不是"all below"）
+    chunks = (
+        _mk_preview(score=MIN_CHUNK_SCORE, chunk_id="c1"),
+        _mk_preview(score=MIN_CHUNK_SCORE / 3, chunk_id="c2"),
+    )
+    coverage, missing = compute_per_subquery_coverage(subquery=sq, chunks=chunks)
+    # 没触发任何结构化 missing_aspects（chunks 数够、不是全低分、无 entity_hints）
+    assert missing == ()
+    # 但 coverage 必须落在 (0, 1) 之间，体现 chunk 相关度不齐
+    assert 0.0 < coverage < 1.0
+
+
 # ---------------------------------------------------------------------------
 # global 规则：仅在 comparison / depends_on 场景启用
 # ---------------------------------------------------------------------------

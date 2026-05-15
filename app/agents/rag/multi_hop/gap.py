@@ -135,6 +135,37 @@ def _preview_contains_entity(
     return any(needle in (p.preview or "").lower() for p in previews)
 
 
+def coverage_from_scores(scores: list[float]) -> float:
+    """共享的 chunk 级相关度加权 coverage 公式（0~1）。
+
+    multi_hop_node 在初始 hop 用 hit dict 调它，gap detector 在 refine 阶段用
+    EvidencePreview 调它，两边走同一公式避免漂移（如分别维护，调参时极易
+    一改一漏，导致 node debug snapshot 与 refine plan 数值口径不一致）。
+
+    公式：
+      contrib_i = min(1.0, max(0.0, score_i) / MIN_CHUNK_SCORE)
+      coverage = mean(top N contribs)，其中 N = MIN_CHUNKS_PER_SUBQUERY
+      若 scores 数 < N，按 N 平均（缺位计 0），与 _PEN_INSUFFICIENT_CHUNKS 互补。
+    """
+
+    if not scores:
+        return 0.0
+    if MIN_CHUNK_SCORE <= 0 or MIN_CHUNKS_PER_SUBQUERY <= 0:
+        return 1.0  # 退化为旧二元行为，避免除 0
+
+    top = sorted(scores, reverse=True)[:MIN_CHUNKS_PER_SUBQUERY]
+    contribs = [min(1.0, max(0.0, s) / MIN_CHUNK_SCORE) for s in top]
+    return round(sum(contribs) / MIN_CHUNKS_PER_SUBQUERY, 4)
+
+
+def _chunk_score_weighted_base(
+    chunks: tuple[EvidencePreview, ...],
+) -> float:
+    """EvidencePreview 适配层，复用 coverage_from_scores 公式。"""
+
+    return coverage_from_scores([float(c.score or 0.0) for c in chunks])
+
+
 def compute_per_subquery_coverage(
     *,
     subquery: Subquery,
@@ -143,8 +174,10 @@ def compute_per_subquery_coverage(
 ) -> tuple[float, tuple[str, ...]]:
     """按 §6.1 规则评估单 subquery 的 coverage。
 
-    返回 `(coverage, missing_aspects)`。coverage 取 `max(0, 1-sum(penalty))`，
-    便于 multi_hop_node 写入 `EvidenceGroup.per_subquery_coverage`。
+    返回 `(coverage, missing_aspects)`。coverage 公式为
+    `max(0, score_weighted_base - sum(penalty))`：
+    - `score_weighted_base` 反映 chunk 实际相关度（见 _chunk_score_weighted_base）；
+    - `penalty` 仍按结构化 missing_aspects 叠加，保持 refine 决策行为不变。
     """
 
     missing: list[str] = []
@@ -165,7 +198,8 @@ def compute_per_subquery_coverage(
             missing.append(f"{MISSING_ENTITY_PREFIX}{entity}")
             penalty += _PEN_ENTITY_MISS
 
-    coverage = max(0.0, 1.0 - penalty)
+    base = _chunk_score_weighted_base(chunks)
+    coverage = max(0.0, base - penalty)
     return coverage, tuple(missing)
 
 
@@ -451,6 +485,7 @@ __all__ = [
     "NewSubquerySuggestion",
     "RefinePlan",
     "SubqueryRefine",
+    "coverage_from_scores",
     "compute_global_coverage",
     "compute_per_subquery_coverage",
     "detect_gaps",
