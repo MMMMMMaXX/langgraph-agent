@@ -59,6 +59,7 @@ from app.constants.multi_hop import (
     MAX_HOPS,
     MAX_SUBQUERIES,
     MAX_TOTAL_CHUNKS,
+    MULTI_HOP_DEBUG_KEY,
     MULTI_HOP_STEP_ID,
 )
 from app.constants.routes import ROUTE_MULTI_HOP_AGENT
@@ -82,8 +83,8 @@ _PLAN_SUBQUERY_KEEP_KEYS = ("id", "intent", "query")
 # Multi-hop pseudo-step 固定 id 在 `app/constants/multi_hop.py:MULTI_HOP_STEP_ID`
 # 统一维护，Composer / Verifier / eval 共享同一常量，避免字面量副本。
 
-# debug_info 下的多跳分层 key，集中在此避免各处散落字面量。
-_DEBUG_KEY = "multi_hop"
+# debug_info 下的多跳分层 key 已抽到 `app/constants/multi_hop.py:MULTI_HOP_DEBUG_KEY`，
+# Composer / Verifier / eval / 前端共享，避免字面量"multi_hop"散落各处。
 _BASE_QUERY_SOURCE_REWRITTEN = "rewritten"
 _BASE_QUERY_SOURCE_LATEST_MESSAGE = "latest_user_message"
 
@@ -773,6 +774,10 @@ def _finalize(
 
     debug_payload = dict(debug)
     debug_payload["total_ms"] = round(total_ms, 2)
+    # 把最终交付给 Composer 的 citations 也带进 debug，让 eval / trace 可以
+    # 直接看到 multi-hop 真正引用的 doc/chunk，而不必绕道 step_results
+    # （后者不会出现在 API debug 响应里）。
+    debug_payload["citations"] = list(step.get("citations") or [])
     if errors:
         debug_payload["errors"] = errors
 
@@ -805,7 +810,7 @@ def _finalize(
         "workflow_status": workflow_status,
         "step_results": {step["id"]: step},
         "agent_outputs": {ROUTE_MULTI_HOP_AGENT: answer},
-        "debug_info": {ROUTE_MULTI_HOP_AGENT: {_DEBUG_KEY: debug_payload}},
+        "debug_info": {ROUTE_MULTI_HOP_AGENT: {MULTI_HOP_DEBUG_KEY: debug_payload}},
     }
     if answer:
         next_state["answer"] = answer

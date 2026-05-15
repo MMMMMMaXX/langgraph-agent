@@ -300,6 +300,111 @@ def test_build_retrieval_eval_reports_chunk_merge_miss() -> None:
     assert metrics["retrieval_failure_stage"] == "chunk_merge_miss"
 
 
+def test_build_retrieval_eval_synthesizes_multi_hop_view_when_rag_absent() -> None:
+    """multi-hop case 没有 rag_agent debug，应从 multi_hop_agent.multi_hop 合成检索视图。
+
+    覆盖：top_k_hit / citation_hit 来自 evidence_groups_preview + citations；
+    filter / rerank / merge 不存在，应该都是 "-"，retrieval_failure_stage 不能误报。
+    """
+
+    case = {"expected_doc_ids": ["doc-rag", "doc-openai"]}
+    debug_nodes = {
+        "multi_hop_agent": {
+            "multi_hop": {
+                "evidence_groups_preview": [
+                    {
+                        "subquery_id": "sq1",
+                        "chunks": [
+                            {
+                                "doc_id": "doc-rag",
+                                "chunk_id": "doc-rag::chunk::0",
+                                "ref": "[1]",
+                                "score": 0.83,
+                                "preview": "RAG ...",
+                            }
+                        ],
+                    },
+                    {
+                        "subquery_id": "sq2",
+                        "chunks": [
+                            {
+                                "doc_id": "doc-openai",
+                                "chunk_id": "doc-openai::chunk::0",
+                                "ref": "[2]",
+                                "score": 0.79,
+                                "preview": "OpenAI ...",
+                            }
+                        ],
+                    },
+                ],
+                "citations": [
+                    {
+                        "index": 1,
+                        "ref": "[1]",
+                        "doc_id": "doc-rag",
+                        "chunk_id": "doc-rag::chunk::0",
+                    },
+                    {
+                        "index": 2,
+                        "ref": "[2]",
+                        "doc_id": "doc-openai",
+                        "chunk_id": "doc-openai::chunk::0",
+                    },
+                ],
+            }
+        }
+    }
+
+    metrics = build_retrieval_eval(case, debug_nodes, "结合 RAG[1] 和 OpenAI[2] 设计")
+
+    assert metrics["top_k_hit"] == "true"
+    assert metrics["citation_hit"] == "true"
+    assert metrics["citation_count"] == 2
+    assert metrics["citation_all_expected_docs_hit"] == "true"
+    # multi-hop 没有 filter / rerank / merge 阶段，必须透传 "-"。
+    assert metrics["filtered_hit"] == "-"
+    assert metrics["rerank_hit"] == "-"
+    assert metrics["merged_hit"] == "-"
+    # 命中无问题时不能误报 stage miss。
+    assert metrics["retrieval_failure_stage"] == ""
+    # answer_has_citation 依赖 doc_used，由 citations 推导。
+    assert metrics["answer_has_citation"] == "true"
+
+
+def test_build_retrieval_eval_multi_hop_reports_top_docs_miss_when_evidence_misses() -> (
+    None
+):
+    """multi-hop 检索完全没拿到 expected 时，仍应能推断 top_docs_miss。"""
+
+    case = {"expected_doc_ids": ["doc-target"]}
+    debug_nodes = {
+        "multi_hop_agent": {
+            "multi_hop": {
+                "evidence_groups_preview": [
+                    {
+                        "subquery_id": "sq1",
+                        "chunks": [
+                            {
+                                "doc_id": "doc-other",
+                                "chunk_id": "doc-other::chunk::0",
+                                "ref": "[1]",
+                                "score": 0.4,
+                            }
+                        ],
+                    }
+                ],
+                "citations": [],
+            }
+        }
+    }
+
+    metrics = build_retrieval_eval(case, debug_nodes, "")
+
+    assert metrics["top_k_hit"] == "false"
+    assert metrics["citation_hit"] == "false"
+    assert metrics["retrieval_failure_stage"] == "top_docs_miss"
+
+
 def test_decide_chroma_keep_reason_priority() -> None:
     # 外部目录优先级最高：即使 run 成功也不能动用户/包装器自己管理的目录。
     assert (

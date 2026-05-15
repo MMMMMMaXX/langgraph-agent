@@ -141,6 +141,12 @@ DEGRADE_NOTICE_FALLBACK: Final[str] = "提示：本次回答存在降级，内�
 # 避免字面量"mh1"散落各处。
 MULTI_HOP_STEP_ID: Final[str] = "mh1"
 
+# ---- debug payload key ---------------------------------------------------
+
+# multi_hop_node 把分层指标写入 `debug_info[ROUTE_MULTI_HOP_AGENT][MULTI_HOP_DEBUG_KEY]`；
+# eval / 前端 / 监控统一通过这个常量读取，避免字面量"multi_hop"散落各处。
+MULTI_HOP_DEBUG_KEY: Final[str] = "multi_hop"
+
 
 __all__ = [
     "DEGRADE_NOTICE_FALLBACK",
@@ -158,6 +164,7 @@ __all__ = [
     "MIN_CHUNKS_PER_SUBQUERY",
     "MIN_CHUNK_SCORE",
     "MIN_DOCS_MULTI",
+    "MULTI_HOP_DEBUG_KEY",
     "MULTI_HOP_NEGATIVE_GATES",
     "MULTI_HOP_STEP_ID",
     "MULTI_HOP_TRIGGERS",

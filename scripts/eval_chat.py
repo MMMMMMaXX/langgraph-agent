@@ -97,6 +97,7 @@ from app.constants.eval import (
     EVAL_OUTPUT_CSV_ENV,
     EVAL_OUTPUT_JSON_ENV,
 )
+from app.constants.multi_hop import MULTI_HOP_DEBUG_KEY, ROUTE_MULTI_HOP_AGENT
 from app.constants.policies import INSUFFICIENT_KNOWLEDGE_ANSWER
 
 CASES_PATH = Path(__file__).resolve().parent / "eval_cases.json"
@@ -355,7 +356,11 @@ def calculate_expected_doc_coverage(
 
 
 def infer_retrieval_failure_stage(metrics: dict) -> str:
-    """根据各阶段命中状态推断正确文档最早在哪一步丢失。"""
+    """根据各阶段命中状态推断正确文档最早在哪一步丢失。
+
+    multi-hop 链路没有 filter / rerank / merge 三阶段，对应字段会是 "-"，
+    `not "-"` 为假会被自动跳过，不会误报。
+    """
 
     if metrics["top_k_hit"] == "-":
         return "-"
@@ -370,12 +375,69 @@ def infer_retrieval_failure_stage(metrics: dict) -> str:
     return ""
 
 
+def _synthesize_multi_hop_retrieval_view(mh_debug: dict) -> dict:
+    """把 multi-hop debug payload 改造成 build_retrieval_eval 需要的 rag_debug 形态。
+
+    multi-hop 链路没有 filter / rerank / merge 三阶段，相关字段留空给上层渲染 "-"。
+    `top_docs` 取自 `evidence_groups_preview` 全部 chunks（按 (doc_id, chunk_id) 去重，
+    保持插入顺序），用于评估"是否曾检索到 expected"；`citations` 直接取 multi_hop_node
+    在 _finalize 写入的最终 citations 列表。
+    """
+
+    evidence_groups = mh_debug.get("evidence_groups_preview") or []
+    seen: set[tuple[str, str]] = set()
+    flat_hits: list[dict] = []
+    for group in evidence_groups:
+        for chunk in group.get("chunks") or []:
+            doc_id = str(chunk.get("doc_id") or "")
+            chunk_id = str(chunk.get("chunk_id") or chunk.get("id") or "")
+            key = (doc_id, chunk_id)
+            if not (doc_id or chunk_id) or key in seen:
+                continue
+            seen.add(key)
+            flat_hits.append(
+                {
+                    "doc_id": doc_id,
+                    "chunk_id": chunk_id,
+                    "ref": chunk.get("ref", ""),
+                    "score": chunk.get("score", 0.0),
+                }
+            )
+
+    citations = list(mh_debug.get("citations") or [])
+    return {
+        "doc_used": bool(citations),
+        "top_docs": flat_hits,
+        # filter / rerank / merge 在 multi-hop 不存在；保持空列表，
+        # 让 build_retrieval_eval 通过 "-" 透出"该阶段不适用"。
+        "filtered_docs": [],
+        "post_rerank_docs": [],
+        "merged_docs": [],
+        "citations": citations,
+        "retrieval_debug": {"doc": {}},
+    }
+
+
+def _resolve_retrieval_debug(debug_nodes: dict) -> tuple[dict, bool]:
+    """优先取 rag_agent；缺席时合成 multi-hop 视图。返回 (rag_debug, is_multi_hop)。"""
+
+    rag_debug = debug_nodes.get("rag_agent") or {}
+    if rag_debug:
+        return rag_debug, False
+    mh_debug = (debug_nodes.get(ROUTE_MULTI_HOP_AGENT) or {}).get(
+        MULTI_HOP_DEBUG_KEY
+    ) or {}
+    if mh_debug:
+        return _synthesize_multi_hop_retrieval_view(mh_debug), True
+    return {}, False
+
+
 def build_retrieval_eval(case: dict, debug_nodes: dict, answer: str = "") -> dict:
     """从 API debug payload 计算分阶段 retrieval eval 指标。"""
 
     expected_doc_ids = normalize_expected_ids(case.get("expected_doc_ids"))
     expected_chunk_ids = normalize_expected_ids(case.get("expected_chunk_ids"))
-    rag_debug = debug_nodes.get("rag_agent", {})
+    rag_debug, is_multi_hop = _resolve_retrieval_debug(debug_nodes)
     doc_debug = (rag_debug.get("retrieval_debug") or {}).get("doc", {})
     top_docs = rag_debug.get("top_docs") or []
     filtered_docs = rag_debug.get("filtered_docs") or []
@@ -420,20 +482,32 @@ def build_retrieval_eval(case: dict, debug_nodes: dict, answer: str = "") -> dic
             expected_doc_ids=expected_doc_ids,
             expected_chunk_ids=expected_chunk_ids,
         ),
-        "filtered_hit": hits_contain_expected(
-            filtered_docs,
-            expected_doc_ids=expected_doc_ids,
-            expected_chunk_ids=expected_chunk_ids,
+        "filtered_hit": (
+            "-"
+            if is_multi_hop
+            else hits_contain_expected(
+                filtered_docs,
+                expected_doc_ids=expected_doc_ids,
+                expected_chunk_ids=expected_chunk_ids,
+            )
         ),
-        "rerank_hit": hits_contain_expected(
-            post_rerank_docs,
-            expected_doc_ids=expected_doc_ids,
-            expected_chunk_ids=expected_chunk_ids,
+        "rerank_hit": (
+            "-"
+            if is_multi_hop
+            else hits_contain_expected(
+                post_rerank_docs,
+                expected_doc_ids=expected_doc_ids,
+                expected_chunk_ids=expected_chunk_ids,
+            )
         ),
-        "merged_hit": hits_contain_expected(
-            merged_docs,
-            expected_doc_ids=expected_doc_ids,
-            expected_chunk_ids=expected_chunk_ids,
+        "merged_hit": (
+            "-"
+            if is_multi_hop
+            else hits_contain_expected(
+                merged_docs,
+                expected_doc_ids=expected_doc_ids,
+                expected_chunk_ids=expected_chunk_ids,
+            )
         ),
         "top_k_doc_ids": join_ids(collect_stage_doc_ids(top_docs)),
         "filtered_doc_ids": join_ids(collect_stage_doc_ids(filtered_docs)),
