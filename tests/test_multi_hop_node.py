@@ -746,3 +746,29 @@ def test_multi_hop_node_output_flows_through_composer_and_verifier(
     verifier_in = {**composer_in, "verification": {}}
     verifier_out = verifier_node(verifier_in)
     assert RISK_WARN_MULTI_HOP_COVERAGE in verifier_out["verification"]["risk_warnings"]
+
+
+def test_compute_per_subquery_coverage_grades_relevance() -> None:
+    """coverage 不再是二元开关：要按 chunk score + 数量加权反映相关性。"""
+
+    from app.agents.rag.multi_hop.node import _compute_per_subquery_coverage
+    from app.constants.multi_hop import MIN_CHUNK_SCORE, MIN_CHUNKS_PER_SUBQUERY
+
+    # 0 命中 → 0
+    assert _compute_per_subquery_coverage([]) == 0.0
+
+    # MIN_CHUNKS_PER_SUBQUERY 个 score≥阈值的 hit → 满分
+    full = [{"score": MIN_CHUNK_SCORE} for _ in range(MIN_CHUNKS_PER_SUBQUERY)]
+    assert _compute_per_subquery_coverage(full) == 1.0
+
+    # 只有 1 个达标 hit（不足 MIN_CHUNKS_PER_SUBQUERY）→ 不应给满分，
+    # 必须低于 PER_SUBQUERY_OK_THRESHOLD 才能让 refine_loop 感知到需要补召回。
+    one_hit = _compute_per_subquery_coverage([{"score": 0.9}])
+    assert one_hit < 1.0
+    assert one_hit < 0.6  # PER_SUBQUERY_OK_THRESHOLD
+
+    # 全部低分（远低于阈值）→ coverage 显著衰减，不能再给 1.0
+    low = [{"score": 0.05}, {"score": 0.05}, {"score": 0.05}]
+    low_cov = _compute_per_subquery_coverage(low)
+    assert low_cov < 0.5
+    assert low_cov > 0.0  # 仍非零，反映"有微弱召回"

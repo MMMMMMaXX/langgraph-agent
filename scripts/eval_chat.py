@@ -644,12 +644,54 @@ def build_knowledge_import_payload(import_config: dict) -> dict:
     return payload
 
 
+def reset_knowledge_for_case(client) -> int:
+    """case 开始前清空知识库，避免前序 case 导入残留污染本 case 的检索召回。
+
+    仅在 eval 进程自建的 temp chroma（_EVAL_CHROMA_AUTO_CREATED=True）下生效；
+    base-url 或用户自带 CHROMA_PERSIST_DIR 时绝不主动删数据，避免误删生产/共享库。
+
+    返回删除的 doc 数量，便于排查。
+    """
+
+    if not _EVAL_CHROMA_AUTO_CREATED:
+        return 0
+
+    deleted = 0
+    # 翻页拉取，避免文档总数超过单次 limit 上限时漏删。
+    while True:
+        response = client.get("/knowledge/docs", params={"limit": 200, "offset": 0})
+        if response.status_code >= 400:
+            raise RuntimeError(
+                f"reset_knowledge_for_case: list failed: {response.status_code} {response.text}"
+            )
+        documents = (response.json() or {}).get("documents") or []
+        if not documents:
+            break
+        for doc in documents:
+            doc_id = str(doc.get("doc_id") or "").strip()
+            if not doc_id:
+                continue
+            del_resp = client.delete(f"/knowledge/docs/{doc_id}")
+            # 404 视作已被并发清理，不阻断；其他错误抛出。
+            if del_resp.status_code >= 400 and del_resp.status_code != 404:
+                raise RuntimeError(
+                    f"reset_knowledge_for_case: delete {doc_id} failed: "
+                    f"{del_resp.status_code} {del_resp.text}"
+                )
+            deleted += 1
+    return deleted
+
+
 def setup_knowledge_imports(client, case: dict) -> dict[str, str]:
     """执行 case 级知识导入，并返回 import alias -> doc_id 映射。
 
     这样 eval 不需要把内容 hash 生成的 doc_id 写死在 eval_cases.json 里。
+
+    导入前会先清空 chroma + SQLite catalog（仅 temp chroma 模式），保证每个 case
+    只在本 case 自己声明的 setup_knowledge_imports 上做检索，杜绝跨 case 污染。
     """
 
+    reset_knowledge_for_case(client)
     alias_to_doc_id: dict[str, str] = {}
     for index, import_config in enumerate(case.get(EVAL_CASE_SETUP_IMPORTS_KEY, [])):
         import_payload = build_knowledge_import_payload(import_config)

@@ -59,6 +59,8 @@ from app.constants.multi_hop import (
     MAX_HOPS,
     MAX_SUBQUERIES,
     MAX_TOTAL_CHUNKS,
+    MIN_CHUNK_SCORE,
+    MIN_CHUNKS_PER_SUBQUERY,
     MULTI_HOP_DEBUG_KEY,
     MULTI_HOP_STEP_ID,
 )
@@ -159,6 +161,46 @@ def _retrieve_for_subquery(
     )
 
 
+def _coverage_from_scores(scores: list[float]) -> float:
+    """共享的 chunk 级相关度加权 coverage 公式（0~1）。
+
+    ``scores`` 既可能来自原始 hit dict（首跳），也可能来自 EvidencePreview
+    （refine 合并阶段），统一抽出 score 列表后走同一公式，避免两个调用路径
+    各自写一份。
+    """
+
+    if not scores:
+        return 0.0
+    if MIN_CHUNK_SCORE <= 0 or MIN_CHUNKS_PER_SUBQUERY <= 0:
+        return 1.0  # 退化为旧二元行为，避免除 0
+
+    top = sorted(scores, reverse=True)[:MIN_CHUNKS_PER_SUBQUERY]
+    contribs = [min(1.0, max(0.0, s) / MIN_CHUNK_SCORE) for s in top]
+    coverage = sum(contribs) / MIN_CHUNKS_PER_SUBQUERY
+    return round(min(1.0, coverage), 4)
+
+
+def _compute_per_subquery_coverage(hits: list[dict]) -> float:
+    """按 chunk 相关度 + 数量加权计算 per_subquery_coverage（0~1）。
+
+    旧实现是 `1.0 if hits else 0.0` 的二元开关——只要有任意 hit 就给满分，导致
+    coverage 系统性虚高（baseline 中常见 avg_global_coverage=1.0 但 LLM 仍判
+    "资料不足"），refine_loop 也无法据此识别"召回了但相关性差"的退化情况。
+
+    新实现按 top-N hit 的 score 相对于 `MIN_CHUNK_SCORE` 的归一化贡献做平均：
+      per_chunk_contrib = min(1.0, score / MIN_CHUNK_SCORE)
+      coverage = sum(top N contribs) / MIN_CHUNKS_PER_SUBQUERY
+    其中 N = MIN_CHUNKS_PER_SUBQUERY。这样：
+      - 0 hits → 0
+      - 1 个 score≥阈值的 hit → 0.5（仍未达 PER_SUBQUERY_OK_THRESHOLD=0.6，会触发 refine）
+      - 2 个 score≥阈值的 hit → 1.0
+      - N 个低分 hit → 按比例衰减，反映相关性差
+    既保留量上达标即满分的稳定性，也让 refine_loop 能感知到弱召回。
+    """
+
+    return _coverage_from_scores([float(hit.get("score", 0.0) or 0.0) for hit in hits])
+
+
 def _build_evidence_group(
     subquery: Subquery,
     hits: list[dict],
@@ -172,7 +214,7 @@ def _build_evidence_group(
         EvidenceGroup(
             subquery_id=subquery.id,
             chunks=previews,
-            per_subquery_coverage=1.0 if hits else 0.0,
+            per_subquery_coverage=_compute_per_subquery_coverage(hits),
             missing_aspects=(),
             hop=hop,
         ),
@@ -368,7 +410,9 @@ def _run_retrieval_round(
         new_group = EvidenceGroup(
             subquery_id=subquery.id,
             chunks=tuple(combined),
-            per_subquery_coverage=1.0 if combined else 0.0,
+            per_subquery_coverage=_coverage_from_scores(
+                [float(p.score or 0.0) for p in combined]
+            ),
             missing_aspects=(),
             hop=hop,
         )

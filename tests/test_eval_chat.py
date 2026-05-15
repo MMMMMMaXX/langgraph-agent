@@ -209,22 +209,47 @@ def test_eval_cases_include_skills_real_doc_questions() -> None:
     }.issubset(case_ids)
 
 
+class _FakeJsonResponse:
+    """简易 client.json() / status_code 桩，统一供 setup/reset 测试复用。"""
+
+    def __init__(self, *, status_code: int = 200, payload: dict | None = None) -> None:
+        self.status_code = status_code
+        self.text = ""
+        self._payload = payload or {}
+
+    def json(self):
+        return self._payload
+
+
+class _FakeKnowledgeClient:
+    """同时实现 GET/DELETE/POST 的伪 client，覆盖 case 级 reset + import 路径。"""
+
+    def __init__(self, *, existing_docs: list[dict] | None = None) -> None:
+        # 用列表模拟 catalog 状态，DELETE 会真的把项移除，模拟翻页空了就停下的语义。
+        self._existing_docs = list(existing_docs or [])
+        self.posts: list[dict] = []
+        self.deletes: list[str] = []
+        self.gets: list[dict] = []
+
+    def get(self, path: str, params: dict | None = None):
+        self.gets.append({"path": path, "params": params or {}})
+        return _FakeJsonResponse(payload={"documents": list(self._existing_docs)})
+
+    def delete(self, path: str):
+        doc_id = path.rsplit("/", 1)[-1]
+        self.deletes.append(doc_id)
+        self._existing_docs = [
+            doc for doc in self._existing_docs if doc.get("doc_id") != doc_id
+        ]
+        return _FakeJsonResponse(payload={"deleted": True})
+
+    def post(self, path: str, json: dict):
+        self.posts.append({"path": path, "json": json})
+        return _FakeJsonResponse(payload={"doc_id": "doc-imported"})
+
+
 def test_setup_knowledge_imports_returns_alias_to_doc_id() -> None:
-    class FakeResponse:
-        status_code = 200
-
-        def json(self):
-            return {"doc_id": "doc-imported"}
-
-    class FakeClient:
-        def __init__(self) -> None:
-            self.posts = []
-
-        def post(self, path: str, json: dict):
-            self.posts.append({"path": path, "json": json})
-            return FakeResponse()
-
-    client = FakeClient()
+    client = _FakeKnowledgeClient()
     case = {
         "setup_knowledge_imports": [
             {
@@ -241,6 +266,55 @@ def test_setup_knowledge_imports_returns_alias_to_doc_id() -> None:
     assert client.posts[0]["path"] == "/knowledge/import"
     assert client.posts[0]["json"]["title"] == "Skill 文档"
     assert "alias" not in client.posts[0]["json"]
+
+
+def test_setup_knowledge_imports_resets_prior_case_residue(monkeypatch) -> None:
+    """case 级隔离：前序 case 残留必须在 import 前先被清空，避免污染检索。"""
+
+    # conftest 默认把 CHROMA_PERSIST_DIR 指到测试目录，
+    # 因此 import 阶段 _EVAL_CHROMA_AUTO_CREATED=False；这里显式开启 reset 路径。
+    import scripts.eval_chat as _eval_chat_mod
+
+    monkeypatch.setattr(_eval_chat_mod, "_EVAL_CHROMA_AUTO_CREATED", True)
+
+    client = _FakeKnowledgeClient(
+        existing_docs=[{"doc_id": "doc-prev-1"}, {"doc_id": "doc-prev-2"}],
+    )
+    case = {
+        "setup_knowledge_imports": [
+            {"alias": "current_doc", "title": "本 case 文档", "content": "x"},
+        ]
+    }
+
+    setup_knowledge_imports(client, case)
+
+    # reset 必须删掉所有前序残留，且发生在 POST /knowledge/import 之前
+    assert set(client.deletes) == {"doc-prev-1", "doc-prev-2"}
+    assert client.posts[0]["path"] == "/knowledge/import"
+
+
+def test_setup_knowledge_imports_skips_reset_when_chroma_not_auto_created(
+    monkeypatch,
+) -> None:
+    """安全护栏：用户自带 CHROMA_PERSIST_DIR / base-url 时绝不主动删数据。"""
+
+    import scripts.eval_chat as _eval_chat_mod
+
+    monkeypatch.setattr(_eval_chat_mod, "_EVAL_CHROMA_AUTO_CREATED", False)
+
+    client = _FakeKnowledgeClient(
+        existing_docs=[{"doc_id": "doc-keep"}],
+    )
+    case = {
+        "setup_knowledge_imports": [
+            {"alias": "x", "title": "本 case", "content": "y"},
+        ]
+    }
+
+    setup_knowledge_imports(client, case)
+
+    assert client.deletes == []
+    assert client.gets == []  # 连 list 都不应该调，避免对生产服务造成无谓压力
 
 
 def test_build_knowledge_import_payload_reads_content_path() -> None:
