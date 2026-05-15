@@ -45,7 +45,9 @@ RECHUNK_WARNING_PREVIEW_GENERATED_NO_CHUNKS = "preview_generated_no_chunks"
 RECHUNK_ERROR_DOCUMENT_NOT_FOUND = "document not found"
 
 # Rechunk apply 错误：旧数据没有完整原文，不能安全地执行真实重切片。
-RECHUNK_ERROR_DOCUMENT_CONTENT_MISSING = "document content not available; reimport document before apply"
+RECHUNK_ERROR_DOCUMENT_CONTENT_MISSING = (
+    "document content not available; reimport document before apply"
+)
 
 # Rechunk apply 日志 stage：新 Chroma 重建失败后，已经尝试恢复旧 SQLite/FTS5。
 RECHUNK_APPLY_ROLLBACK_STAGE = "knowledge.rechunk.apply.rollback"
@@ -115,3 +117,7 @@ KNOWLEDGE_HEALTH_WARNING_MISSING_CHROMA_CHUNKS = "missing_chroma_chunks"
 
 # Knowledge API 错误：指定文档不存在，路由层统一复用。
 KNOWLEDGE_ERROR_DOCUMENT_NOT_FOUND = "document not found"
+
+# Ingestion skipped_reason：catalog 中已有同 doc_id 且 content_hash 一致，跳过 chunk 重建与 Chroma upsert。
+# 主要用于阻止反复导入相同 fixture 触发 HNSW 段文件膨胀（PR-7 防 chroma bloat 根因）。
+INGESTION_SKIPPED_REASON_CONTENT_UNCHANGED = "content_unchanged"

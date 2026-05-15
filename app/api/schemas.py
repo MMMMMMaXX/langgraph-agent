@@ -105,6 +105,9 @@ class KnowledgeImportResponse(BaseModel):
     chunk_count: int
     indexed_to_sqlite: bool
     indexed_to_chroma: bool
+    # PR-7：当内容未变化、跳过 chunk 重建与 Chroma upsert 时给出的原因；
+    # 正常导入路径返回 null，调用方可据此跳过依赖 chunk_id 变化的副作用。
+    skipped_reason: str | None = None
 
 
 class KnowledgeDocumentListResponse(BaseModel):

@@ -13,6 +13,7 @@ from typing import Any
 
 from app.chunking import chunk_document_text
 from app.config import VECTOR_STORE_CONFIG
+from app.constants.knowledge import INGESTION_SKIPPED_REASON_CONTENT_UNCHANGED
 from app.knowledge.catalog import (
     KnowledgeCatalog,
     KnowledgeChunkRecord,
@@ -56,6 +57,9 @@ class KnowledgeImportResult:
     chunk_count: int
     indexed_to_sqlite: bool
     indexed_to_chroma: bool
+    # PR-7：当 catalog 中已有同 doc_id 且 content_hash 一致时，跳过 chunk 重建
+    # 与 Chroma upsert，并在结果里给出可观测的原因；正常导入路径保持 None。
+    skipped_reason: str | None = None
 
 
 def _normalize_source_type(source_type: str, source: str = "") -> str:
@@ -267,12 +271,42 @@ def import_knowledge_document(
         raise ValueError("content must not be empty")
 
     doc_id = build_stable_doc_id(normalized.content, normalized.doc_id)
+    new_content_hash = content_hash(normalized.content)
     source = normalized.source or f"{doc_id}.{normalized.source_type}"
     title = _infer_title(
         title=normalized.title,
         source=source,
         content=normalized.content,
     )
+    metadata = dict(normalized.metadata or {})
+
+    active_catalog = catalog or KnowledgeCatalog()
+
+    # PR-7：幂等短路。只有 content_hash 与 catalog 中索引相关元数据
+    # （title/source/source_type/metadata）都未变化时才跳过 chunk 重建与
+    # Chroma upsert——避免 ACL/标签等 metadata 更新被静默吞掉。
+    existing_doc = active_catalog.get_document(doc_id)
+    if (
+        existing_doc
+        and existing_doc["content_hash"] == new_content_hash
+        and existing_doc["title"] == title
+        and existing_doc["source"] == source
+        and existing_doc["source_type"] == normalized.source_type
+        and (existing_doc.get("metadata") or {}) == metadata
+    ):
+        return KnowledgeImportResult(
+            doc_id=doc_id,
+            title=existing_doc["title"],
+            source=existing_doc["source"],
+            source_type=existing_doc["source_type"],
+            content_hash=new_content_hash,
+            content_char_len=int(existing_doc["content_char_len"]),
+            chunk_count=len(existing_doc["chunks"]),
+            indexed_to_sqlite=False,
+            indexed_to_chroma=False,
+            skipped_reason=INGESTION_SKIPPED_REASON_CONTENT_UNCHANGED,
+        )
+
     catalog_records, chroma_records = build_chunk_records(
         doc_id=doc_id,
         title=title,
@@ -281,14 +315,13 @@ def import_knowledge_document(
         source_type=normalized.source_type,
     )
 
-    active_catalog = catalog or KnowledgeCatalog()
     active_catalog.upsert_document(
         doc_id=doc_id,
         title=title,
         source=source,
         content=normalized.content,
         source_type=normalized.source_type,
-        metadata=normalized.metadata,
+        metadata=metadata,
     )
     active_catalog.replace_chunks(catalog_records)
 
@@ -305,9 +338,10 @@ def import_knowledge_document(
         title=title,
         source=source,
         source_type=normalized.source_type,
-        content_hash=content_hash(normalized.content),
+        content_hash=new_content_hash,
         content_char_len=len(normalized.content),
         chunk_count=len(catalog_records),
         indexed_to_sqlite=True,
         indexed_to_chroma=True,
+        skipped_reason=None,
     )

@@ -54,9 +54,16 @@ curl -X POST http://127.0.0.1:8000/knowledge/import \
   "content_char_len": 67,
   "chunk_count": 1,
   "indexed_to_sqlite": true,
-  "indexed_to_chroma": true
+  "indexed_to_chroma": true,
+  "skipped_reason": null
 }
 ```
+
+> **幂等导入**：catalog 已有同 `doc_id` 且 `content_hash` 一致时，本接口会
+> 跳过 chunk 重建与 Chroma upsert，返回 `indexed_to_sqlite=false`、
+> `indexed_to_chroma=false`、`skipped_reason="content_unchanged"`，避免反复
+> 导入相同 fixture 撑爆 HNSW 段文件。需要强制重建时请改文档内容或显式
+> `DELETE /knowledge/docs/<doc_id>` 后再导入。
 
 ### 文件上传导入
 

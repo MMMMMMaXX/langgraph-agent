@@ -315,6 +315,49 @@ def test_import_knowledge_endpoint_returns_index_summary(
     assert body["chunk_count"] == 1
     assert body["indexed_to_sqlite"] is True
     assert body["indexed_to_chroma"] is True
+    assert body["skipped_reason"] is None
+
+
+def test_import_knowledge_endpoint_exposes_skipped_reason(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PR-7 P2：当 ingestion 层因内容/元数据未变化短路时，HTTP 响应必须把
+    skipped_reason 透出，避免后续 schema/dataclass 字段调整误吞这个可观测字段。"""
+
+    import app.api.routes as routes_mod
+
+    def fake_import(payload):
+        return KnowledgeImportResult(
+            doc_id="doc-api",
+            title="API 导入文档",
+            source="api.md",
+            source_type="md",
+            content_hash="hash",
+            content_char_len=10,
+            chunk_count=2,
+            indexed_to_sqlite=False,
+            indexed_to_chroma=False,
+            skipped_reason="content_unchanged",
+        )
+
+    monkeypatch.setattr(routes_mod, "import_knowledge_document", fake_import)
+
+    resp = client.post(
+        "/knowledge/import",
+        json={
+            "title": "API 导入文档",
+            "source": "api.md",
+            "source_type": "md",
+            "content": "any",
+        },
+    )
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["indexed_to_sqlite"] is False
+    assert body["indexed_to_chroma"] is False
+    assert body["skipped_reason"] == "content_unchanged"
 
 
 def test_import_knowledge_file_endpoint_returns_index_summary(
