@@ -548,6 +548,9 @@ PR-1 把所有共享常量先行落地；PR-2 纯函数风险最小；PR-3 才�
 - **PR-8.3（06503a5）**：本轮 session 新增的两个 hotfix
   - **Decompose prompt 自相矛盾修复**（`app/prompts/rag.py:120-123`）：原 rule 1 "若单实体输出 1，否则返回空" 被 LLM 字面解释为"复合查询返回空"，导致 `multihop_cross_doc_chain` / `multihop_budget_degrades_gracefully` 全部走单跳 fallback。改写为"可拆 → 输出 2~MAX，仅单一定义/无法拆分 → 返回空"，并显式追加 "(不要把可拆解的复合问题当成单实体返回空)"。
   - **Decompose error code 透出 eval CSV**（`scripts/eval_chat.py:1084-1098` / `:1552-1556`）：新增 `mh_decompose_error_code` / `mh_decompose_reason` 列，让 `llm_returned_empty_subqueries` / `single_subquery_same_as_rewritten` / `schema_invalid` 等失败模式可被离线追溯。
+- **PR-8.4（f6c8873）**：eval 断言层引入 OR-group 语义，收尾 PR-8.x
+  - `scripts/eval_chat.py` `contains_all` 接受嵌套 list/tuple 作为 OR-group：`["Agent", ["RAG", "检索"]]` 表示"必有 Agent，且 RAG 或 检索 至少一个"。AND 主语义不变，只在元素层放宽到同义词集合。
+  - `multihop_cross_doc_chain` 的 `must_include` 从 `["RAG","Agent"]` 调整为 `[["RAG","检索"],"Agent"]`，承认 LLM 用"检索"复述 RAG 概念是合法表达，不再因表层措辞断送通过。multi-hop 子集回到 6/6。
 
 ### 与原计划的差异
 
@@ -561,26 +564,25 @@ PR-1 把所有共享常量先行落地；PR-2 纯函数风险最小；PR-3 才�
 ### 未完成 / 推迟
 
 - **`global_coverage` 仍是 binary**：跨 subquery 的实体覆盖率/doc 多样性目前仍按布尔聚合。优先级低于 per-subquery，待 baseline 稳定后再做。
-- **Embedding provider quota 监控**：本轮 baseline 撞到 GLM 429（额度耗尽）。当前依赖 env-var 切 provider（deepseek / glm / openai / 自建 embedding），未做主动 quota 探测。
+- **Embedding provider quota 监控**：PR-8.3 baseline 撞到 GLM 429（额度耗尽）。当前依赖 env-var 切 provider（deepseek / glm / openai / 自建 embedding），未做主动 quota 探测。
+- **`scripts/eval_chat.py` 的 `.env` 加载时序**：eval 脚本在 `import app` 前就检查 `os.environ`，导致 `.env` 中 `CHROMA_PERSIST_DIR=data/chroma` 无法生效，eval 一直跑在临时空 chroma 上。无 `setup_knowledge_imports` 的 11 个知识类 case（`aria_definition` / `virtual_list_definition` / `beijing_climate` / `wai_aria_*` / `unknown_concept_fallback` / `session_isolation_summary` 等）因此一直 fail，与 multi-hop 无关。该问题与 case 配置一并放到 Phase 3 之外的 eval 框架专项处理。
 
 ---
 
 ## 14. 当前 baseline 状态
 
-最近一次完整跑分（PR-8 commit `92f065c`，41 cases）：
+PR-8.4 后的 multi-hop 子集（commit `f6c8873`，6 cases，多跳全绿）：
 
-- 整体 `pass_rate = 100%`，multi-hop 子集 6/6
-- `avg_hop_count = 0.75`，`avg_per_subquery_coverage = 0.500`
-- 已知问题：2 个 case（`multihop_cross_doc_chain` / `multihop_budget_degrades_gracefully`）触发"问题拆解失败，已回落到单跳检索"
+- `pass_rate = 100% (6/6)`
+- `avg_hop_count = 2.25`（PR-8: 0.75）
+- `avg_per_subquery_coverage = 0.927`（PR-8: 0.500）
+- `avg_global_coverage = 0.925`
+- `decompose_failed = 0`（PR-8: 2）
 
-PR-8.3 后的 multi-hop 子集 mini-run（6 cases，新 prompt）：
+41-case 全量 pass_rate = 70.7%（29/41）。失败的 12 个 case 全部命中"无 `setup_knowledge_imports` 且依赖未生效的 `data/chroma` 种子"模式，属 eval 框架预设问题，不在 Phase 3 范围内。multi-hop 6 个 case 在全量跑分里也全部通过（其中 `multihop_negative_gate_simple_compare` 已在 PR-8.2 调整为允许 fallback 文案）。
 
-- `avg_hop_count: 0.75 → 1.50`
-- `decompose_failed: 2 → 0`
-- 全 41 case baseline 待 embedding provider 切换完成后重跑验证
+### Phase 3 收尾 / 后续可选
 
-### 下一步
-
-1. 用新 embedding provider 重跑 41-case 全量 baseline，验证 PR-8.3 在非 multi-hop case 上无回归。
-2. 若 baseline 稳定，把 chunk-weighted 思想推到 `global_coverage`（实体维度 + doc 多样性维度按权重聚合，不再 binary）。
-3. 持续观察 `mh_decompose_error_code` 分布；若仍有 `synonym_subquery` / `single_subquery_same_as_rewritten` 类失败，回到 prompt 或 schema 层补强。
+1. （Phase 3 之外）eval 框架专项：在 `scripts/eval_chat.py` 顶部显式 `load_dotenv()`，并给 11 个无 imports 的知识类 case 补 `setup_knowledge_imports` 或改成"应输出资料不足"的语义，让 41-case 重新具备可比性。
+2. （可选优化）把 chunk-weighted 思想推到 `global_coverage`，实体维度 + doc 多样性维度按权重聚合而非 binary。
+3. （监控）持续观察 `mh_decompose_error_code` 分布；若仍出现 `synonym_subquery` / `single_subquery_same_as_rewritten` 类失败，回到 prompt 或 schema 层补强。
