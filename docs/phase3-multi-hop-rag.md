@@ -527,3 +527,60 @@ PR-1 把所有共享常量先行落地；PR-2 纯函数风险最小；PR-3 才�
 - "关键设计取舍：答案由 multi_hop_node 自己用全文证据生成，Composer 只重排 citations 不重写文案——既不让 state/trace 看到全文，又不牺牲 faithfulness；触发条件走"正则触发器 + 负向门控"，把简单 comparison 挡在单跳路径上，不吃多跳成本税。"
 - "多跳和副作用工具编排明确分层：workflow 是任务级（含副作用），multi_hop 是检索级（纯读）；workflow step 可以嵌套 multi_hop 子流程，但 multi_hop 不反过来调工具，安全入口收敛在 tool_agent 不被绕过。"
 - "在线链路坚持规则驱动的 gap detector 和 schema 强校验，LLM claim-level faithfulness 按总设计留在离线 eval；在线只保留 citation 合法性、来源多样性、coverage 阈值这类可解释信号，不把不确定性压到用户每次请求。"
+
+---
+
+## 13. 执行进度（实际落地的 PR 与原计划差异）
+
+§9 是预设的 PR-1 ～ PR-6 切分；实际执行过程中 baseline eval 暴露了若干设计/实现层缝隙，临时新增了 PR-7 / PR-8 / PR-8.x 系列 hotfix。本节记录截至 commit `06503a5` 的实际状态。
+
+### 已落地
+
+- **PR-1 ～ PR-6（原计划）**：常量层、Decomposer、Retrieval 结构化参数、Gap Detector、multi_hop_node、Supervisor/Classifier、Composer/Verifier 直通契约、Workflow 嵌套均已合入。`workflow_multihop_chain` eval case 跑通。
+- **PR-7 / PR-7.1**：Eval 侧修复——per-field retrieval 分母统一 + multi-hop `global_coverage` 在 eval 输出中复用同一统计口径，避免单跳/多跳 eval 用不同分母互相误读。
+- **PR-8（92f065c）**：三件并发的 baseline 修复
+  - **Per-case Chroma 隔离**：`reset_knowledge_for_case()` 在 `_EVAL_CHROMA_AUTO_CREATED` 模式下，每个 case 跑前清掉前一 case 的 docs，杜绝跨 case 检索污染。
+  - **Chunk-weighted coverage**：把 `node.py` / `gap.py` 中 binary `1.0 if hits else 0.0` 替换成
+    `sum(min(1.0, score_i / MIN_CHUNK_SCORE)) / MIN_CHUNKS_PER_SUBQUERY`（常量见 `app/constants/multi_hop.py:83` / `:86`），分辨"恰好命中阈值"和"高分多 chunk"。
+  - **negative-gate 断言放宽**：`multihop_negative_gate_simple_compare` 由 `must_not_include ["资料不足"]` 改为 `must_include ["RAG", "Agent"]` + `must_not_include ["工具暂时无法处理"]`，允许检索确实不足时的 fallback 文案。
+- **PR-8.1（55473c5）**：把 chunk-weighted coverage 进一步带入 gap_detector 的 refine 决策，避免 binary 满分但实际证据弱的假绿灯。
+- **PR-8.2（a383711）**：放宽 negative-gate compare 断言（同 PR-8 第三项的补丁）。
+- **PR-8.3（06503a5）**：本轮 session 新增的两个 hotfix
+  - **Decompose prompt 自相矛盾修复**（`app/prompts/rag.py:120-123`）：原 rule 1 "若单实体输出 1，否则返回空" 被 LLM 字面解释为"复合查询返回空"，导致 `multihop_cross_doc_chain` / `multihop_budget_degrades_gracefully` 全部走单跳 fallback。改写为"可拆 → 输出 2~MAX，仅单一定义/无法拆分 → 返回空"，并显式追加 "(不要把可拆解的复合问题当成单实体返回空)"。
+  - **Decompose error code 透出 eval CSV**（`scripts/eval_chat.py:1084-1098` / `:1552-1556`）：新增 `mh_decompose_error_code` / `mh_decompose_reason` 列，让 `llm_returned_empty_subqueries` / `single_subquery_same_as_rewritten` / `schema_invalid` 等失败模式可被离线追溯。
+
+### 与原计划的差异
+
+| 原计划中假设                                | 实际发现                                                                      | 处理                                                                 |
+| ------------------------------------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `per_subquery_coverage` binary 即可（§6.1） | binary 分布两极化，"刚刚命中阈值" vs "高分多 chunk" 都是 1.0，掩盖召回弱化    | PR-8 引入 chunk-weighted；`MIN_CHUNK_SCORE=0.3`，`MIN_CHUNKS=2` 归一 |
+| 单一长寿命 chroma 即可承载 eval             | case 间共享 chroma 导致前序 case 文档命中后序 case query，citation_hit 假阳性 | PR-8 case 级 reset                                                   |
+| Decompose prompt rule 1 表达清晰            | "否则" 被 LLM 解释为"复合查询返回空"，反向降级                                | PR-8.3 改写为正向规则 + 反例提醒                                     |
+| Decompose 失败可由 hop_count=0 推断         | 单跳 fallback 也会写 hop_count=0，无法和 decompose 失败区分                   | PR-8.3 把 `decompose_error_code/reason` 直接出到 CSV                 |
+
+### 未完成 / 推迟
+
+- **`global_coverage` 仍是 binary**：跨 subquery 的实体覆盖率/doc 多样性目前仍按布尔聚合。优先级低于 per-subquery，待 baseline 稳定后再做。
+- **Embedding provider quota 监控**：本轮 baseline 撞到 GLM 429（额度耗尽）。当前依赖 env-var 切 provider（deepseek / glm / openai / 自建 embedding），未做主动 quota 探测。
+
+---
+
+## 14. 当前 baseline 状态
+
+最近一次完整跑分（PR-8 commit `92f065c`，41 cases）：
+
+- 整体 `pass_rate = 100%`，multi-hop 子集 6/6
+- `avg_hop_count = 0.75`，`avg_per_subquery_coverage = 0.500`
+- 已知问题：2 个 case（`multihop_cross_doc_chain` / `multihop_budget_degrades_gracefully`）触发"问题拆解失败，已回落到单跳检索"
+
+PR-8.3 后的 multi-hop 子集 mini-run（6 cases，新 prompt）：
+
+- `avg_hop_count: 0.75 → 1.50`
+- `decompose_failed: 2 → 0`
+- 全 41 case baseline 待 embedding provider 切换完成后重跑验证
+
+### 下一步
+
+1. 用新 embedding provider 重跑 41-case 全量 baseline，验证 PR-8.3 在非 multi-hop case 上无回归。
+2. 若 baseline 稳定，把 chunk-weighted 思想推到 `global_coverage`（实体维度 + doc 多样性维度按权重聚合，不再 binary）。
+3. 持续观察 `mh_decompose_error_code` 分布；若仍有 `synonym_subquery` / `single_subquery_same_as_rewritten` 类失败，回到 prompt 或 schema 层补强。

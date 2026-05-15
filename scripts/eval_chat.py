@@ -175,8 +175,22 @@ def answer_quality(answer: str) -> str:
     return "good"
 
 
-def contains_all(text: str, expected_parts: list[str]) -> bool:
-    return all(part in text for part in expected_parts)
+def contains_all(text: str, expected_parts: list) -> bool:
+    """All listed parts must appear in `text`.
+
+    Each part may be either a string (literal substring) or a list/tuple of
+    strings interpreted as an OR-group (any one of them satisfies the part).
+    Lets eval cases tolerate synonym wording from the LLM without weakening
+    the overall AND semantics.
+    """
+    for part in expected_parts:
+        if isinstance(part, (list, tuple)):
+            if not any(option in text for option in part):
+                return False
+        else:
+            if part not in text:
+                return False
+    return True
 
 
 def contains_any(text: str, blocked_parts: list[str]) -> bool:

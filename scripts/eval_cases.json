@@ -526,7 +526,7 @@
     "message": "基于 RAG 的检索要点和 Agent 的循环机制，设计一个带检索能力的 Agent 架构方案",
     "expected_route": "multi_hop_agent",
     "expected_import_aliases": ["mh_rag_doc", "mh_agent_doc"],
-    "must_include": ["RAG", "Agent"],
+    "must_include": [["RAG", "检索"], "Agent"],
     "must_not_include": ["资料不足", "工具暂时无法处理"]
   },
   {
