@@ -210,6 +210,12 @@ def test_multi_hop_node_success_writes_minimal_state(patch_node) -> None:
     for group in groups:
         for chunk in group["chunks"]:
             assert len(chunk["preview"]) <= EVIDENCE_PREVIEW_MAX_CHARS
+    # 硬契约 5.1：refine_loop.global_coverage 必须同步到 debug 顶层，
+    # 让 eval / 前端 / 监控统一通过 mh_debug["global_coverage"] 读取。
+    assert "global_coverage" in debug
+    assert debug["global_coverage"] == debug["refine_loop"]["global_coverage"]
+    # 硬契约 5.2：citations 必须出现在 debug，让 API debug 响应可见。
+    assert debug["citations"] == [{"ref": "[1]", "doc_id": "doc-A", "subquery_ids": ()}]
     # State 顶层不得出现 full_chunks / evidence_groups
     for leaked in ("full_chunks", "evidence_groups", "doc_hits"):
         assert leaked not in result

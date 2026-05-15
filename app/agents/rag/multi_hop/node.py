@@ -774,6 +774,14 @@ def _finalize(
 
     debug_payload = dict(debug)
     debug_payload["total_ms"] = round(total_ms, 2)
+    # 把 refine_loop.global_coverage 同步到 debug 顶层。
+    # 历史上 coverage 只写到 `refine_loop.global_coverage`，eval / 前端 / 监控
+    # 想读 mh_debug["global_coverage"] 时全部拿到 0.0，导致聚合层把覆盖率误报为零。
+    # 在 _finalize 统一镜像，所有进入此处的分支都会得到一致的顶层字段。
+    if "global_coverage" not in debug_payload:
+        refine_loop = debug_payload.get("refine_loop") or {}
+        if "global_coverage" in refine_loop:
+            debug_payload["global_coverage"] = refine_loop["global_coverage"]
     # 把最终交付给 Composer 的 citations 也带进 debug，让 eval / trace 可以
     # 直接看到 multi-hop 真正引用的 doc/chunk，而不必绕道 step_results
     # （后者不会出现在 API debug 响应里）。

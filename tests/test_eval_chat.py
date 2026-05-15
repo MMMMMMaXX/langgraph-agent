@@ -9,6 +9,7 @@ from scripts.eval_chat import (
     manifest_path_for_output,
     resolve_expected_doc_ids,
     setup_knowledge_imports,
+    summarize_results,
 )
 
 
@@ -403,6 +404,54 @@ def test_build_retrieval_eval_multi_hop_reports_top_docs_miss_when_evidence_miss
     assert metrics["top_k_hit"] == "false"
     assert metrics["citation_hit"] == "false"
     assert metrics["retrieval_failure_stage"] == "top_docs_miss"
+
+
+def test_summarize_results_uses_per_field_denominator_for_retrieval() -> None:
+    """multi-hop case 的 filter / rerank / merge 字段是 "-"（不适用），
+    汇总分母必须按字段独立计算，否则会把"不适用"算成"未命中"，把命中率压低。"""
+
+    results = [
+        # 普通 RAG case：四阶段都参与统计。
+        {
+            "category": "retrieval",
+            "assertion": "pass",
+            "top_k_hit": "true",
+            "filtered_hit": "true",
+            "rerank_hit": "true",
+            "merged_hit": "true",
+            "citation_hit": "true",
+            "citation_all_expected_docs_hit": "true",
+            "answer_has_citation": "true",
+            "citation_refs_valid": "true",
+        },
+        # multi-hop case：filter / rerank / merge = "-"，应被这三个字段的分母排除。
+        {
+            "category": "multi_hop",
+            "assertion": "pass",
+            "top_k_hit": "true",
+            "filtered_hit": "-",
+            "rerank_hit": "-",
+            "merged_hit": "-",
+            "citation_hit": "true",
+            "citation_all_expected_docs_hit": "true",
+            "answer_has_citation": "true",
+            "citation_refs_valid": "true",
+        },
+    ]
+
+    summary = summarize_results(results)
+    retrieval = summary["retrieval_stats"]
+
+    # 同时进入分母的字段（top_k / citation_*）：分母 = 2，命中 = 2。
+    assert retrieval["top_k_hit"]["total"] == 2
+    assert retrieval["top_k_hit"]["hits"] == 2
+    assert retrieval["citation_hit"]["total"] == 2
+    # 仅 RAG case 进入分母的字段：分母 = 1，命中 = 1，命中率 = 100%（而非 50%）。
+    assert retrieval["filtered_hit"]["total"] == 1
+    assert retrieval["filtered_hit"]["hits"] == 1
+    assert retrieval["filtered_hit"]["rate"] == 100.0
+    assert retrieval["rerank_hit"]["total"] == 1
+    assert retrieval["merged_hit"]["total"] == 1
 
 
 def test_decide_chroma_keep_reason_priority() -> None:

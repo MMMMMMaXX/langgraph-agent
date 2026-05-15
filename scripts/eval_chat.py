@@ -1223,10 +1223,8 @@ def summarize_results(results: list[dict]) -> dict:
         key=lambda item: parse_ms(item.get("request_ms")) or -1,
         reverse=True,
     )[:3]
-    retrieval_cases = [
-        item for item in results if item.get("top_k_hit") not in (None, "-")
-    ]
-
+    # multi-hop 链路对 filter / rerank / merge 三阶段不适用，相关字段为 "-"。
+    # 这里按字段分别计算分母，避免把"不适用"算成"未命中"，从而压低聚合命中率。
     retrieval_stats = {}
     for field in (
         "top_k_hit",
@@ -1238,8 +1236,9 @@ def summarize_results(results: list[dict]) -> dict:
         "answer_has_citation",
         "citation_refs_valid",
     ):
-        total_with_expected = len(retrieval_cases)
-        hits = sum(1 for item in retrieval_cases if item.get(field) == "true")
+        field_cases = [item for item in results if item.get(field) not in (None, "-")]
+        total_with_expected = len(field_cases)
+        hits = sum(1 for item in field_cases if item.get(field) == "true")
         retrieval_stats[field] = {
             "hits": hits,
             "total": total_with_expected,
