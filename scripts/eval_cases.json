@@ -578,7 +578,8 @@
     "message": "RAG 和 Agent 有什么区别？",
     "expected_route": "rag_agent",
     "expected_import_aliases": ["mh_rag_doc", "mh_agent_doc"],
-    "must_not_include": ["资料不足"]
+    "must_include": ["RAG", "Agent"],
+    "must_not_include": ["工具暂时无法处理"]
   },
   {
     "id": "multihop_negative_gate_definition_query",
