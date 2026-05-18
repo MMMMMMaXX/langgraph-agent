@@ -11,6 +11,10 @@ services:
     container_name: ${LANGGRAPH_AGENT_CONTAINER:-langgraph-agent-prod}
     env_file:
       - .env
+    environment:
+      # PR-1：开启 prometheus_client 多进程模式；目录由 Dockerfile 创建并由
+      # entrypoint 启动前清空。运维若使用外置 sidecar，可改写或留空。
+      PROMETHEUS_MULTIPROC_DIR: /var/run/prometheus_multiproc
     ports:
       - "${LANGGRAPH_AGENT_PORT:-8000}:8000"
     volumes:

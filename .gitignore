@@ -35,6 +35,7 @@ Thumbs.db
 *.log
 logs/
 backups/
+data/
 data/chroma/
 data/vector_store/
 data/*.sqlite*

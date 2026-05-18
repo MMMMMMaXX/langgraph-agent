@@ -14,7 +14,12 @@ COPY app ./app
 COPY scripts ./scripts
 COPY README.md ./
 
-RUN mkdir -p data outputs
+RUN mkdir -p data outputs /var/run/prometheus_multiproc \
+    && chmod +x scripts/docker_entrypoint.sh
+
+# Prometheus 多进程样本目录：PR-1 要求容器入口脚本启动前清空，
+# 应用层 stale pid 巡检兜底 SIGKILL/OOM 残留。
+ENV PROMETHEUS_MULTIPROC_DIR=/var/run/prometheus_multiproc
 
 # 版本元数据：由构建侧注入，应用通过 /health 暴露给监控 / 排障
 ARG APP_GIT_SHA=unknown
@@ -31,4 +36,5 @@ LABEL org.opencontainers.image.title="langgraph-agent" \
 
 EXPOSE 8000
 
+ENTRYPOINT ["./scripts/docker_entrypoint.sh"]
 CMD ["uvicorn", "app.api:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -10,3 +10,4 @@ uvicorn
 chromadb
 httpx
 jieba
+prometheus_client>=0.20

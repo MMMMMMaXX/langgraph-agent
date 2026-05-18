@@ -1,29 +1,86 @@
-"""FastAPI 应用实例 + 系统级路由（/health、/health/ready、/debug-ui）。
+"""FastAPI 应用实例 + 系统级路由（/health、/health/ready、/debug-ui、/metrics）。
 
 业务路由放在 routes.py 里，这里只负责：
 1. 创建 FastAPI 实例（供 uvicorn / TestClient 使用）
 2. 挂上系统类路由
 3. 把业务 router include 进来
+4. 启动 PR-1 可观测性栈：选择 backend、清理 multiproc dir、安装 metrics middleware
 """
 
 from __future__ import annotations
 
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 
 from app.config import CONVERSATION_HISTORY_CONFIG, VECTOR_STORE_CONFIG
+from app.constants.metrics import (
+    LABEL_BUILD_TIME,
+    LABEL_GIT_SHA,
+    LABEL_VERSION,
+    METRIC_APP_VERSION_INFO,
+)
 from app.constants.model_profiles import PROFILE_DEFAULT_CHAT
 from app.llm.providers import get_profile_runtime_info
+from app.observability.backend_prometheus import (
+    PrometheusBackend,
+    render_exposition,
+)
+from app.observability.emit import emit_gauge, set_backend
+from app.observability.middleware import install_metrics_middleware
+from app.observability.multiprocess import (
+    StalePidScanner,
+    assert_multiproc_safe,
+    lifespan_should_prepare_multiproc_dir,
+    prepare_multiproc_dir,
+)
 
 from .routes import router as chat_router
 
 # 调试页面在仓库内随包分发，不依赖运行目录。
 DEBUG_UI_PATH = Path(__file__).resolve().parent.parent / "debug_ui.html"
 
-app = FastAPI(title="LangGraph Agent API")
+
+_stale_pid_scanner = StalePidScanner()
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
+    """应用生命周期：启动时配置 metrics backend，关闭时停 scanner。"""
+
+    # 1. dev/reload 与 multiproc 同时启用即 fail-fast（监控方案 §9 PR-1）。
+    assert_multiproc_safe()
+    # 2. multiproc dir 的清理默认交给容器 entrypoint。
+    #    多 worker 模式下若 lifespan 也清，后启动的 worker 会擦掉先启动 worker 的样本，
+    #    造成"样本黑洞"。仅当显式设置 OBS_LIFESPAN_PREPARE_MULTIPROC_DIR=1
+    #    （本地单进程裸跑时的逃生口）才允许在 lifespan 里执行。
+    if lifespan_should_prepare_multiproc_dir():
+        prepare_multiproc_dir()
+    # 3. 注入 prometheus_client backend，emit 包装器从此开始把样本写到真 backend。
+    set_backend(PrometheusBackend())
+    # 4. 推送一次版本元信息，便于 dashboard 区分镜像。
+    emit_gauge(
+        METRIC_APP_VERSION_INFO,
+        1.0,
+        {
+            LABEL_VERSION: os.getenv("APP_VERSION", "dev"),
+            LABEL_GIT_SHA: os.getenv("APP_GIT_SHA", "unknown"),
+            LABEL_BUILD_TIME: os.getenv("APP_BUILD_TIME", "unknown"),
+        },
+    )
+    # 5. 启动 stale pid 巡检（仅在 multiproc 模式下生效，单进程会立刻 no-op）。
+    _stale_pid_scanner.start()
+    try:
+        yield
+    finally:
+        _stale_pid_scanner.stop()
+
+
+app = FastAPI(title="LangGraph Agent API", lifespan=_lifespan)
+install_metrics_middleware(app)
 
 
 @app.get("/health")
@@ -133,6 +190,14 @@ def health_ready() -> JSONResponse:
 @app.get("/debug-ui")
 def debug_ui() -> FileResponse:
     return FileResponse(DEBUG_UI_PATH)
+
+
+@app.get("/metrics")
+def metrics() -> Response:
+    """Prometheus 抓取端点。多进程模式下使用 MultiProcessCollector 聚合。"""
+
+    body, content_type = render_exposition()
+    return Response(content=body, media_type=content_type)
 
 
 app.include_router(chat_router)
